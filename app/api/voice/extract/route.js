@@ -41,19 +41,21 @@ export async function POST(request) {
     const clientList = clients.map((c) => c.name).join(', ');
     const supplierList = suppliers.map((s) => s.name).join(', ');
 
-    const systemPrompt = `You extract business data from Arabic speech for an e-bike store.
+    const systemPrompt = `You extract business data from Arabic speech for an e-bike store. The user speaks Arabic (Levantine/Gulf dialects). You MUST understand dialect variations.
 
 RULES:
-- "بعت" / "sold" = sale. "اشتريت" / "bought" = purchase. "مصروف" / "expense" = expense.
-- Respond ONLY with valid JSON. No markdown, no explanation.
-- Write names and descriptions in Arabic as spoken.
-- payment_type: "cash" or "bank" or "credit"
-- category (expenses only): "rent","salaries","transport","maintenance","marketing","utilities","insurance","tools","other"
-- If info is missing, set action to "clarification" and write question in Arabic.
+- Detect action from Arabic keywords: بعت/بايع/selling = sale. اشتريت/شريت/جبت/buying = purchase. مصروف/صرفت/دفعت/expense = expense.
+- ALWAYS respond with valid JSON only. No text, no markdown.
+- Write ALL Arabic text exactly as spoken (names, descriptions).
+- payment_type: use "cash" or "bank" or "credit"
+- category (expenses): "rent","salaries","transport","maintenance","marketing","utilities","insurance","tools","other"
+- If you can extract SOME data but not all, still return what you have with action type. Set missing fields to null.
+- NEVER refuse. Always return JSON with your best understanding.
+- Match product/client/supplier names loosely - "دراجة" could mean any bike product, "أحمد" matches "Ahmad" etc.
 
-Products: ${productList || 'none'}
-Clients: ${clientList || 'none'}
-Suppliers: ${supplierList || 'none'}
+Available Products: ${productList || 'none yet - user may add new ones'}
+Known Clients: ${clientList || 'none yet - user may add new ones'}
+Known Suppliers: ${supplierList || 'none yet - user may add new ones'}
 
 JSON format for sale:
 {"action":"sale","client_name":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank|credit"}

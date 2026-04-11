@@ -26,12 +26,13 @@ export async function POST(request) {
     const [products, clients, suppliers] = await Promise.all([
       getProducts(), getClients(), getSuppliers(),
     ]);
-    const vocab = [
+    // Build context prompt - full sentences help Whisper understand word boundaries
+    const names = [
       ...products.map((p) => p.name),
       ...clients.map((c) => c.name),
       ...suppliers.map((s) => s.name),
-      'كاش', 'بنك', 'آجل', 'دراجة', 'بطارية', 'شاحن',
-    ].join('، ');
+    ].filter(Boolean).join('، ');
+    const vocab = `بعت، اشتريت، مصروف، كاش، بنك، آجل، دراجة كهربائية، بطارية، شاحن، إيجار، رواتب، ${names}`;
 
     // Convert to proper File for Groq
     const arrayBuffer = await audioFile.arrayBuffer();
@@ -42,9 +43,9 @@ export async function POST(request) {
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const transcription = await groq.audio.transcriptions.create({
       file: file,
-      model: 'whisper-large-v3',
+      model: 'whisper-large-v3-turbo',
       language: 'ar',
-      prompt: vocab.slice(0, 200),
+      prompt: vocab.slice(0, 500),
     });
 
     const rawText = transcription.text || '';
