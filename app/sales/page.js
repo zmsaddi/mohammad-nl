@@ -382,7 +382,7 @@ function SalesContent() {
                             const phone = (client?.phone || '').replace(/^0/, '31').replace(/[^0-9]/g, '');
                             if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
                             const msg = encodeURIComponent(
-`*Mohammad NL*
+`*Vitesse Eco*
 *الكود:* ${row.ref_code || row.id}
 *المنتج:* ${row.item}
 *الكمية:* ${row.quantity}
@@ -432,7 +432,7 @@ function SalesContent() {
                 onClick={() => {
                   const s = whatsappShare;
                   const msg = encodeURIComponent(
-`*Mohammad NL - تأكيد طلب*
+`*Vitesse Eco - تأكيد طلب*
 ━━━━━━━━━━━━━━━━━
 *الكود:* ${s.refCode}
 *المنتج:* ${s.item}

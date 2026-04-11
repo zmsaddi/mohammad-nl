@@ -52,7 +52,7 @@ function LoginForm() {
             </svg>
           </div>
         </div>
-        <h1>Mohammad NL</h1>
+        <h1>Vitesse Eco</h1>
         <p>دراجات كهربائية - إكسسوارات - قطع غيار</p>
 
         {error && <div className="login-error">{error}</div>}

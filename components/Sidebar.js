@@ -90,7 +90,7 @@ export default function Sidebar() {
 
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <h1>Mohammad NL</h1>
+          <h1>Vitesse Eco</h1>
           <p>دراجات كهربائية وإكسسوارات</p>
         </div>
 
