@@ -39,7 +39,7 @@ export async function POST(request) {
     const { saleId, deliveryId, refCode } = await addSale(data);
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
 
