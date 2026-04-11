@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
+import VoiceButton from '@/components/VoiceButton';
+import VoiceConfirm from '@/components/VoiceConfirm';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -22,6 +24,8 @@ function SummaryContent() {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [voiceResult, setVoiceResult] = useState(null);
+  const canUseVoice = ['admin', 'manager', 'seller'].includes(session?.user?.role);
 
   const fetchData = async (from, to) => {
     setLoading(true);
@@ -95,6 +99,32 @@ function SummaryContent() {
         <h2>لوحة التحكم</h2>
         <p>نظرة شاملة على أداء المتجر</p>
       </div>
+
+      {/* Voice Input */}
+      {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
+        <div className="card" style={{ marginBottom: '24px', textAlign: 'center', padding: '24px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#374151' }}>إدخال صوتي</h3>
+          <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '16px' }}>اضغط مع الاستمرار وتكلم: "بعت لأحمد دراجة بسبعمية كاش"</p>
+          <VoiceButton
+            onResult={(r) => setVoiceResult(r)}
+            onError={(e) => addToast(e, 'error')}
+          />
+        </div>
+      )}
+
+      {/* Voice Confirmation Modal */}
+      <VoiceConfirm
+        result={voiceResult}
+        onConfirm={async (endpoint, submitData) => {
+          try {
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData) });
+            if (res.ok) { addToast('تم الحفظ بنجاح!'); setVoiceResult(null); fetchData(dateFrom, dateTo); }
+            else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+          } catch { addToast('خطأ في الاتصال', 'error'); }
+        }}
+        onCancel={() => setVoiceResult(null)}
+        onRetry={() => setVoiceResult(null)}
+      />
 
       {/* Date Filters */}
       <div className="card" style={{ marginBottom: '24px' }}>
