@@ -23,6 +23,8 @@ function SalesContent() {
   const [form, setForm] = useState({
     date: getTodayDate(),
     clientName: '',
+    clientPhone: '',
+    clientAddress: '',
     item: '',
     quantity: '',
     unitPrice: '',
@@ -30,6 +32,17 @@ function SalesContent() {
     paidAmount: '',
     notes: '',
   });
+
+  // Auto-fill phone/address when client selected
+  const handleClientChange = (name) => {
+    const client = clients.find((c) => c['اسم العميل'] === name);
+    setForm((prev) => ({
+      ...prev,
+      clientName: name,
+      clientPhone: client ? client['رقم الهاتف'] || '' : '',
+      clientAddress: client ? client['العنوان'] || '' : '',
+    }));
+  };
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
   const paid = form.paymentMethod === 'نقدي' ? total : (parseFloat(form.paidAmount) || 0);
@@ -91,8 +104,8 @@ function SalesContent() {
         body: JSON.stringify({ ...form, paidAmount: paid }),
       });
       if (res.ok) {
-        addToast('تم تسجيل عملية البيع بنجاح');
-        setForm({ date: getTodayDate(), clientName: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paidAmount: '', notes: '' });
+        addToast('تم تسجيل عملية البيع وإنشاء توصيلة تلقائياً');
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paidAmount: '', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -145,8 +158,8 @@ function SalesContent() {
                 type="text"
                 list="clients-list"
                 value={form.clientName}
-                onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-                placeholder="اختر أو أدخل اسم العميل"
+                onChange={(e) => handleClientChange(e.target.value)}
+                placeholder="اكتب للبحث أو أضف عميل جديد"
                 required
               />
               <datalist id="clients-list">

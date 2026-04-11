@@ -50,7 +50,22 @@ export async function POST(request) {
       data.notes || '',
     ]);
 
-    return NextResponse.json({ success: true, id });
+    // Auto-create delivery for this sale
+    const deliveryId = await getNextId(SHEETS.DELIVERIES);
+    await appendRow(SHEETS.DELIVERIES, [
+      deliveryId,
+      data.date,
+      data.clientName,
+      data.clientPhone || '',
+      data.clientAddress || '',
+      `${data.item} (${data.quantity})`,
+      total,
+      'قيد الانتظار',
+      '',
+      `بيع رقم ${id}`,
+    ]);
+
+    return NextResponse.json({ success: true, id, deliveryId });
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
