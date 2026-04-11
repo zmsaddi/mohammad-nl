@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { initDatabase, resetDatabase } from '@/lib/db';
+import { sql } from '@vercel/postgres';
 
 export async function GET(request) {
   return handleInit(request);
@@ -21,6 +22,19 @@ async function handleInit(request) {
     if (searchParams.get('reset') === 'true') {
       await resetDatabase();
       return NextResponse.json({ success: true, message: 'تم إعادة تهيئة قاعدة البيانات بالكامل' });
+    }
+    if (searchParams.get('clean') === 'true') {
+      await sql`DELETE FROM purchases`;
+      await sql`DELETE FROM sales`;
+      await sql`DELETE FROM expenses`;
+      await sql`DELETE FROM deliveries`;
+      await sql`DELETE FROM payments`;
+      await sql`DELETE FROM products`;
+      await sql`DELETE FROM suppliers`;
+      await sql`DELETE FROM clients`;
+      await sql`DELETE FROM bonuses`;
+      await sql`DELETE FROM settlements`;
+      return NextResponse.json({ success: true, message: 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
     }
     await initDatabase();
     return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
