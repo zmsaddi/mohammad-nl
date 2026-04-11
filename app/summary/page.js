@@ -139,12 +139,13 @@ function SummaryContent() {
                 <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف التشغيلية</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses)}</div>
               </div>
-              <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#7c3aed', fontWeight: 500 }}>البونص (مدفوع + مستحق)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.totalBonusCost || 0)}</div>
-                {(data.totalBonusOwed || 0) > 0 && (
-                  <div style={{ fontSize: '0.7rem', color: '#a78bfa', marginTop: '2px' }}>منها {formatNumber(data.totalBonusOwed)} مستحق لم يُصرف</div>
-                )}
+              <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>بونص تم صرفه</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center', border: (data.totalBonusOwed || 0) > 0 ? '2px solid #dc2626' : 'none' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>بونص مستحق (لازم تدفعه)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalBonusOwed || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
                 <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح</div>
