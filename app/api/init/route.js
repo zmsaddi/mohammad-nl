@@ -35,6 +35,7 @@ async function handleInit(request) {
       await sql`DELETE FROM bonuses`;
       await sql`DELETE FROM settlements`;
       await sql`DELETE FROM invoices`.catch(() => {});
+      await sql`DELETE FROM price_history`.catch(() => {});
       return NextResponse.json({ success: true, message: 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
     }
     await initDatabase();

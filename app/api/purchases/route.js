@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getPurchases, addPurchase, deletePurchase } from '@/lib/db';
+import { getPurchases, addPurchase, deletePurchase, updatePurchase } from '@/lib/db';
 
 async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -29,6 +29,18 @@ export async function POST(request) {
     return NextResponse.json({ success: true, id });
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في إضافة البيانات: ' + error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request) {
+  const token = await checkAuth(request);
+  if (!token || token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  try {
+    const data = await request.json();
+    await updatePurchase(data);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
