@@ -28,6 +28,7 @@ function PurchasesContent() {
     item: '',
     quantity: '',
     unitPrice: '',
+    sellPrice: '',
     paymentType: 'كاش',
     notes: '',
   });
@@ -91,7 +92,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', notes: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -169,6 +170,10 @@ function PurchasesContent() {
             <div className="form-group">
               <label htmlFor="pur-price">سعر الوحدة *</label>
               <input id="pur-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+            </div>
+            <div className="form-group">
+              <label htmlFor="pur-sell-price">سعر البيع الموصى *</label>
+              <input id="pur-sell-price" type="number" min="0" step="any" value={form.sellPrice} onChange={(e) => setForm({ ...form, sellPrice: e.target.value })} placeholder="سعر البيع للعميل" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-total">الإجمالي</label>
