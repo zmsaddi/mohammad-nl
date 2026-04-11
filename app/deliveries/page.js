@@ -40,6 +40,8 @@ function DeliveriesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [confirmDelivery, setConfirmDelivery] = useState(null); // {row, step: 'amount'|'vin'}
+  const [vinInput, setVinInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
 
@@ -117,6 +119,16 @@ function DeliveriesContent() {
   };
 
   const handleStatusChange = async (row, newStatus) => {
+    // If confirming delivery, show confirmation flow
+    if (newStatus === 'تم التوصيل') {
+      setConfirmDelivery({ row, step: 'amount' });
+      setVinInput('');
+      return;
+    }
+    await doStatusChange(row, newStatus, '');
+  };
+
+  const doStatusChange = async (row, newStatus, vin) => {
     try {
       const res = await fetch('/api/deliveries', {
         method: 'PUT',
@@ -131,7 +143,9 @@ function DeliveriesContent() {
           totalAmount: row.total_amount,
           status: newStatus,
           driverName: row.driver_name,
+          assignedDriver: row.assigned_driver,
           notes: row.notes,
+          vin: vin || '',
         }),
       });
       if (res.ok) {
@@ -396,6 +410,64 @@ function DeliveriesContent() {
           ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
         ] : []}
       />
+
+      {/* Delivery Confirmation Flow */}
+      {confirmDelivery && confirmDelivery.step === 'amount' && (
+        <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <h3>تأكيد التوصيل</h3>
+            <div style={{ margin: '16px 0', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
+              <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>العميل: <strong style={{ color: '#1e293b' }}>{confirmDelivery.row.client_name}</strong></div>
+              <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>الأصناف: <strong style={{ color: '#1e293b' }}>{confirmDelivery.row.items}</strong></div>
+              {confirmDelivery.row.total_amount > 0 && (
+                <div style={{ padding: '12px', background: confirmDelivery.row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', borderRadius: '10px', textAlign: 'center', marginTop: '12px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    {confirmDelivery.row.payment_type === 'آجل' ? 'دين على العميل' : 'المبلغ المطلوب تحصيله'}
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: confirmDelivery.row.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>
+                    {formatNumber(confirmDelivery.row.total_amount)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'vin' })}>
+                تأكيد ← التالي
+              </button>
+              <button className="btn btn-outline" onClick={() => setConfirmDelivery(null)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelivery && confirmDelivery.step === 'vin' && (
+        <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <h3>رقم الهيكل (VIN)</h3>
+            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>إذا المنتج دراجة كهربائية، أدخل رقم الهيكل. أو اضغط تخطي.</p>
+            <div className="form-group" style={{ margin: '16px 0' }}>
+              <input
+                type="text"
+                value={vinInput}
+                onChange={(e) => setVinInput(e.target.value.toUpperCase())}
+                placeholder="مثال: WB10A1234Z5678"
+                style={{ direction: 'ltr', textAlign: 'center', fontSize: '1.1rem', fontWeight: 600, letterSpacing: '2px' }}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
+                await doStatusChange(confirmDelivery.row, 'تم التوصيل', vinInput);
+                setConfirmDelivery(null);
+                setVinInput('');
+              }}>
+                {vinInput ? 'تأكيد مع VIN' : 'تخطي وتأكيد'}
+              </button>
+              <button className="btn btn-outline" onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}>رجوع</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={!!deleteId}
