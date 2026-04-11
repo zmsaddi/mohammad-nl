@@ -23,8 +23,8 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   try {
     const data = await request.json();
-    const { saleId, deliveryId } = await addSale(data);
-    return NextResponse.json({ success: true, id: saleId, deliveryId });
+    const { saleId, deliveryId, refCode } = await addSale(data);
+    return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
