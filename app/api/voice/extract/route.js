@@ -3,8 +3,20 @@ import { getToken } from 'next-auth/jwt';
 import Groq from 'groq-sdk';
 import { getProducts, getClients, getSuppliers } from '@/lib/db';
 import { sql } from '@vercel/postgres';
-import { getSystemPrompt, FEW_SHOT_EXAMPLES, TOOL_SCHEMAS } from '@/lib/voice-prompts';
 import { fuzzyMatchName } from '@/lib/voice-normalizer';
+import { EXPENSE_CATEGORIES } from '@/lib/utils';
+
+const CATEGORY_MAP = {
+  'rent': 'إيجار', 'salaries': 'رواتب', 'transport': 'نقل وشحن',
+  'maintenance': 'صيانة وإصلاح', 'marketing': 'تسويق وإعلان',
+  'utilities': 'كهرباء وماء', 'insurance': 'تأمين', 'tools': 'أدوات ومعدات',
+  'other': 'أخرى', 'إيجار': 'إيجار', 'رواتب': 'رواتب',
+};
+
+const PAYMENT_MAP = {
+  'cash': 'كاش', 'bank': 'بنك', 'credit': 'آجل',
+  'كاش': 'كاش', 'بنك': 'بنك', 'آجل': 'آجل',
+};
 
 export async function POST(request) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -18,116 +30,107 @@ export async function POST(request) {
   }
 
   try {
-    const { text, conversationHistory } = await request.json();
+    const { text } = await request.json();
     if (!text) return NextResponse.json({ error: 'لم يتم إرسال نص' }, { status: 400 });
 
-    // Fetch context from DB
     const [products, clients, suppliers] = await Promise.all([
       getProducts(), getClients(), getSuppliers(),
     ]);
 
-    const systemPrompt = getSystemPrompt(products, clients, suppliers);
+    const productList = products.map((p) => p.name).join(', ');
+    const clientList = clients.map((c) => c.name).join(', ');
+    const supplierList = suppliers.map((s) => s.name).join(', ');
 
-    // Build messages
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...FEW_SHOT_EXAMPLES,
-      ...(conversationHistory || []),
-      { role: 'user', content: text },
-    ];
+    const systemPrompt = `You extract business data from Arabic speech for an e-bike store.
 
-    // Call LLM with function calling
+RULES:
+- "بعت" / "sold" = sale. "اشتريت" / "bought" = purchase. "مصروف" / "expense" = expense.
+- Respond ONLY with valid JSON. No markdown, no explanation.
+- Write names and descriptions in Arabic as spoken.
+- payment_type: "cash" or "bank" or "credit"
+- category (expenses only): "rent","salaries","transport","maintenance","marketing","utilities","insurance","tools","other"
+- If info is missing, set action to "clarification" and write question in Arabic.
+
+Products: ${productList || 'none'}
+Clients: ${clientList || 'none'}
+Suppliers: ${supplierList || 'none'}
+
+JSON format for sale:
+{"action":"sale","client_name":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank|credit"}
+
+JSON format for purchase:
+{"action":"purchase","supplier":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank"}
+
+JSON format for expense:
+{"action":"expense","category":"rent|salaries|...","description":"...","amount":N,"payment_type":"cash|bank"}
+
+JSON format when info is missing:
+{"action":"clarification","question":"السؤال بالعربي","missing_fields":["field1","field2"]}`;
+
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      messages,
-      tools: TOOL_SCHEMAS,
-      tool_choice: 'required',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: text },
+      ],
       temperature: 0.1,
-      max_tokens: 500,
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
     });
 
-    const choice = completion.choices[0];
-    const toolCall = choice?.message?.tool_calls?.[0];
-
-    if (!toolCall) {
-      return NextResponse.json({
-        action: 'clarification',
-        question: 'لم أفهم - حاول مرة أخرى بوضوح أكثر',
-        missing_fields: [],
-      });
-    }
-
-    const funcName = toolCall.function.name;
-    let args;
+    const rawResponse = completion.choices[0]?.message?.content || '{}';
+    let parsed;
     try {
-      args = JSON.parse(toolCall.function.arguments);
+      parsed = JSON.parse(rawResponse);
     } catch {
-      return NextResponse.json({
-        action: 'clarification',
-        question: 'حدث خطأ في فهم البيانات - حاول مرة أخرى',
-        missing_fields: [],
-      });
+      return NextResponse.json({ action: 'clarification', question: 'لم أفهم - حاول مرة أخرى', missing_fields: [] });
     }
 
-    // Map English keywords back to Arabic
-    const PAYMENT_MAP = { cash: 'كاش', bank: 'بنك', credit: 'آجل', 'كاش': 'كاش', 'بنك': 'بنك', 'آجل': 'آجل' };
-    const CATEGORY_MAP = { rent: 'إيجار', salaries: 'رواتب', transport: 'نقل وشحن', maintenance: 'صيانة وإصلاح', marketing: 'تسويق وإعلان', utilities: 'كهرباء وماء', insurance: 'تأمين', tools: 'أدوات ومعدات', other: 'أخرى' };
-    if (args.payment_type) args.payment_type = PAYMENT_MAP[args.payment_type.toLowerCase()] || args.payment_type;
-    if (args.category) args.category = CATEGORY_MAP[args.category.toLowerCase()] || args.category;
+    // Map English values to Arabic
+    if (parsed.payment_type) parsed.payment_type = PAYMENT_MAP[parsed.payment_type] || parsed.payment_type;
+    if (parsed.category) parsed.category = CATEGORY_MAP[parsed.category] || parsed.category;
 
     // Handle clarification
-    if (funcName === 'request_clarification') {
-      return NextResponse.json({
-        action: 'clarification',
-        question: args.question,
-        missing_fields: args.missing_fields || [],
-        partial_data: args.partial_data || {},
-      });
+    if (parsed.action === 'clarification') {
+      return NextResponse.json({ action: 'clarification', question: parsed.question || 'معلومات ناقصة', missing_fields: parsed.missing_fields || [] });
     }
 
-    // Validate and enhance extracted data
-    const result = { action: funcName, data: args, warnings: [] };
+    // Map action names
+    const ACTION_MAP = { sale: 'register_sale', purchase: 'register_purchase', expense: 'register_expense' };
+    const action = ACTION_MAP[parsed.action] || parsed.action;
+    const warnings = [];
 
-    if (funcName === 'register_sale') {
-      // Fuzzy match client
-      const clientMatch = fuzzyMatchName(args.client_name, clients.map((c) => c.name));
-      if (clientMatch) {
-        result.data.client_name = clientMatch.name;
-        if (clientMatch.confidence !== 'high') result.warnings.push(`العميل "${args.client_name}" تم مطابقته مع "${clientMatch.name}" - تأكد`);
-      } else {
-        return NextResponse.json({ action: 'clarification', question: `العميل "${args.client_name}" غير موجود. أضفه يدوياً أولاً.`, missing_fields: ['client_name'] });
-      }
+    // Validate sale
+    if (action === 'register_sale') {
+      const clientMatch = fuzzyMatchName(parsed.client_name, clients.map((c) => c.name));
+      if (clientMatch) { parsed.client_name = clientMatch.name; if (clientMatch.confidence !== 'high') warnings.push(`تم مطابقة "${parsed.client_name}" - تأكد`); }
+      else return NextResponse.json({ action: 'clarification', question: `العميل "${parsed.client_name}" غير موجود. أضفه يدوياً أولاً.`, missing_fields: ['client_name'] });
 
-      // Fuzzy match product
-      const productMatch = fuzzyMatchName(args.item, products.map((p) => p.name));
-      if (productMatch) {
-        result.data.item = productMatch.name;
-        const prod = products.find((p) => p.name === productMatch.name);
-        if (prod && args.quantity > prod.stock) {
-          result.warnings.push(`الكمية ${args.quantity} أكبر من المخزون ${prod.stock}`);
-        }
-      } else {
-        return NextResponse.json({ action: 'clarification', question: `المنتج "${args.item}" غير موجود بالمخزون.`, missing_fields: ['item'] });
-      }
+      const productMatch = fuzzyMatchName(parsed.item, products.map((p) => p.name));
+      if (productMatch) { parsed.item = productMatch.name; }
+      else return NextResponse.json({ action: 'clarification', question: `المنتج "${parsed.item}" غير موجود بالمخزون.`, missing_fields: ['item'] });
     }
 
-    if (funcName === 'register_purchase') {
-      const supplierMatch = fuzzyMatchName(args.supplier, suppliers.map((s) => s.name));
-      if (supplierMatch) {
-        result.data.supplier = supplierMatch.name;
-      } else {
-        return NextResponse.json({ action: 'clarification', question: `المورد "${args.supplier}" غير موجود. أضفه يدوياً أولاً.`, missing_fields: ['supplier'] });
-      }
+    // Validate purchase
+    if (action === 'register_purchase') {
+      const supplierMatch = fuzzyMatchName(parsed.supplier, suppliers.map((s) => s.name));
+      if (supplierMatch) { parsed.supplier = supplierMatch.name; }
+      else return NextResponse.json({ action: 'clarification', question: `المورد "${parsed.supplier}" غير موجود. أضفه يدوياً أولاً.`, missing_fields: ['supplier'] });
     }
 
-    // Log voice interaction
+    // Validate expense category
+    if (action === 'register_expense' && parsed.category && !EXPENSE_CATEGORIES.includes(parsed.category)) {
+      parsed.category = 'أخرى';
+    }
+
+    // Log
     const today = new Date().toISOString().split('T')[0];
-    await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status)
-      VALUES (${today}, ${token.username}, ${text}, ${text}, ${funcName}, 'extracted')`.catch(() => {});
+    await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${text}, ${text}, ${action}, 'extracted')`.catch(() => {});
 
-    return NextResponse.json(result);
+    return NextResponse.json({ action, data: parsed, warnings, transcript: text });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ: ' + error.message }, { status: 500 });
+    console.error('Voice extract error:', error);
+    return NextResponse.json({ error: 'خطأ: ' + (error?.message || '') }, { status: 500 });
   }
 }
