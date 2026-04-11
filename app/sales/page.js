@@ -29,18 +29,19 @@ function SalesContent() {
     quantity: '',
     unitPrice: '',
     paymentMethod: 'نقدي',
+    paymentType: 'نقدي',
     paidAmount: '',
     notes: '',
   });
 
   // Auto-fill phone/address when client selected
   const handleClientChange = (name) => {
-    const client = clients.find((c) => c['اسم العميل'] === name);
+    const client = clients.find((c) => c.name === name);
     setForm((prev) => ({
       ...prev,
       clientName: name,
-      clientPhone: client ? client['رقم الهاتف'] || '' : '',
-      clientAddress: client ? client['العنوان'] || '' : '',
+      clientPhone: client ? client.phone || '' : '',
+      clientAddress: client ? client.address || '' : '',
     }));
   };
 
@@ -79,7 +80,7 @@ function SalesContent() {
     setSubmitting(true);
     try {
       // Auto-create client if new
-      const clientExists = clients.some((c) => c['اسم العميل'] === form.clientName);
+      const clientExists = clients.some((c) => c.name === form.clientName);
       if (!clientExists) {
         await fetch('/api/clients', {
           method: 'POST',
@@ -89,7 +90,7 @@ function SalesContent() {
       }
 
       // Auto-create product if new
-      const productExists = products.some((p) => p['اسم المنتج'] === form.item);
+      const productExists = products.some((p) => p.name === form.item);
       if (!productExists && form.item) {
         await fetch('/api/products', {
           method: 'POST',
@@ -105,7 +106,7 @@ function SalesContent() {
       });
       if (res.ok) {
         addToast('تم تسجيل عملية البيع وإنشاء توصيلة تلقائياً');
-        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paidAmount: '', notes: '' });
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paymentType: 'نقدي', paidAmount: '', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -163,14 +164,14 @@ function SalesContent() {
                 required
               />
               <datalist id="clients-list">
-                {clients.map((c) => <option key={c['معرف']} value={c['اسم العميل']} />)}
+                {clients.map((c) => <option key={c.id} value={c.name} />)}
               </datalist>
             </div>
             <div className="form-group">
               <label>اسم الصنف *</label>
               <input type="text" list="sales-products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
               <datalist id="sales-products-list">
-                {products.map((p) => <option key={p['معرف']} value={p['اسم المنتج']} />)}
+                {products.map((p) => <option key={p.id} value={p.name} />)}
               </datalist>
             </div>
             <div className="form-group">
@@ -186,15 +187,28 @@ function SalesContent() {
               <input type="text" value={formatNumber(total)} readOnly />
             </div>
             <div className="form-group">
-              <label>طريقة الدفع *</label>
+              <label>حالة الدفع *</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
                   <input type="radio" name="payment" value="نقدي" checked={form.paymentMethod === 'نقدي'} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value, paidAmount: '' })} />
-                  نقدي
+                  مدفوع
                 </label>
                 <label className="radio-option">
                   <input type="radio" name="payment" value="آجل" checked={form.paymentMethod === 'آجل'} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} />
                   آجل (دين)
+                </label>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>وسيلة الدفع</label>
+              <div className="radio-group" style={{ marginTop: '6px' }}>
+                <label className="radio-option">
+                  <input type="radio" name="payType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  نقدي (كاش)
+                </label>
+                <label className="radio-option">
+                  <input type="radio" name="payType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  بنك (تحويل)
                 </label>
               </div>
             </div>
@@ -259,26 +273,26 @@ function SalesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['معرف']}</td>
-                    <td>{row['التاريخ']}</td>
-                    <td>{row['اسم العميل']}</td>
-                    <td>{row['اسم الصنف']}</td>
-                    <td className="number-cell">{formatNumber(row['الكمية'])}</td>
-                    <td className="number-cell">{formatNumber(row['سعر الوحدة'])}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row['الإجمالي'])}</td>
+                  <tr key={row.id}>
+                    <td>{row.id}</td>
+                    <td>{row.date}</td>
+                    <td>{row.client_name}</td>
+                    <td>{row.item}</td>
+                    <td className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
                     <td>
-                      <span className={`status-badge ${row['طريقة الدفع'] === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
-                        {row['طريقة الدفع']}
+                      <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
+                        {row.payment_method}
                       </span>
                     </td>
-                    <td className="number-cell">{formatNumber(row['المبلغ المدفوع'])}</td>
-                    <td className="number-cell" style={{ color: parseFloat(row['المبلغ المتبقي']) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
-                      {formatNumber(row['المبلغ المتبقي'])}
+                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
+                    <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                      {formatNumber(row.remaining)}
                     </td>
                     {isAdmin && (
                       <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row['معرف'])}>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                           حذف
                         </button>
                       </td>

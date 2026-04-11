@@ -88,7 +88,7 @@ function ClientsContent() {
   };
 
   const filtered = clients.filter((c) =>
-    c['اسم العميل']?.includes(search) || c['رقم الهاتف']?.includes(search)
+    c.name?.includes(search) || c.phone?.includes(search)
   );
 
   const totalDebt = clients.reduce((sum, c) => sum + (c.remainingDebt || 0), 0);
@@ -183,9 +183,9 @@ function ClientsContent() {
             {isAdmin && clients.length > 0 && (
               <ExportExcel
                 data={clients.map((c) => ({
-                  'اسم العميل': c['اسم العميل'],
-                  'رقم الهاتف': c['رقم الهاتف'],
-                  'العنوان': c['العنوان'],
+                  'اسم العميل': c.name,
+                  'رقم الهاتف': c.phone,
+                  'العنوان': c.address,
                   'إجمالي المشتريات': c.totalSales,
                   'المدفوع': c.totalPaid,
                   'الدين المتبقي': c.remainingDebt,
@@ -220,10 +220,10 @@ function ClientsContent() {
               </thead>
               <tbody>
                 {filtered.map((client) => (
-                  <tr key={client['معرف']}>
-                    <td>{client['معرف']}</td>
-                    <td style={{ fontWeight: 600 }}>{client['اسم العميل']}</td>
-                    <td>{client['رقم الهاتف']}</td>
+                  <tr key={client.id}>
+                    <td>{client.id}</td>
+                    <td style={{ fontWeight: 600 }}>{client.name}</td>
+                    <td>{client.phone}</td>
                     <td className="number-cell">{formatNumber(client.totalSales)}</td>
                     <td className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>
                     <td className="number-cell" style={{ color: client.remainingDebt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
@@ -231,11 +231,11 @@ function ClientsContent() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        <Link href={`/clients/${client['معرف']}`} className="btn btn-primary btn-sm">
+                        <Link href={`/clients/${client.id}`} className="btn btn-primary btn-sm">
                           التفاصيل
                         </Link>
                         {isAdmin && (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(client['معرف'])}>
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(client.id)}>
                             حذف
                           </button>
                         )}

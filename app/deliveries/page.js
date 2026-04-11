@@ -75,12 +75,12 @@ function DeliveriesContent() {
   // Auto-fill phone when client is selected
   const handleClientChange = (name) => {
     setForm((prev) => {
-      const client = clients.find((c) => c['اسم العميل'] === name);
+      const client = clients.find((c) => c.name === name);
       return {
         ...prev,
         clientName: name,
-        clientPhone: client ? client['رقم الهاتف'] || '' : prev.clientPhone,
-        address: client ? client['العنوان'] || '' : prev.address,
+        clientPhone: client ? client.phone || '' : prev.clientPhone,
+        address: client ? client.address || '' : prev.address,
       };
     });
   };
@@ -119,16 +119,16 @@ function DeliveriesContent() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: row['معرف'],
-          date: row['التاريخ'],
-          clientName: row['اسم العميل'],
-          clientPhone: row['رقم الهاتف'],
-          address: row['العنوان'],
-          items: row['الأصناف'],
-          totalAmount: row['المبلغ'],
+          id: row.id,
+          date: row.date,
+          clientName: row.client_name,
+          clientPhone: row.client_phone,
+          address: row.address,
+          items: row.items,
+          totalAmount: row.total_amount,
           status: newStatus,
-          driverName: row['اسم السائق'],
-          notes: row['ملاحظات'],
+          driverName: row.driver_name,
+          notes: row.notes,
         }),
       });
       if (res.ok) {
@@ -154,13 +154,13 @@ function DeliveriesContent() {
     setDeleteId(null);
   };
 
-  const filtered = filterStatus ? rows.filter((r) => r['الحالة'] === filterStatus) : rows;
+  const filtered = filterStatus ? rows.filter((r) => r.status === filterStatus) : rows;
 
   // Stats
-  const pending = rows.filter((r) => r['الحالة'] === 'قيد الانتظار').length;
-  const inTransit = rows.filter((r) => r['الحالة'] === 'جاري التوصيل').length;
-  const delivered = rows.filter((r) => r['الحالة'] === 'تم التوصيل').length;
-  const cancelled = rows.filter((r) => r['الحالة'] === 'ملغي').length;
+  const pending = rows.filter((r) => r.status === 'قيد الانتظار').length;
+  const inTransit = rows.filter((r) => r.status === 'جاري التوصيل').length;
+  const delivered = rows.filter((r) => r.status === 'تم التوصيل').length;
+  const cancelled = rows.filter((r) => r.status === 'ملغي').length;
 
   return (
     <AppLayout>
@@ -239,7 +239,7 @@ function DeliveriesContent() {
                   required
                 />
                 <datalist id="delivery-clients-list">
-                  {clients.map((c) => <option key={c['معرف']} value={c['اسم العميل']} />)}
+                  {clients.map((c) => <option key={c.id} value={c.name} />)}
                 </datalist>
               </div>
               <div className="form-group">
@@ -330,18 +330,18 @@ function DeliveriesContent() {
               </thead>
               <tbody>
                 {filtered.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['معرف']}</td>
-                    <td>{row['التاريخ']}</td>
-                    <td style={{ fontWeight: 600 }}>{row['اسم العميل']}</td>
-                    <td style={{ direction: 'ltr', textAlign: 'right' }}>{row['رقم الهاتف']}</td>
-                    <td>{row['العنوان']}</td>
-                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row['الأصناف']}</td>
-                    <td className="number-cell">{row['المبلغ'] ? formatNumber(row['المبلغ']) : '-'}</td>
-                    <td>{row['اسم السائق'] || '-'}</td>
+                  <tr key={row.id}>
+                    <td>{row.id}</td>
+                    <td>{row.date}</td>
+                    <td style={{ fontWeight: 600 }}>{row.client_name}</td>
+                    <td style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
+                    <td>{row.address}</td>
+                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.items}</td>
+                    <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
+                    <td>{row.driver_name || '-'}</td>
                     <td>
                       <select
-                        value={row['الحالة']}
+                        value={row.status}
                         onChange={(e) => handleStatusChange(row, e.target.value)}
                         style={{
                           padding: '4px 8px',
@@ -351,7 +351,7 @@ function DeliveriesContent() {
                           fontWeight: 600,
                           fontFamily: "'Cairo', sans-serif",
                           cursor: 'pointer',
-                          ...getStatusStyle(row['الحالة']),
+                          ...getStatusStyle(row.status),
                         }}
                       >
                         {DELIVERY_STATUSES.map((s) => (
@@ -361,7 +361,7 @@ function DeliveriesContent() {
                     </td>
                     <td>
                       {isAdmin && (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row['معرف'])}>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                           حذف
                         </button>
                       )}

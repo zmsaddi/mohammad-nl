@@ -23,6 +23,7 @@ function ExpensesContent() {
     category: '',
     description: '',
     amount: '',
+    paymentType: 'نقدي',
     notes: '',
   });
 
@@ -55,7 +56,7 @@ function ExpensesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة المصروف بنجاح');
-        setForm({ date: getTodayDate(), category: '', description: '', amount: '', notes: '' });
+        setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'نقدي', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -84,7 +85,7 @@ function ExpensesContent() {
     setDeleteId(null);
   };
 
-  const totalExpenses = rows.reduce((sum, r) => sum + (parseFloat(r['المبلغ']) || 0), 0);
+  const totalExpenses = rows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
 
   return (
     <AppLayout>
@@ -118,6 +119,19 @@ function ExpensesContent() {
             <div className="form-group">
               <label>المبلغ *</label>
               <input type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+            </div>
+            <div className="form-group">
+              <label>وسيلة الدفع</label>
+              <div className="radio-group" style={{ marginTop: '6px' }}>
+                <label className="radio-option">
+                  <input type="radio" name="expPayType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  نقدي
+                </label>
+                <label className="radio-option">
+                  <input type="radio" name="expPayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  بنك
+                </label>
+              </div>
             </div>
             <div className="form-group">
               <label>ملاحظات</label>
@@ -164,16 +178,16 @@ function ExpensesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['معرف']}</td>
-                    <td>{row['التاريخ']}</td>
-                    <td><span className="status-badge status-credit">{row['الفئة']}</span></td>
-                    <td>{row['الوصف']}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row['المبلغ'])}</td>
-                    <td>{row['ملاحظات']}</td>
+                  <tr key={row.id}>
+                    <td>{row.id}</td>
+                    <td>{row.date}</td>
+                    <td><span className="status-badge status-credit">{row.category}</span></td>
+                    <td>{row.description}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
+                    <td>{row.notes}</td>
                     {isAdmin && (
                       <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row['معرف'])}>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                           حذف
                         </button>
                       </td>

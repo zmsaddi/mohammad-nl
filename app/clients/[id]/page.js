@@ -30,13 +30,13 @@ function ClientDetailContent({ params }) {
     try {
       const clientsRes = await fetch('/api/clients?withDebt=true');
       const clientsData = await clientsRes.json();
-      const found = clientsData.find((c) => c['معرف'] === id);
+      const found = clientsData.find((c) => c.id === id);
 
       if (found) {
         setClient(found);
         const [salesRes, paymentsRes] = await Promise.all([
-          fetch(`/api/sales?client=${encodeURIComponent(found['اسم العميل'])}`),
-          fetch(`/api/payments?client=${encodeURIComponent(found['اسم العميل'])}`),
+          fetch(`/api/sales?client=${encodeURIComponent(found.name)}`),
+          fetch(`/api/payments?client=${encodeURIComponent(found.name)}`),
         ]);
         const salesData = await salesRes.json();
         const paymentsData = await paymentsRes.json();
@@ -65,7 +65,7 @@ function ClientDetailContent({ params }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: paymentForm.date,
-          clientName: client['اسم العميل'],
+          clientName: client.name,
           amount: paymentForm.amount,
           notes: paymentForm.notes,
         }),
@@ -109,7 +109,7 @@ function ClientDetailContent({ params }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
           <Link href="/clients" style={{ color: '#64748b', textDecoration: 'none' }}>العملاء</Link>
           <span style={{ color: '#94a3b8' }}>/</span>
-          <h2 style={{ margin: 0 }}>{client['اسم العميل']}</h2>
+          <h2 style={{ margin: 0 }}>{client.name}</h2>
         </div>
       </div>
 
@@ -118,15 +118,15 @@ function ClientDetailContent({ params }) {
         <div className="client-info-card">
           <div className="client-info-item">
             <label>اسم العميل</label>
-            <div className="value">{client['اسم العميل']}</div>
+            <div className="value">{client.name}</div>
           </div>
           <div className="client-info-item">
             <label>رقم الهاتف</label>
-            <div className="value">{client['رقم الهاتف'] || '-'}</div>
+            <div className="value">{client.phone || '-'}</div>
           </div>
           <div className="client-info-item">
             <label>العنوان</label>
-            <div className="value">{client['العنوان'] || '-'}</div>
+            <div className="value">{client.address || '-'}</div>
           </div>
           <div className="client-info-item">
             <label>إجمالي المشتريات</label>
@@ -180,7 +180,7 @@ function ClientDetailContent({ params }) {
             سجل المبيعات ({sales.length})
           </h3>
           {isAdmin && sales.length > 0 && (
-            <ExportExcel data={sales} fileName={`مبيعات_${client['اسم العميل']}`} sheetName="المبيعات" />
+            <ExportExcel data={sales} fileName={`مبيعات_${client.name}`} sheetName="المبيعات" />
           )}
         </div>
         {sales.length === 0 ? (
@@ -202,20 +202,20 @@ function ClientDetailContent({ params }) {
               </thead>
               <tbody>
                 {sales.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['التاريخ']}</td>
-                    <td>{row['اسم الصنف']}</td>
-                    <td className="number-cell">{formatNumber(row['الكمية'])}</td>
-                    <td className="number-cell">{formatNumber(row['سعر الوحدة'])}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row['الإجمالي'])}</td>
+                  <tr key={row.id}>
+                    <td>{row.date}</td>
+                    <td>{row.item}</td>
+                    <td className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
                     <td>
-                      <span className={`status-badge ${row['طريقة الدفع'] === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
-                        {row['طريقة الدفع']}
+                      <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
+                        {row.payment_method}
                       </span>
                     </td>
-                    <td className="number-cell">{formatNumber(row['المبلغ المدفوع'])}</td>
-                    <td className="number-cell" style={{ color: parseFloat(row['المبلغ المتبقي']) > 0 ? '#dc2626' : '#16a34a' }}>
-                      {formatNumber(row['المبلغ المتبقي'])}
+                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
+                    <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a' }}>
+                      {formatNumber(row.remaining)}
                     </td>
                   </tr>
                 ))}
@@ -232,7 +232,7 @@ function ClientDetailContent({ params }) {
             سجل الدفعات ({payments.length})
           </h3>
           {isAdmin && payments.length > 0 && (
-            <ExportExcel data={payments} fileName={`دفعات_${client['اسم العميل']}`} sheetName="الدفعات" />
+            <ExportExcel data={payments} fileName={`دفعات_${client.name}`} sheetName="الدفعات" />
           )}
         </div>
         {payments.length === 0 ? (
@@ -249,10 +249,10 @@ function ClientDetailContent({ params }) {
               </thead>
               <tbody>
                 {payments.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['التاريخ']}</td>
-                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(row['المبلغ'])}</td>
-                    <td>{row['ملاحظات']}</td>
+                  <tr key={row.id}>
+                    <td>{row.date}</td>
+                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(row.amount)}</td>
+                    <td>{row.notes}</td>
                   </tr>
                 ))}
               </tbody>

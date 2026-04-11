@@ -83,6 +83,9 @@ function SummaryContent() {
     { 'البند': 'إجمالي المصاريف', 'المبلغ': data.totalExpenses },
     { 'البند': 'الربح الإجمالي', 'المبلغ': data.grossProfit },
     { 'البند': 'صافي الربح', 'المبلغ': data.netProfit },
+    { 'البند': 'ربح بعد التوصيل', 'المبلغ': data.deliveredProfit },
+    { 'البند': 'مبيعات نقدي', 'المبلغ': data.salesCash },
+    { 'البند': 'مبيعات بنك', 'المبلغ': data.salesBank },
     { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
   ] : [];
 
@@ -211,6 +214,39 @@ function SummaryContent() {
               <div className="summary-card-content">
                 <h3>جاري التوصيل</h3>
                 <div className="value" style={{ color: '#3b82f6' }}>{data.inTransitDeliveries || 0}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cash vs Bank Breakdown */}
+          <div className="card" style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+              تفصيل نقدي / بنك
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات نقدي</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.salesCash || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '0.8rem', color: '#2563eb', marginBottom: '4px' }}>مبيعات بنك</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1d4ed8' }}>{formatNumber(data.salesBank || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات نقدي</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.purchasesCash || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fdf4ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
+                <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginBottom: '4px' }}>مشتريات بنك</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.purchasesBank || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف نقدي</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.expensesCash || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0284c7', marginBottom: '4px' }}>مصاريف بنك</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0369a1' }}>{formatNumber(data.expensesBank || 0)}</div>
               </div>
             </div>
           </div>

@@ -26,6 +26,7 @@ function PurchasesContent() {
     item: '',
     quantity: '',
     unitPrice: '',
+    paymentType: 'نقدي',
     notes: '',
   });
 
@@ -62,7 +63,7 @@ function PurchasesContent() {
     setSubmitting(true);
     try {
       // Auto-create product if new
-      const productExists = products.some((p) => p['اسم المنتج'] === form.item);
+      const productExists = products.some((p) => p.name === form.item);
       if (!productExists && form.item) {
         await fetch('/api/products', {
           method: 'POST',
@@ -72,7 +73,7 @@ function PurchasesContent() {
       }
 
       // Auto-create supplier if new
-      const supplierExists = suppliers.some((s) => s['اسم المورد'] === form.supplier);
+      const supplierExists = suppliers.some((s) => s.name === form.supplier);
       if (!supplierExists && form.supplier) {
         await fetch('/api/suppliers', {
           method: 'POST',
@@ -88,7 +89,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', notes: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', paymentType: 'نقدي', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -146,14 +147,14 @@ function PurchasesContent() {
                 required
               />
               <datalist id="suppliers-list">
-                {suppliers.map((s) => <option key={s['معرف'] || s} value={s['اسم المورد'] || s} />)}
+                {suppliers.map((s) => <option key={s.id || s} value={s.name || s} />)}
               </datalist>
             </div>
             <div className="form-group">
               <label>اسم الصنف *</label>
               <input type="text" list="products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
               <datalist id="products-list">
-                {products.map((p) => <option key={p['معرف']} value={p['اسم المنتج']} />)}
+                {products.map((p) => <option key={p.id} value={p.name} />)}
               </datalist>
             </div>
             <div className="form-group">
@@ -167,6 +168,19 @@ function PurchasesContent() {
             <div className="form-group">
               <label>الإجمالي</label>
               <input type="text" value={formatNumber(total)} readOnly />
+            </div>
+            <div className="form-group">
+              <label>طريقة الدفع</label>
+              <div className="radio-group" style={{ marginTop: '6px' }}>
+                <label className="radio-option">
+                  <input type="radio" name="purchasePayType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  نقدي
+                </label>
+                <label className="radio-option">
+                  <input type="radio" name="purchasePayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  بنك
+                </label>
+              </div>
             </div>
             <div className="form-group">
               <label>ملاحظات</label>
@@ -215,18 +229,18 @@ function PurchasesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row['معرف']}>
-                    <td>{row['معرف']}</td>
-                    <td>{row['التاريخ']}</td>
-                    <td>{row['اسم المورد']}</td>
-                    <td>{row['اسم الصنف']}</td>
-                    <td className="number-cell">{formatNumber(row['الكمية'])}</td>
-                    <td className="number-cell">{formatNumber(row['سعر الوحدة'])}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row['الإجمالي'])}</td>
-                    <td>{row['ملاحظات']}</td>
+                  <tr key={row.id}>
+                    <td>{row.id}</td>
+                    <td>{row.date}</td>
+                    <td>{row.supplier}</td>
+                    <td>{row.item}</td>
+                    <td className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td>{row.notes}</td>
                     {isAdmin && (
                       <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row['معرف'])}>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                           حذف
                         </button>
                       </td>
