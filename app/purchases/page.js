@@ -28,7 +28,7 @@ function PurchasesContent() {
     item: '',
     quantity: '',
     unitPrice: '',
-    paymentType: 'نقدي',
+    paymentType: 'كاش',
     notes: '',
   });
 
@@ -91,7 +91,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', paymentType: 'نقدي', notes: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -178,8 +178,8 @@ function PurchasesContent() {
               <label>طريقة الدفع</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="purchasePayType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
-                  نقدي
+                  <input type="radio" name="purchasePayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  كاش
                 </label>
                 <label className="radio-option">
                   <input type="radio" name="purchasePayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
@@ -240,7 +240,7 @@ function PurchasesContent() {
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'نقدي'}</span></td>
+                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'كاش'}</span></td>
                     <td>{row.notes}</td>
                     {isAdmin && (
                       <td>
@@ -271,7 +271,7 @@ function PurchasesContent() {
           { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
           { label: 'الإجمالي', type: 'money', value: selectedRow.total },
           { type: 'divider' },
-          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'نقدي', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
+          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'كاش', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
           ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
         ] : []}

@@ -32,9 +32,7 @@ function SalesContent() {
     item: '',
     quantity: '',
     unitPrice: '',
-    paymentMethod: 'نقدي',
-    paymentType: 'نقدي',
-    paidAmount: '',
+    paymentType: 'كاش',
     notes: '',
   });
 
@@ -51,8 +49,6 @@ function SalesContent() {
   };
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
-  const paid = form.paymentMethod === 'نقدي' ? total : (parseFloat(form.paidAmount) || 0);
-  const remaining = total - paid;
 
   const fetchData = async () => {
     try {
@@ -127,7 +123,7 @@ function SalesContent() {
           setWhatsappShare(shareData);
         }
 
-        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paymentType: 'نقدي', paidAmount: '', notes: '' });
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -265,43 +261,27 @@ function SalesContent() {
               );
             })()}
             <div className="form-group">
-              <label>حالة الدفع *</label>
+              <label>طريقة الدفع *</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="payment" value="نقدي" checked={form.paymentMethod === 'نقدي'} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value, paidAmount: '' })} />
-                  مدفوع
-                </label>
-                <label className="radio-option">
-                  <input type="radio" name="payment" value="آجل" checked={form.paymentMethod === 'آجل'} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} />
-                  آجل (دين)
-                </label>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>وسيلة الدفع</label>
-              <div className="radio-group" style={{ marginTop: '6px' }}>
-                <label className="radio-option">
-                  <input type="radio" name="payType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
-                  نقدي (كاش)
+                  <input type="radio" name="payType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  كاش (عند التوصيل)
                 </label>
                 <label className="radio-option">
                   <input type="radio" name="payType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   بنك (تحويل)
                 </label>
+                <label className="radio-option">
+                  <input type="radio" name="payType" value="آجل" checked={form.paymentType === 'آجل'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  آجل (دين)
+                </label>
               </div>
+              {form.paymentType === 'آجل' && (
+                <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef3c7', borderRadius: '8px', fontSize: '0.8rem', color: '#92400e' }}>
+                  سيُسجل كدين على العميل - يُدفع لاحقاً من صفحة تفاصيل العميل
+                </div>
+              )}
             </div>
-            {form.paymentMethod === 'آجل' && (
-              <>
-                <div className="form-group">
-                  <label>المبلغ المدفوع</label>
-                  <input type="number" min="0" step="any" value={form.paidAmount} onChange={(e) => setForm({ ...form, paidAmount: e.target.value })} placeholder="0" />
-                </div>
-                <div className="form-group">
-                  <label>المبلغ المتبقي</label>
-                  <input type="text" value={formatNumber(remaining)} readOnly style={{ color: remaining > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }} />
-                </div>
-              </>
-            )}
             <div className="form-group">
               <label>ملاحظات</label>
               <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
@@ -370,8 +350,11 @@ function SalesContent() {
                       </span>
                     </td>
                     <td>
-                      <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
-                        {row.payment_method}
+                      <span className="status-badge" style={{
+                        background: row.payment_type === 'بنك' ? '#dbeafe' : row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
+                        color: row.payment_type === 'بنك' ? '#1e40af' : row.payment_type === 'آجل' ? '#d97706' : '#16a34a'
+                      }}>
+                        {row.payment_type || 'كاش'}
                       </span>
                     </td>
                     <td>
@@ -432,8 +415,7 @@ function SalesContent() {
           ] : []),
           { type: 'divider' },
           { label: 'حالة الطلب', type: 'badge', value: selectedRow.status || 'محجوز', bg: selectedRow.status === 'مؤكد' ? '#dcfce7' : selectedRow.status === 'ملغي' ? '#fee2e2' : '#fef3c7', color: selectedRow.status === 'مؤكد' ? '#16a34a' : selectedRow.status === 'ملغي' ? '#dc2626' : '#d97706' },
-          { label: 'حالة الدفع', type: 'badge', value: selectedRow.payment_method, bg: selectedRow.payment_method === 'نقدي' ? '#dcfce7' : '#fef3c7', color: selectedRow.payment_method === 'نقدي' ? '#16a34a' : '#d97706' },
-          { label: 'وسيلة الدفع', value: selectedRow.payment_type || 'نقدي' },
+          { label: 'طريقة الدفع', type: 'badge', value: selectedRow.payment_type || 'كاش', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : selectedRow.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : selectedRow.payment_type === 'آجل' ? '#d97706' : '#16a34a' },
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
           ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
         ] : []}

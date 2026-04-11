@@ -85,7 +85,7 @@ function SummaryContent() {
     { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
     { 'البند': 'قيمة المخزون', 'المبلغ': data.inventoryValue },
     { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
-    { 'البند': 'مبيعات نقدي', 'المبلغ': data.salesCash },
+    { 'البند': 'مبيعات كاش (COD)', 'المبلغ': data.salesCash },
     { 'البند': 'مبيعات بنك', 'المبلغ': data.salesBank },
   ] : [];
 
@@ -208,7 +208,7 @@ function SummaryContent() {
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات نقدي</div>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات كاش (COD)</div>
                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.salesCash || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
@@ -216,7 +216,7 @@ function SummaryContent() {
                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1d4ed8' }}>{formatNumber(data.salesBank || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات نقدي</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات كاش</div>
                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.purchasesCash || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fdf4ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
@@ -224,7 +224,7 @@ function SummaryContent() {
                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.purchasesBank || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
-                <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف نقدي</div>
+                <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف كاش</div>
                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.expensesCash || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd' }}>

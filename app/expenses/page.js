@@ -24,7 +24,7 @@ function ExpensesContent() {
     category: '',
     description: '',
     amount: '',
-    paymentType: 'نقدي',
+    paymentType: 'كاش',
     notes: '',
   });
 
@@ -57,7 +57,7 @@ function ExpensesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة المصروف بنجاح');
-        setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'نقدي', notes: '' });
+        setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -125,8 +125,8 @@ function ExpensesContent() {
               <label>وسيلة الدفع</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="expPayType" value="نقدي" checked={form.paymentType === 'نقدي'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
-                  نقدي
+                  <input type="radio" name="expPayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  كاش
                 </label>
                 <label className="radio-option">
                   <input type="radio" name="expPayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
@@ -183,7 +183,7 @@ function ExpensesContent() {
                     <td><span className="status-badge status-credit">{row.category}</span></td>
                     <td>{row.description}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
-                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'نقدي'}</span></td>
+                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'كاش'}</span></td>
                     <td>{row.notes}</td>
                     {isAdmin && (
                       <td>
@@ -210,7 +210,7 @@ function ExpensesContent() {
           { label: 'الوصف', value: selectedRow.description },
           { type: 'divider' },
           { label: 'المبلغ', type: 'money', value: selectedRow.amount },
-          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'نقدي', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
+          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'كاش', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
           ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
         ] : []}

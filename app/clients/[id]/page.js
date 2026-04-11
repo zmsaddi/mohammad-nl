@@ -209,8 +209,11 @@ function ClientDetailContent({ params }) {
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
                     <td>
-                      <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
-                        {row.payment_method}
+                      <span className="status-badge" style={{
+                        background: row.payment_type === 'بنك' ? '#dbeafe' : row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
+                        color: row.payment_type === 'بنك' ? '#1e40af' : row.payment_type === 'آجل' ? '#d97706' : '#16a34a'
+                      }}>
+                        {row.payment_type || 'كاش'}
                       </span>
                     </td>
                     <td className="number-cell">{formatNumber(row.paid_amount)}</td>
