@@ -103,7 +103,7 @@ function SalesContent() {
       const res = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, paidAmount: paid }),
+        body: JSON.stringify(form),
       });
       if (res.ok) {
         const result = await res.json();
@@ -117,7 +117,7 @@ function SalesContent() {
             item: form.item,
             quantity: form.quantity,
             total,
-            paymentMethod: form.paymentMethod,
+            paymentMethod: form.paymentType,
             address: form.clientAddress,
           };
           setWhatsappShare(shareData);
