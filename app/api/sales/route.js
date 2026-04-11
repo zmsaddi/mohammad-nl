@@ -26,6 +26,16 @@ export async function POST(request) {
   try {
     const data = await request.json();
     data.createdBy = token.username;
+
+    // Seller cannot sell below recommended price (backend validation)
+    if (token.role === 'seller' && data.item) {
+      const { sql: sqlQ } = await import('@vercel/postgres');
+      const { rows: prod } = await sqlQ`SELECT sell_price FROM products WHERE name = ${data.item}`;
+      if (prod.length > 0 && prod[0].sell_price > 0 && parseFloat(data.unitPrice) < prod[0].sell_price) {
+        return NextResponse.json({ error: `لا يمكن البيع بأقل من السعر الموصى (${prod[0].sell_price})` }, { status: 400 });
+      }
+    }
+
     const { saleId, deliveryId, refCode } = await addSale(data);
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {

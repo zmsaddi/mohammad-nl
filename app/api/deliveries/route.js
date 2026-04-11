@@ -44,7 +44,7 @@ export async function PUT(request) {
       const existing = (await getDeliveries()).find(d => d.id === data.id);
       if (!existing || existing.assigned_driver !== token.username) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
       if (existing.status === 'تم التوصيل' || existing.status === 'ملغي') return NextResponse.json({ error: 'لا يمكن تحديث هذا التوصيل' }, { status: 403 });
-      data = { id: data.id, status: 'تم التوصيل' };
+      data = { ...existing, id: data.id, status: 'تم التوصيل', vin: data.vin || '', clientName: existing.client_name, clientPhone: existing.client_phone, driverName: existing.driver_name, assignedDriver: existing.assigned_driver };
     }
     await updateDelivery(data);
     return NextResponse.json({ success: true });
