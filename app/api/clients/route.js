@@ -22,8 +22,10 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
+    data.createdBy = token.username;
     const result = await addClient(data);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
@@ -34,6 +36,7 @@ export async function POST(request) {
 export async function PUT(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
     await updateClient(data);

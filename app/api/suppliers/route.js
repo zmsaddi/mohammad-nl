@@ -9,6 +9,7 @@ async function checkAuth(request) {
 export async function GET(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const rows = await getSuppliers();
     return NextResponse.json(rows);
@@ -20,6 +21,7 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
     const result = await addSupplier(data);

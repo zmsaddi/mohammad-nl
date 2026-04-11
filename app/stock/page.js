@@ -188,7 +188,35 @@ function StockContent() {
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
                       <td>{p.category || '-'}</td>
                       <td className="number-cell">{formatNumber(p.buy_price)}</td>
-                      <td className="number-cell" style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</td>
+                      <td className="number-cell">
+                        {isAdmin ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            defaultValue={p.sell_price || ''}
+                            placeholder="0"
+                            style={{ width: '80px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center', fontFamily: "'Cairo', sans-serif" }}
+                            onBlur={async (e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              if (val !== (p.sell_price || 0)) {
+                                try {
+                                  const { sql } = await import('@vercel/postgres');
+                                  await fetch('/api/products', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: p.id, sell_price: val }),
+                                  });
+                                  addToast('تم تحديث سعر البيع');
+                                  fetchData();
+                                } catch { addToast('خطأ', 'error'); }
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</span>
+                        )}
+                      </td>
                       <td className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
                         {formatNumber(p.stock)}
                       </td>

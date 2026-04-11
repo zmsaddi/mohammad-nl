@@ -11,7 +11,8 @@ export async function GET(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);
-    const rows = await getSales(searchParams.get('client'));
+    let rows = await getSales(searchParams.get('client'));
+    if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
     return NextResponse.json(rows);
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
@@ -21,8 +22,10 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
+    data.createdBy = token.username;
     const { saleId, deliveryId, refCode } = await addSale(data);
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {

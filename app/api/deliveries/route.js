@@ -11,7 +11,9 @@ export async function GET(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);
-    const rows = await getDeliveries(searchParams.get('status'));
+    let rows = await getDeliveries(searchParams.get('status'));
+    if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
+    if (token.role === 'driver') rows = rows.filter(r => r.assigned_driver === token.username);
     return NextResponse.json(rows);
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
@@ -21,6 +23,7 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
     const id = await addDelivery(data);
@@ -33,8 +36,16 @@ export async function POST(request) {
 export async function PUT(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager','driver'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
+    let data = await request.json();
+    if (token.role === 'driver') {
+      if (data.status !== 'تم التوصيل') return NextResponse.json({ error: 'السائق يمكنه فقط تحديث الحالة إلى تم التوصيل' }, { status: 403 });
+      const existing = (await getDeliveries()).find(d => d.id === data.id);
+      if (!existing || existing.assigned_driver !== token.username) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+      if (existing.status === 'تم التوصيل' || existing.status === 'ملغي') return NextResponse.json({ error: 'لا يمكن تحديث هذا التوصيل' }, { status: 403 });
+      data = { id: data.id, status: 'تم التوصيل' };
+    }
     await updateDelivery(data);
     return NextResponse.json({ success: true });
   } catch (error) {

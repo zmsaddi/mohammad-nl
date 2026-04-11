@@ -10,6 +10,7 @@ async function checkAuth(request) {
 export async function GET(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const { searchParams } = new URL(request.url);
     const rows = await getPayments(searchParams.get('client'));
@@ -22,8 +23,10 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
+    data.createdBy = token.username;
     const id = await addPayment(data);
     return NextResponse.json({ success: true, id });
   } catch (error) {

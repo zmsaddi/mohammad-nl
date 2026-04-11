@@ -9,6 +9,7 @@ async function checkAuth(request) {
 export async function GET(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const { searchParams } = new URL(request.url);
     const data = await getSummaryData(searchParams.get('from'), searchParams.get('to'));
