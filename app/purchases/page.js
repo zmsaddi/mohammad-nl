@@ -95,10 +95,11 @@ function PurchasesContent() {
         setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
-        addToast('خطأ في إضافة البيانات', 'error');
+        const err = await res.json();
+        addToast(err.error || 'خطأ في إضافة البيانات', 'error');
       }
-    } catch {
-      addToast('خطأ في الاتصال', 'error');
+    } catch (e) {
+      addToast('خطأ في الاتصال: ' + (e.message || ''), 'error');
     } finally {
       setSubmitting(false);
     }

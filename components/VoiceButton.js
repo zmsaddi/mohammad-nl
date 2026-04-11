@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-const MAX_DURATION = 15; // seconds
+const MAX_DURATION = 30; // seconds
 
 export default function VoiceButton({ onResult, onError }) {
   const [state, setState] = useState('idle'); // idle, recording, processing
