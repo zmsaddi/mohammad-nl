@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { initDatabase } from '@/lib/db';
+import { initDatabase, resetDatabase } from '@/lib/db';
 
-// Allow both GET and POST for easy initialization
 export async function GET(request) {
   return handleInit(request);
 }
@@ -18,9 +17,14 @@ async function handleInit(request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    if (searchParams.get('reset') === 'true') {
+      await resetDatabase();
+      return NextResponse.json({ success: true, message: 'تم إعادة تهيئة قاعدة البيانات بالكامل' });
+    }
     await initDatabase();
-    return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح! يمكنك الآن استخدام النظام.' });
+    return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في تهيئة قاعدة البيانات: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ: ' + error.message }, { status: 500 });
   }
 }
