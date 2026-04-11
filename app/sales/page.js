@@ -308,8 +308,8 @@ function SalesContent() {
                   <th>الإجمالي</th>
                   <th>التكلفة</th>
                   <th>الربح</th>
+                  <th>الحالة</th>
                   <th>الدفع</th>
-                  <th>المتبقي</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
               </thead>
@@ -328,12 +328,17 @@ function SalesContent() {
                       {formatNumber(row.profit)}
                     </td>
                     <td>
+                      <span className="status-badge" style={{
+                        background: row.status === 'مؤكد' ? '#dcfce7' : row.status === 'ملغي' ? '#fee2e2' : '#fef3c7',
+                        color: row.status === 'مؤكد' ? '#16a34a' : row.status === 'ملغي' ? '#dc2626' : '#d97706',
+                      }}>
+                        {row.status || 'محجوز'}
+                      </span>
+                    </td>
+                    <td>
                       <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
                         {row.payment_method}
                       </span>
-                    </td>
-                    <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
-                      {formatNumber(row.remaining)}
                     </td>
                     {isAdmin && (
                       <td>
