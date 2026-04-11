@@ -32,8 +32,13 @@ export async function middleware(request) {
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-  // Not logged in → redirect to login
+  // Not logged in
   if (!token) {
+    // API routes → return 401 JSON
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+    // Pages → redirect to login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
