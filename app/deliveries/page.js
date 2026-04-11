@@ -32,7 +32,9 @@ function TruckIcon({ size = 24, color = 'currentColor' }) {
 function DeliveriesContent() {
   const { data: session } = useSession();
   const addToast = useToast();
-  const isAdmin = session?.user?.role === 'admin';
+  const userRole = session?.user?.role;
+  const isAdmin = userRole === 'admin';
+  const canChangeStatus = ['admin', 'manager', 'driver'].includes(userRole);
 
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
@@ -355,6 +357,7 @@ function DeliveriesContent() {
                     <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
                     <td>{row.driver_name || '-'}</td>
                     <td>
+                      {canChangeStatus ? (
                       <select
                         value={row.status}
                         onChange={(e) => handleStatusChange(row, e.target.value)}
@@ -373,6 +376,9 @@ function DeliveriesContent() {
                           <option key={s.value} value={s.value}>{s.label}</option>
                         ))}
                       </select>
+                      ) : (
+                        <span className="status-badge" style={getStatusStyle(row.status)}>{row.status}</span>
+                      )}
                     </td>
                     <td>
                       {isAdmin && (
