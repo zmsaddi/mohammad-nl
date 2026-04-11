@@ -1,0 +1,299 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import AppLayout from '@/components/AppLayout';
+import { ToastProvider, useToast } from '@/components/Toast';
+import ExportExcel from '@/components/ExportExcel';
+import { formatNumber } from '@/lib/utils';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell,
+  LineChart, Line,
+} from 'recharts';
+
+const COLORS = ['#1e40af', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#ec4899'];
+
+function SummaryContent() {
+  const { data: session } = useSession();
+  const addToast = useToast();
+  const isAdmin = session?.user?.role === 'admin';
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const fetchData = async (from, to) => {
+    setLoading(true);
+    try {
+      let url = '/api/summary';
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      if (params.toString()) url += `?${params}`;
+
+      const res = await fetch(url);
+      const result = await res.json();
+      setData(result);
+    } catch {
+      addToast('خطأ في جلب البيانات', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleFilter = () => {
+    fetchData(dateFrom, dateTo);
+  };
+
+  const handlePreset = (preset) => {
+    const now = new Date();
+    let from, to;
+
+    if (preset === 'thisMonth') {
+      from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      to = now.toISOString().split('T')[0];
+    } else if (preset === 'lastMonth') {
+      const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      from = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-01`;
+      to = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth(), 0).getDate()}`;
+    } else if (preset === 'thisYear') {
+      from = `${now.getFullYear()}-01-01`;
+      to = now.toISOString().split('T')[0];
+    } else {
+      from = '';
+      to = '';
+    }
+
+    setDateFrom(from);
+    setDateTo(to);
+    fetchData(from, to);
+  };
+
+  const pieData = data?.expenseByCategory
+    ? Object.entries(data.expenseByCategory).map(([name, value]) => ({ name, value }))
+    : [];
+
+  const exportData = data ? [
+    { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
+    { 'البند': 'إجمالي المبيعات', 'المبلغ': data.totalSales },
+    { 'البند': 'إجمالي المصاريف', 'المبلغ': data.totalExpenses },
+    { 'البند': 'الربح الإجمالي', 'المبلغ': data.grossProfit },
+    { 'البند': 'صافي الربح', 'المبلغ': data.netProfit },
+    { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
+  ] : [];
+
+  return (
+    <AppLayout>
+      <div className="page-header">
+        <h2>الملخص</h2>
+        <p>نظرة عامة على الأداء المالي</p>
+      </div>
+
+      {/* Date Filters */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div className="filters-bar">
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <span style={{ color: '#64748b' }}>إلى</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <button className="btn btn-primary btn-sm" onClick={handleFilter}>تصفية</button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
+            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
+            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisYear')}>هذه السنة</button>
+            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('all')}>الكل</button>
+          </div>
+          {isAdmin && data && (
+            <ExportExcel data={exportData} fileName="تقرير_مالي" sheetName="الملخص" />
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-overlay"><div className="spinner"></div></div>
+      ) : data ? (
+        <>
+          {/* Summary Cards */}
+          <div className="summary-cards">
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>إجمالي المشتريات</h3>
+                <div className="value">{formatNumber(data.totalPurchases)}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>إجمالي المبيعات</h3>
+                <div className="value" style={{ color: '#16a34a' }}>{formatNumber(data.totalSales)}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#fef3c7' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>إجمالي المصاريف</h3>
+                <div className="value" style={{ color: '#f59e0b' }}>{formatNumber(data.totalExpenses)}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#1e40af" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>الربح الإجمالي</h3>
+                <div className="value" style={{ color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={data.netProfit >= 0 ? '#16a34a' : '#dc2626'} width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>صافي الربح</h3>
+                <div className="value" style={{ color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>الديون المستحقة</h3>
+                <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="charts-grid">
+            {/* Bar Chart - Monthly Sales vs Purchases */}
+            <div className="chart-card">
+              <h3>المبيعات مقابل المشتريات (آخر 6 شهور)</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value) => formatNumber(value)} />
+                  <Legend />
+                  <Bar dataKey="sales" name="المبيعات" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="purchases" name="المشتريات" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Pie Chart - Expense Breakdown */}
+            <div className="chart-card">
+              <h3>توزيع المصاريف بالفئة</h3>
+              {pieData.length === 0 ? (
+                <div className="empty-state" style={{ padding: '40px' }}><h3>لا توجد مصاريف</h3></div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      outerRadius={100}
+                      dataKey="value"
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatNumber(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Line Chart - Profit Trend */}
+            <div className="chart-card">
+              <h3>اتجاه صافي الربح</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value) => formatNumber(value)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="profit" name="صافي الربح" stroke="#1e40af" strokeWidth={2} dot={{ fill: '#1e40af' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Top Debtors */}
+          {data.topDebtors?.length > 0 && (
+            <div className="card">
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                أعلى المدينين
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>الترتيب</th>
+                      <th>اسم العميل</th>
+                      <th>الدين المتبقي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topDebtors.map((debtor, i) => (
+                      <tr key={debtor.name}>
+                        <td>{i + 1}</td>
+                        <td style={{ fontWeight: 600 }}>{debtor.name}</td>
+                        <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(debtor.debt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="empty-state">
+          <h3>لا توجد بيانات</h3>
+        </div>
+      )}
+    </AppLayout>
+  );
+}
+
+export default function SummaryPage() {
+  return (
+    <ToastProvider>
+      <SummaryContent />
+    </ToastProvider>
+  );
+}

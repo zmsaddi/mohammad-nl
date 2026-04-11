@@ -1,0 +1,206 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import AppLayout from '@/components/AppLayout';
+import { ToastProvider, useToast } from '@/components/Toast';
+import ExportExcel from '@/components/ExportExcel';
+import ConfirmModal from '@/components/ConfirmModal';
+import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
+
+function ExpensesContent() {
+  const { data: session } = useSession();
+  const addToast = useToast();
+  const isAdmin = session?.user?.role === 'admin';
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+
+  const [form, setForm] = useState({
+    date: getTodayDate(),
+    category: '',
+    description: '',
+    amount: '',
+    notes: '',
+  });
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/expenses');
+      const data = await res.json();
+      setRows(Array.isArray(data) ? data.reverse() : []);
+    } catch {
+      addToast('خطأ في جلب البيانات', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.date || !form.category || !form.description || !form.amount) {
+      addToast('يرجى ملء جميع الحقول المطلوبة', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        addToast('تم إضافة المصروف بنجاح');
+        setForm({ date: getTodayDate(), category: '', description: '', amount: '', notes: '' });
+        fetchData();
+      } else {
+        addToast('خطأ في إضافة البيانات', 'error');
+      }
+    } catch {
+      addToast('خطأ في الاتصال', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const res = await fetch(`/api/expenses?id=${deleteId}`, { method: 'DELETE' });
+      if (res.ok) {
+        addToast('تم الحذف بنجاح');
+        fetchData();
+      } else {
+        const data = await res.json();
+        addToast(data.error || 'خطأ في الحذف', 'error');
+      }
+    } catch {
+      addToast('خطأ في الاتصال', 'error');
+    }
+    setDeleteId(null);
+  };
+
+  const totalExpenses = rows.reduce((sum, r) => sum + (parseFloat(r['المبلغ']) || 0), 0);
+
+  return (
+    <AppLayout>
+      <div className="page-header">
+        <h2>المصاريف</h2>
+        <p>تسجيل وإدارة المصاريف التشغيلية</p>
+      </div>
+
+      {/* Add Form */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+          إضافة مصروف جديد
+        </h3>
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>التاريخ *</label>
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+            </div>
+            <div className="form-group">
+              <label>الفئة *</label>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
+                <option value="">اختر الفئة</option>
+                {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>الوصف *</label>
+              <input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="وصف المصروف" required />
+            </div>
+            <div className="form-group">
+              <label>المبلغ *</label>
+              <input type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+            </div>
+            <div className="form-group">
+              <label>ملاحظات</label>
+              <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+            </div>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'جاري الإضافة...' : 'إضافة مصروف'}
+          </button>
+        </form>
+      </div>
+
+      {/* Data Table */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
+            سجل المصاريف ({rows.length}) - الإجمالي: {formatNumber(totalExpenses)}
+          </h3>
+          {isAdmin && rows.length > 0 && (
+            <ExportExcel data={rows} fileName="المصاريف" sheetName="المصاريف" />
+          )}
+        </div>
+
+        {loading ? (
+          <div className="loading-overlay"><div className="spinner"></div></div>
+        ) : rows.length === 0 ? (
+          <div className="empty-state">
+            <h3>لا توجد مصاريف بعد</h3>
+            <p>أضف أول مصروف من النموذج أعلاه</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>التاريخ</th>
+                  <th>الفئة</th>
+                  <th>الوصف</th>
+                  <th>المبلغ</th>
+                  <th>ملاحظات</th>
+                  {isAdmin && <th>إجراءات</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row['معرف']}>
+                    <td>{row['معرف']}</td>
+                    <td>{row['التاريخ']}</td>
+                    <td><span className="status-badge status-credit">{row['الفئة']}</span></td>
+                    <td>{row['الوصف']}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row['المبلغ'])}</td>
+                    <td>{row['ملاحظات']}</td>
+                    {isAdmin && (
+                      <td>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row['معرف'])}>
+                          حذف
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="حذف مصروف"
+        message="هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
+    </AppLayout>
+  );
+}
+
+export default function ExpensesPage() {
+  return (
+    <ToastProvider>
+      <ExpensesContent />
+    </ToastProvider>
+  );
+}
