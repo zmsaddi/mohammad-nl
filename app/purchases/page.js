@@ -135,8 +135,8 @@ function PurchasesContent() {
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="form-group">
-              <label>التاريخ *</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <label htmlFor="pur-date">التاريخ *</label>
+              <input id="pur-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>المورد *</label>
@@ -163,33 +163,33 @@ function PurchasesContent() {
               />
             </div>
             <div className="form-group">
-              <label>الكمية *</label>
-              <input type="number" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <label htmlFor="pur-qty">الكمية *</label>
+              <input id="pur-qty" type="number" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
-              <label>سعر الوحدة *</label>
-              <input type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <label htmlFor="pur-price">سعر الوحدة *</label>
+              <input id="pur-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
-              <label>الإجمالي</label>
-              <input type="text" value={formatNumber(total)} readOnly />
+              <label htmlFor="pur-total">الإجمالي</label>
+              <input id="pur-total" type="text" value={formatNumber(total)} readOnly />
             </div>
             <div className="form-group">
               <label>طريقة الدفع</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="purchasePayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="pur-pay-cash" type="radio" name="purchasePayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   كاش
                 </label>
                 <label className="radio-option">
-                  <input type="radio" name="purchasePayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="pur-pay-bank" type="radio" name="purchasePayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   بنك
                 </label>
               </div>
             </div>
             <div className="form-group">
-              <label>ملاحظات</label>
-              <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+              <label htmlFor="pur-notes">ملاحظات</label>
+              <input id="pur-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

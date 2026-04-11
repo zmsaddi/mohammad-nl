@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-export default function SmartSelect({ value, onChange, options, placeholder, allowNew, newLabel, renderOption, required }) {
+export default function SmartSelect({ value, onChange, options, placeholder, allowNew, newLabel, renderOption, required, id }) {
   const [search, setSearch] = useState(value || '');
   const [isOpen, setIsOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
@@ -52,6 +52,7 @@ export default function SmartSelect({ value, onChange, options, placeholder, all
     <div ref={wrapperRef} className="smart-select">
       <input
         ref={inputRef}
+        id={id}
         type="text"
         value={search}
         onChange={(e) => { setSearch(e.target.value); onChange(e.target.value); setIsOpen(true); setHighlighted(-1); }}

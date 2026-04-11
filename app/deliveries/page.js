@@ -228,12 +228,13 @@ function DeliveriesContent() {
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label>التاريخ *</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <label htmlFor="del-date">التاريخ *</label>
+                <input id="del-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
-                <label>اسم العميل *</label>
+                <label htmlFor="del-client">اسم العميل *</label>
                 <input
+                  id="del-client"
                   type="text"
                   list="delivery-clients-list"
                   value={form.clientName}
@@ -246,28 +247,28 @@ function DeliveriesContent() {
                 </datalist>
               </div>
               <div className="form-group">
-                <label>رقم الهاتف</label>
-                <input type="text" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="رقم هاتف العميل" />
+                <label htmlFor="del-phone">رقم الهاتف</label>
+                <input id="del-phone" type="text" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="رقم هاتف العميل" />
               </div>
               <div className="form-group">
-                <label>العنوان *</label>
-                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="عنوان التوصيل" required />
+                <label htmlFor="del-address">العنوان *</label>
+                <input id="del-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="عنوان التوصيل" required />
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label>الأصناف *</label>
-                <input type="text" value={form.items} onChange={(e) => setForm({ ...form, items: e.target.value })} placeholder="مثال: 2 دراجة كهربائية، 3 بطاريات، 1 شاحن" required />
+                <label htmlFor="del-items">الأصناف *</label>
+                <input id="del-items" type="text" value={form.items} onChange={(e) => setForm({ ...form, items: e.target.value })} placeholder="مثال: 2 دراجة كهربائية، 3 بطاريات، 1 شاحن" required />
               </div>
               <div className="form-group">
-                <label>المبلغ</label>
-                <input type="number" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
+                <label htmlFor="del-amount">المبلغ</label>
+                <input id="del-amount" type="number" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
               </div>
               <div className="form-group">
-                <label>اسم السائق</label>
-                <input type="text" value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} placeholder="اسم السائق" />
+                <label htmlFor="del-driver">اسم السائق</label>
+                <input id="del-driver" type="text" value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} placeholder="اسم السائق" />
               </div>
               <div className="form-group">
-                <label>ملاحظات</label>
-                <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات" />
+                <label htmlFor="del-notes">ملاحظات</label>
+                <input id="del-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>

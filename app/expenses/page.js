@@ -103,40 +103,40 @@ function ExpensesContent() {
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="form-group">
-              <label>التاريخ *</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <label htmlFor="exp-date">التاريخ *</label>
+              <input id="exp-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
-              <label>الفئة *</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
+              <label htmlFor="exp-category">الفئة *</label>
+              <select id="exp-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
                 <option value="">اختر الفئة</option>
                 {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label>الوصف *</label>
-              <input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="وصف المصروف" required />
+              <label htmlFor="exp-desc">الوصف *</label>
+              <input id="exp-desc" type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="وصف المصروف" required />
             </div>
             <div className="form-group">
-              <label>المبلغ *</label>
-              <input type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+              <label htmlFor="exp-amount">المبلغ *</label>
+              <input id="exp-amount" type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label>وسيلة الدفع</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="expPayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="exp-pay-cash" type="radio" name="expPayType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   كاش
                 </label>
                 <label className="radio-option">
-                  <input type="radio" name="expPayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="exp-pay-bank" type="radio" name="expPayType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   بنك
                 </label>
               </div>
             </div>
             <div className="form-group">
-              <label>ملاحظات</label>
-              <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+              <label htmlFor="exp-notes">ملاحظات</label>
+              <input id="exp-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

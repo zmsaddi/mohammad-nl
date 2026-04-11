@@ -135,24 +135,24 @@ function ClientsContent() {
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label>اسم العميل *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="أدخل اسم العميل" required />
+                <label htmlFor="client-name">اسم العميل *</label>
+                <input id="client-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="أدخل اسم العميل" required />
               </div>
               <div className="form-group">
-                <label>رقم الهاتف</label>
-                <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+31612345678" style={{ direction: 'ltr', textAlign: 'right' }} />
+                <label htmlFor="client-phone">رقم الهاتف</label>
+                <input id="client-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+31612345678" style={{ direction: 'ltr', textAlign: 'right' }} />
               </div>
               <div className="form-group">
-                <label>الإيميل</label>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
+                <label htmlFor="client-email">الإيميل</label>
+                <input id="client-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
               </div>
               <div className="form-group">
-                <label>العنوان</label>
-                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="العنوان الكامل" />
+                <label htmlFor="client-address">العنوان</label>
+                <input id="client-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="العنوان الكامل" />
               </div>
               <div className="form-group">
-                <label>ملاحظات</label>
-                <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات" />
+                <label htmlFor="client-notes">ملاحظات</label>
+                <input id="client-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>

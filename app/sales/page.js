@@ -167,8 +167,8 @@ function SalesContent() {
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="form-group">
-              <label>التاريخ *</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <label htmlFor="sale-date">التاريخ *</label>
+              <input id="sale-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>اسم العميل *</label>
@@ -189,20 +189,21 @@ function SalesContent() {
               />
             </div>
             <div className="form-group">
-              <label>هاتف العميل</label>
-              <input type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+31612345678 أو +966501234567" style={{ direction: 'ltr', textAlign: 'right' }} />
+              <label htmlFor="sale-phone">هاتف العميل</label>
+              <input id="sale-phone" type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+31612345678 أو +966501234567" style={{ direction: 'ltr', textAlign: 'right' }} />
             </div>
             <div className="form-group">
-              <label>إيميل العميل</label>
-              <input type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
+              <label htmlFor="sale-email">إيميل العميل</label>
+              <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
             </div>
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label>عنوان التوصيل</label>
-              <input type="text" value={form.clientAddress} onChange={(e) => setForm({ ...form, clientAddress: e.target.value })} placeholder="العنوان الكامل للتوصيل" />
+              <label htmlFor="sale-address">عنوان التوصيل</label>
+              <input id="sale-address" type="text" value={form.clientAddress} onChange={(e) => setForm({ ...form, clientAddress: e.target.value })} placeholder="العنوان الكامل للتوصيل" />
             </div>
             <div className="form-group">
-              <label>الصنف * (من المخزون)</label>
+              <label htmlFor="sale-product">الصنف * (من المخزون)</label>
               <select
+                id="sale-product"
                 value={form.item}
                 onChange={(e) => {
                   const p = products.find((pr) => pr.name === e.target.value);
@@ -229,12 +230,12 @@ function SalesContent() {
               </select>
             </div>
             <div className="form-group">
-              <label>الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
-              <input type="number" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <label htmlFor="sale-qty">الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
+              <input id="sale-qty" type="number" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
-              <label>سعر البيع *</label>
-              <input type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <label htmlFor="sale-price">سعر البيع *</label>
+              <input id="sale-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label>الإجمالي</label>
@@ -264,15 +265,15 @@ function SalesContent() {
               <label>طريقة الدفع *</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
                 <label className="radio-option">
-                  <input type="radio" name="payType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="pay-cash" type="radio" name="payType" value="كاش" checked={form.paymentType === 'كاش'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   كاش (عند التوصيل)
                 </label>
                 <label className="radio-option">
-                  <input type="radio" name="payType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="pay-bank" type="radio" name="payType" value="بنك" checked={form.paymentType === 'بنك'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   بنك (تحويل)
                 </label>
                 <label className="radio-option">
-                  <input type="radio" name="payType" value="آجل" checked={form.paymentType === 'آجل'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
+                  <input id="pay-credit" type="radio" name="payType" value="آجل" checked={form.paymentType === 'آجل'} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} />
                   آجل (دين)
                 </label>
               </div>
@@ -283,8 +284,8 @@ function SalesContent() {
               )}
             </div>
             <div className="form-group">
-              <label>ملاحظات</label>
-              <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+              <label htmlFor="sale-notes">ملاحظات</label>
+              <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

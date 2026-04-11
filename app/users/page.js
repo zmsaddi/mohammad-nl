@@ -90,20 +90,20 @@ function UsersContent() {
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label>اسم المستخدم (للدخول) *</label>
-                <input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="username" disabled={!!editUser} required={!editUser} style={{ direction: 'ltr', textAlign: 'right' }} />
+                <label htmlFor="user-username">اسم المستخدم (للدخول) *</label>
+                <input id="user-username" type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="username" disabled={!!editUser} required={!editUser} style={{ direction: 'ltr', textAlign: 'right' }} />
               </div>
               <div className="form-group">
-                <label>{editUser ? 'كلمة مرور جديدة (اتركه فارغ لعدم التغيير)' : 'كلمة المرور *'}</label>
-                <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" required={!editUser} />
+                <label htmlFor="user-password">{editUser ? 'كلمة مرور جديدة (اتركه فارغ لعدم التغيير)' : 'كلمة المرور *'}</label>
+                <input id="user-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" required={!editUser} />
               </div>
               <div className="form-group">
-                <label>الاسم الكامل *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" required />
+                <label htmlFor="user-name">الاسم الكامل *</label>
+                <input id="user-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" required />
               </div>
               <div className="form-group">
-                <label>الدور *</label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <label htmlFor="user-role">الدور *</label>
+                <select id="user-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                   {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
