@@ -65,7 +65,20 @@ JSON format for expense:
 {"action":"expense","category":"rent|salaries|...","description":"...","amount":N,"payment_type":"cash|bank"}
 
 JSON format when info is missing:
-{"action":"clarification","question":"السؤال بالعربي","missing_fields":["field1","field2"]}`;
+{"action":"clarification","question":"your question in Arabic","missing_fields":["field1"]}
+
+EXAMPLES:
+Input: "اشتريت من المصنع عشر بطاريات بمية وخمسين كاش"
+Output: {"action":"purchase","supplier":"المصنع","item":"بطاريات","quantity":10,"unit_price":150,"payment_type":"cash"}
+
+Input: "مصروف إيجار المحل ألفين كاش"
+Output: {"action":"expense","category":"rent","description":"إيجار المحل","amount":2000,"payment_type":"cash"}
+
+Input: "بعت لأحمد دراجة بسبعمية كاش"
+Output: {"action":"sale","client_name":"أحمد","item":"دراجة","quantity":1,"unit_price":700,"payment_type":"cash"}
+
+Input: "بعت دراجة"
+Output: {"action":"clarification","question":"لمن بعت؟ وكم السعر؟ كاش أو بنك أو آجل؟","missing_fields":["client_name","unit_price","payment_type"]}`;
 
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const completion = await groq.chat.completions.create({
