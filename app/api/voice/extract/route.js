@@ -70,6 +70,12 @@ export async function POST(request) {
       });
     }
 
+    // Map English keywords back to Arabic
+    const PAYMENT_MAP = { cash: 'كاش', bank: 'بنك', credit: 'آجل', 'كاش': 'كاش', 'بنك': 'بنك', 'آجل': 'آجل' };
+    const CATEGORY_MAP = { rent: 'إيجار', salaries: 'رواتب', transport: 'نقل وشحن', maintenance: 'صيانة وإصلاح', marketing: 'تسويق وإعلان', utilities: 'كهرباء وماء', insurance: 'تأمين', tools: 'أدوات ومعدات', other: 'أخرى' };
+    if (args.payment_type) args.payment_type = PAYMENT_MAP[args.payment_type.toLowerCase()] || args.payment_type;
+    if (args.category) args.category = CATEGORY_MAP[args.category.toLowerCase()] || args.category;
+
     // Handle clarification
     if (funcName === 'request_clarification') {
       return NextResponse.json({
