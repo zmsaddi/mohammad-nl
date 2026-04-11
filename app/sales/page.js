@@ -24,6 +24,7 @@ function SalesContent() {
     date: getTodayDate(),
     clientName: '',
     clientPhone: '',
+    clientEmail: '',
     clientAddress: '',
     item: '',
     quantity: '',
@@ -34,14 +35,15 @@ function SalesContent() {
     notes: '',
   });
 
-  // Auto-fill phone/address when client selected
+  // Smart auto-fill: when client name matches, fill all their info
   const handleClientChange = (name) => {
     const client = clients.find((c) => c.name === name);
     setForm((prev) => ({
       ...prev,
       clientName: name,
-      clientPhone: client ? client.phone || '' : '',
-      clientAddress: client ? client.address || '' : '',
+      clientPhone: client ? client.phone || prev.clientPhone : prev.clientPhone,
+      clientEmail: client ? client.email || prev.clientEmail : prev.clientEmail,
+      clientAddress: client ? client.address || prev.clientAddress : prev.clientAddress,
     }));
   };
 
@@ -106,7 +108,7 @@ function SalesContent() {
       });
       if (res.ok) {
         addToast('تم تسجيل عملية البيع وإنشاء توصيلة تلقائياً');
-        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paymentType: 'نقدي', paidAmount: '', notes: '' });
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paymentType: 'نقدي', paidAmount: '', notes: '' });
         fetchData();
       } else {
         addToast('خطأ في إضافة البيانات', 'error');
@@ -160,12 +162,25 @@ function SalesContent() {
                 list="clients-list"
                 value={form.clientName}
                 onChange={(e) => handleClientChange(e.target.value)}
-                placeholder="اكتب للبحث أو أضف عميل جديد"
+                placeholder="اكتب اسم العميل..."
                 required
+                autoComplete="off"
               />
               <datalist id="clients-list">
-                {clients.map((c) => <option key={c.id} value={c.name} />)}
+                {clients.map((c) => <option key={c.id} value={c.name} label={`${c.phone || ''} - ${c.address || ''}`} />)}
               </datalist>
+            </div>
+            <div className="form-group">
+              <label>هاتف العميل</label>
+              <input type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="05xxxxxxxx" style={{ direction: 'ltr', textAlign: 'right' }} />
+            </div>
+            <div className="form-group">
+              <label>إيميل العميل</label>
+              <input type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
+            </div>
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+              <label>عنوان التوصيل</label>
+              <input type="text" value={form.clientAddress} onChange={(e) => setForm({ ...form, clientAddress: e.target.value })} placeholder="العنوان الكامل للتوصيل" />
             </div>
             <div className="form-group">
               <label>الصنف * (من المخزون)</label>
@@ -299,7 +314,7 @@ function SalesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>الكود</th>
                   <th>التاريخ</th>
                   <th>العميل</th>
                   <th>الصنف</th>
@@ -316,7 +331,7 @@ function SalesContent() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.id}</td>
+                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td>{row.client_name}</td>
                     <td>{row.item}</td>

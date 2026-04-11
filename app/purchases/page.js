@@ -137,25 +137,43 @@ function PurchasesContent() {
               <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
-              <label>اسم المورد *</label>
+              <label>المورد *</label>
               <input
                 type="text"
                 list="suppliers-list"
                 value={form.supplier}
                 onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                placeholder="مثال: شركة الدراجات، مصنع البطاريات"
+                placeholder="اكتب اسم المورد..."
                 required
+                autoComplete="off"
               />
               <datalist id="suppliers-list">
-                {suppliers.map((s) => <option key={s.id || s} value={s.name || s} />)}
+                {suppliers.map((s) => <option key={s.id} value={s.name} />)}
               </datalist>
+              {form.supplier && !suppliers.some((s) => s.name === form.supplier) && (
+                <span style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '2px' }}>+ مورد جديد</span>
+              )}
             </div>
             <div className="form-group">
-              <label>اسم الصنف *</label>
-              <input type="text" list="products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="مثال: دراجة كهربائية X5، بطارية 48V" required />
+              <label>المنتج *</label>
+              <input
+                type="text"
+                list="products-list"
+                value={form.item}
+                onChange={(e) => setForm({ ...form, item: e.target.value })}
+                placeholder="اكتب اسم المنتج..."
+                required
+                autoComplete="off"
+              />
               <datalist id="products-list">
-                {products.map((p) => <option key={p.id} value={p.name} />)}
+                {products.map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock || 0}`} />)}
               </datalist>
+              {form.item && !products.some((p) => p.name === form.item) && (
+                <span style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '2px' }}>+ منتج جديد سيُضاف تلقائياً</span>
+              )}
+              {form.item && products.some((p) => p.name === form.item) && (
+                <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>المخزون الحالي: {products.find((p) => p.name === form.item)?.stock || 0}</span>
+              )}
             </div>
             <div className="form-group">
               <label>الكمية *</label>
@@ -216,13 +234,14 @@ function PurchasesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>الكود</th>
                   <th>التاريخ</th>
                   <th>المورد</th>
-                  <th>الصنف</th>
+                  <th>المنتج</th>
                   <th>الكمية</th>
                   <th>سعر الوحدة</th>
                   <th>الإجمالي</th>
+                  <th>الدفع</th>
                   <th>ملاحظات</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
@@ -230,13 +249,14 @@ function PurchasesContent() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.id}</td>
+                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td>{row.supplier}</td>
                     <td>{row.item}</td>
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'نقدي'}</span></td>
                     <td>{row.notes}</td>
                     {isAdmin && (
                       <td>

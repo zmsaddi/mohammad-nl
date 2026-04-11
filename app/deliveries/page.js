@@ -316,7 +316,7 @@ function DeliveriesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>الكود</th>
                   <th>التاريخ</th>
                   <th>العميل</th>
                   <th>الهاتف</th>
@@ -331,7 +331,7 @@ function DeliveriesContent() {
               <tbody>
                 {filtered.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.id}</td>
+                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td style={{ fontWeight: 600 }}>{row.client_name}</td>
                     <td style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
