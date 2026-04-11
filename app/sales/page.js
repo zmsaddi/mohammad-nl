@@ -12,7 +12,10 @@ import SmartSelect from '@/components/SmartSelect';
 function SalesContent() {
   const { data: session } = useSession();
   const addToast = useToast();
-  const isAdmin = session?.user?.role === 'admin';
+  const role = session?.user?.role;
+  const isAdmin = role === 'admin';
+  const canSeeCosts = role === 'admin' || role === 'manager';
+  const isSeller = role === 'seller';
 
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
@@ -77,6 +80,14 @@ function SalesContent() {
     if (!form.date || !form.clientName || !form.item || !form.quantity || !form.unitPrice) {
       addToast('يرجى ملء جميع الحقول المطلوبة', 'error');
       return;
+    }
+    // Seller cannot sell below recommended price
+    if (isSeller) {
+      const prod = products.find((p) => p.name === form.item);
+      if (prod?.sell_price && parseFloat(form.unitPrice) < prod.sell_price) {
+        addToast(`لا يمكن البيع بأقل من السعر الموصى (${prod.sell_price})`, 'error');
+        return;
+      }
     }
     setSubmitting(true);
     try {
@@ -241,7 +252,7 @@ function SalesContent() {
               <label>الإجمالي</label>
               <input type="text" value={formatNumber(total)} readOnly />
             </div>
-            {form.item && (() => {
+            {form.item && canSeeCosts && (() => {
               const p = products.find((pr) => pr.name === form.item);
               const costPrice = p?.buy_price || 0;
               const qty = parseFloat(form.quantity) || 0;
@@ -321,8 +332,8 @@ function SalesContent() {
                   <th>الكمية</th>
                   <th>سعر الوحدة</th>
                   <th>الإجمالي</th>
-                  <th>التكلفة</th>
-                  <th>الربح</th>
+                  {canSeeCosts && <th>التكلفة</th>}
+                  {canSeeCosts && <th>الربح</th>}
                   <th>الحالة</th>
                   <th>الدفع</th>
                   <th>إجراءات</th>
@@ -338,10 +349,10 @@ function SalesContent() {
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>
-                    <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+                    {canSeeCosts && <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>}
+                    {canSeeCosts && <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
                       {formatNumber(row.profit)}
-                    </td>
+                    </td>}
                     <td>
                       <span className="status-badge" style={{
                         background: row.status === 'مؤكد' ? '#dcfce7' : row.status === 'ملغي' ? '#fee2e2' : '#fef3c7',
@@ -409,7 +420,7 @@ function SalesContent() {
           { label: 'الكمية', value: selectedRow.quantity },
           { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
           { label: 'الإجمالي', type: 'money', value: selectedRow.total },
-          ...(isAdmin ? [
+          ...(canSeeCosts ? [
             { type: 'divider' },
             { label: 'التكلفة', type: 'money', value: selectedRow.cost_total, color: '#94a3b8' },
             { label: 'الربح', type: 'money', value: selectedRow.profit, color: (selectedRow.profit || 0) >= 0 ? '#16a34a' : '#dc2626' },
