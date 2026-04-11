@@ -97,7 +97,7 @@ function ClientsContent() {
     <AppLayout>
       <div className="page-header">
         <h2>بيانات العملاء</h2>
-        <p>إدارة العملاء وتتبع الديون</p>
+        <p>بيانات العملاء والديون المستحقة</p>
       </div>
 
       {/* Summary */}

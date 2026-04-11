@@ -91,7 +91,7 @@ function ExpensesContent() {
     <AppLayout>
       <div className="page-header">
         <h2>المصاريف</h2>
-        <p>تسجيل وإدارة المصاريف التشغيلية</p>
+        <p>مصاريف المتجر والتشغيل</p>
       </div>
 
       {/* Add Form */}

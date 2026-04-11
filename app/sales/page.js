@@ -138,8 +138,8 @@ function SalesContent() {
   return (
     <AppLayout>
       <div className="page-header">
-        <h2>بيع البضائع</h2>
-        <p>تسجيل وإدارة عمليات البيع</p>
+        <h2>المبيعات</h2>
+        <p>بيع الدراجات والإكسسوارات وقطع الغيار</p>
       </div>
 
       {/* Add Form */}

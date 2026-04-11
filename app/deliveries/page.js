@@ -166,7 +166,7 @@ function DeliveriesContent() {
     <AppLayout>
       <div className="page-header">
         <h2>التوصيل</h2>
-        <p>إدارة وتتبع عمليات التوصيل</p>
+        <p>تتبع توصيل الطلبات للعملاء</p>
       </div>
 
       {/* Stats Cards */}
@@ -252,7 +252,7 @@ function DeliveriesContent() {
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label>الأصناف *</label>
-                <input type="text" value={form.items} onChange={(e) => setForm({ ...form, items: e.target.value })} placeholder="مثال: 5 كرتون حليب، 3 كيس أرز" required />
+                <input type="text" value={form.items} onChange={(e) => setForm({ ...form, items: e.target.value })} placeholder="مثال: 2 دراجة كهربائية، 3 بطاريات، 1 شاحن" required />
               </div>
               <div className="form-group">
                 <label>المبلغ</label>

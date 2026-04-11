@@ -2,8 +2,8 @@ import './globals.css';
 import Providers from '@/components/Providers';
 
 export const metadata = {
-  title: 'نظام المحاسبة',
-  description: 'نظام محاسبة متكامل لإدارة المبيعات والمشتريات والمصاريف',
+  title: 'Mohammad NL - إدارة الدراجات الكهربائية',
+  description: 'نظام إدارة متكامل للدراجات الكهربائية والإكسسوارات وقطع الغيار',
 };
 
 export default function RootLayout({ children }) {

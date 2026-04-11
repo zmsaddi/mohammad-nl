@@ -93,8 +93,8 @@ function SummaryContent() {
   return (
     <AppLayout>
       <div className="page-header">
-        <h2>الملخص</h2>
-        <p>نظرة عامة على الأداء المالي</p>
+        <h2>لوحة التحكم</h2>
+        <p>نظرة شاملة على أداء المتجر</p>
       </div>
 
       {/* Date Filters */}

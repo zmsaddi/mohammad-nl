@@ -121,8 +121,8 @@ function PurchasesContent() {
   return (
     <AppLayout>
       <div className="page-header">
-        <h2>شراء البضائع</h2>
-        <p>إضافة وإدارة عمليات الشراء</p>
+        <h2>المشتريات</h2>
+        <p>شراء الدراجات والإكسسوارات وقطع الغيار</p>
       </div>
 
       {/* Add Form */}
@@ -143,7 +143,7 @@ function PurchasesContent() {
                 list="suppliers-list"
                 value={form.supplier}
                 onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                placeholder="اكتب للبحث أو أضف مورد جديد"
+                placeholder="مثال: شركة الدراجات، مصنع البطاريات"
                 required
               />
               <datalist id="suppliers-list">
@@ -152,7 +152,7 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label>اسم الصنف *</label>
-              <input type="text" list="products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
+              <input type="text" list="products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="مثال: دراجة كهربائية X5، بطارية 48V" required />
               <datalist id="products-list">
                 {products.map((p) => <option key={p.id} value={p.name} />)}
               </datalist>

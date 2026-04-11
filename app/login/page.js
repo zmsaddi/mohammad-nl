@@ -52,8 +52,8 @@ function LoginForm() {
             </svg>
           </div>
         </div>
-        <h1>نظام المحاسبة</h1>
-        <p>سجّل دخولك للوصول إلى لوحة التحكم</p>
+        <h1>Mohammad NL</h1>
+        <p>دراجات كهربائية - إكسسوارات - قطع غيار</p>
 
         {error && <div className="login-error">{error}</div>}
 
