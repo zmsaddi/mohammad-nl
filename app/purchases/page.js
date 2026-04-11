@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber, getTodayDate } from '@/lib/utils';
+import DetailModal from '@/components/DetailModal';
+import SmartSelect from '@/components/SmartSelect';
 
 function PurchasesContent() {
   const { data: session } = useSession();
@@ -19,6 +20,7 @@ function PurchasesContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -138,42 +140,27 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label>المورد *</label>
-              <input
-                type="text"
-                list="suppliers-list"
+              <SmartSelect
                 value={form.supplier}
-                onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                onChange={(val) => setForm({ ...form, supplier: val })}
+                options={suppliers.map((s) => ({ name: s.name, value: s.name, label: s.name }))}
                 placeholder="اكتب اسم المورد..."
+                allowNew
+                newLabel="مورد جديد"
                 required
-                autoComplete="off"
               />
-              <datalist id="suppliers-list">
-                {suppliers.map((s) => <option key={s.id} value={s.name} />)}
-              </datalist>
-              {form.supplier && !suppliers.some((s) => s.name === form.supplier) && (
-                <span style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '2px' }}>+ مورد جديد</span>
-              )}
             </div>
             <div className="form-group">
               <label>المنتج *</label>
-              <input
-                type="text"
-                list="products-list"
+              <SmartSelect
                 value={form.item}
-                onChange={(e) => setForm({ ...form, item: e.target.value })}
+                onChange={(val) => setForm({ ...form, item: val })}
+                options={products.map((p) => ({ name: p.name, value: p.name, label: p.name, sub: `مخزون: ${p.stock || 0}` }))}
                 placeholder="اكتب اسم المنتج..."
+                allowNew
+                newLabel="منتج جديد"
                 required
-                autoComplete="off"
               />
-              <datalist id="products-list">
-                {products.map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock || 0}`} />)}
-              </datalist>
-              {form.item && !products.some((p) => p.name === form.item) && (
-                <span style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '2px' }}>+ منتج جديد سيُضاف تلقائياً</span>
-              )}
-              {form.item && products.some((p) => p.name === form.item) && (
-                <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>المخزون الحالي: {products.find((p) => p.name === form.item)?.stock || 0}</span>
-              )}
             </div>
             <div className="form-group">
               <label>الكمية *</label>
@@ -217,9 +204,6 @@ function PurchasesContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             سجل المشتريات ({rows.length})
           </h3>
-          {isAdmin && rows.length > 0 && (
-            <ExportExcel data={rows} fileName="المشتريات" sheetName="المشتريات" />
-          )}
         </div>
 
         {loading ? (
@@ -248,7 +232,7 @@ function PurchasesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td>{row.supplier}</td>
@@ -272,6 +256,26 @@ function PurchasesContent() {
           </div>
         )}
       </div>
+
+      <DetailModal
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? `شراء ${selectedRow.ref_code || selectedRow.id}` : ''}
+        fields={selectedRow ? [
+          { label: 'الكود', value: selectedRow.ref_code || `PU-${selectedRow.id}`, color: '#6366f1' },
+          { label: 'التاريخ', value: selectedRow.date },
+          { label: 'المورد', value: selectedRow.supplier },
+          { type: 'divider' },
+          { label: 'المنتج', value: selectedRow.item },
+          { label: 'الكمية', value: selectedRow.quantity },
+          { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
+          { label: 'الإجمالي', type: 'money', value: selectedRow.total },
+          { type: 'divider' },
+          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'نقدي', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
+          ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
+          ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
+        ] : []}
+      />
 
       <ConfirmModal
         isOpen={!!deleteId}

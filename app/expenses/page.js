@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
+import DetailModal from '@/components/DetailModal';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
 
 function ExpensesContent() {
@@ -17,6 +17,7 @@ function ExpensesContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -150,9 +151,6 @@ function ExpensesContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             سجل المصاريف ({rows.length}) - الإجمالي: {formatNumber(totalExpenses)}
           </h3>
-          {isAdmin && rows.length > 0 && (
-            <ExportExcel data={rows} fileName="المصاريف" sheetName="المصاريف" />
-          )}
         </div>
 
         {loading ? (
@@ -179,7 +177,7 @@ function ExpensesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td>{row.id}</td>
                     <td>{row.date}</td>
                     <td><span className="status-badge status-credit">{row.category}</span></td>
@@ -201,6 +199,22 @@ function ExpensesContent() {
           </div>
         )}
       </div>
+
+      <DetailModal
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? `مصروف #${selectedRow.id}` : ''}
+        fields={selectedRow ? [
+          { label: 'التاريخ', value: selectedRow.date },
+          { label: 'الفئة', type: 'badge', value: selectedRow.category, bg: '#fef3c7', color: '#d97706' },
+          { label: 'الوصف', value: selectedRow.description },
+          { type: 'divider' },
+          { label: 'المبلغ', type: 'money', value: selectedRow.amount },
+          { label: 'وسيلة الدفع', type: 'badge', value: selectedRow.payment_type || 'نقدي', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : '#16a34a' },
+          ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
+          ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
+        ] : []}
+      />
 
       <ConfirmModal
         isOpen={!!deleteId}

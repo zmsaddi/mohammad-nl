@@ -3,14 +3,12 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 
 const TYPES = {
   seller_payout: { label: 'دفع بونص بائع', color: '#16a34a', bg: '#dcfce7' },
   driver_payout: { label: 'دفع بونص سائق', color: '#7c3aed', bg: '#ede9fe' },
   profit_distribution: { label: 'توزيع أرباح', color: '#1e40af', bg: '#dbeafe' },
-  expense_settlement: { label: 'تسوية مصاريف', color: '#f59e0b', bg: '#fef3c7' },
 };
 
 function SettlementsContent() {
@@ -154,7 +152,6 @@ function SettlementsContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>سجل التسويات (لا يُحذف)</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ تسوية جديدة</button>}
-            {Array.isArray(settlements) && settlements.length > 0 && <ExportExcel data={settlements} fileName="التسويات" sheetName="التسويات" />}
           </div>
         </div>
         {loading ? <div className="loading-overlay"><div className="spinner"></div></div> : (

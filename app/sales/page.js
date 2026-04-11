@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber, getTodayDate } from '@/lib/utils';
+import DetailModal from '@/components/DetailModal';
+import SmartSelect from '@/components/SmartSelect';
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -20,6 +21,7 @@ function SalesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [whatsappShare, setWhatsappShare] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -174,18 +176,21 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label>اسم العميل *</label>
-              <input
-                type="text"
-                list="clients-list"
+              <SmartSelect
                 value={form.clientName}
-                onChange={(e) => handleClientChange(e.target.value)}
+                onChange={(val, opt) => {
+                  if (typeof opt === 'object' && opt.name) {
+                    setForm((prev) => ({ ...prev, clientName: opt.name, clientPhone: opt.phone || prev.clientPhone, clientEmail: opt.email || prev.clientEmail, clientAddress: opt.address || prev.clientAddress }));
+                  } else {
+                    setForm((prev) => ({ ...prev, clientName: val }));
+                  }
+                }}
+                options={clients.map((c) => ({ name: c.name, value: c.name, label: c.name, sub: c.phone || c.address || '', phone: c.phone, email: c.email, address: c.address }))}
                 placeholder="اكتب اسم العميل..."
+                allowNew
+                newLabel="عميل جديد"
                 required
-                autoComplete="off"
               />
-              <datalist id="clients-list">
-                {clients.map((c) => <option key={c.id} value={c.name} label={`${c.phone || ''} - ${c.address || ''}`} />)}
-              </datalist>
             </div>
             <div className="form-group">
               <label>هاتف العميل</label>
@@ -314,9 +319,6 @@ function SalesContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             سجل المبيعات ({rows.length})
           </h3>
-          {isAdmin && rows.length > 0 && (
-            <ExportExcel data={rows} fileName="المبيعات" sheetName="المبيعات" />
-          )}
         </div>
 
         {loading ? (
@@ -347,7 +349,7 @@ function SalesContent() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td>{row.client_name}</td>
@@ -409,6 +411,33 @@ function SalesContent() {
           </div>
         )}
       </div>
+
+      <DetailModal
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? `بيع ${selectedRow.ref_code || selectedRow.id}` : ''}
+        fields={selectedRow ? [
+          { label: 'الكود', value: selectedRow.ref_code || `SL-${selectedRow.id}`, color: '#6366f1' },
+          { label: 'التاريخ', value: selectedRow.date },
+          { label: 'العميل', value: selectedRow.client_name },
+          { type: 'divider' },
+          { label: 'المنتج', value: selectedRow.item },
+          { label: 'الكمية', value: selectedRow.quantity },
+          { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
+          { label: 'الإجمالي', type: 'money', value: selectedRow.total },
+          ...(isAdmin ? [
+            { type: 'divider' },
+            { label: 'التكلفة', type: 'money', value: selectedRow.cost_total, color: '#94a3b8' },
+            { label: 'الربح', type: 'money', value: selectedRow.profit, color: (selectedRow.profit || 0) >= 0 ? '#16a34a' : '#dc2626' },
+          ] : []),
+          { type: 'divider' },
+          { label: 'حالة الطلب', type: 'badge', value: selectedRow.status || 'محجوز', bg: selectedRow.status === 'مؤكد' ? '#dcfce7' : selectedRow.status === 'ملغي' ? '#fee2e2' : '#fef3c7', color: selectedRow.status === 'مؤكد' ? '#16a34a' : selectedRow.status === 'ملغي' ? '#dc2626' : '#d97706' },
+          { label: 'حالة الدفع', type: 'badge', value: selectedRow.payment_method, bg: selectedRow.payment_method === 'نقدي' ? '#dcfce7' : '#fef3c7', color: selectedRow.payment_method === 'نقدي' ? '#16a34a' : '#d97706' },
+          { label: 'وسيلة الدفع', value: selectedRow.payment_type || 'نقدي' },
+          ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
+          ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
+        ] : []}
+      />
 
       {/* WhatsApp Share Modal */}
       {whatsappShare && (

@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 
 function ClientDetailContent({ params }) {
@@ -183,9 +182,6 @@ function ClientDetailContent({ params }) {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             سجل المبيعات ({sales.length})
           </h3>
-          {isAdmin && sales.length > 0 && (
-            <ExportExcel data={sales} fileName={`مبيعات_${client.name}`} sheetName="المبيعات" />
-          )}
         </div>
         {sales.length === 0 ? (
           <div className="empty-state" style={{ padding: '24px' }}><h3>لا توجد مبيعات</h3></div>
@@ -235,9 +231,6 @@ function ClientDetailContent({ params }) {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             سجل الدفعات ({payments.length})
           </h3>
-          {isAdmin && payments.length > 0 && (
-            <ExportExcel data={payments} fileName={`دفعات_${client.name}`} sheetName="الدفعات" />
-          )}
         </div>
         {payments.length === 0 ? (
           <div className="empty-state" style={{ padding: '24px' }}><h3>لا توجد دفعات مسجلة</h3></div>

@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
+import DetailModal from '@/components/DetailModal';
 import { formatNumber } from '@/lib/utils';
 
 function StockContent() {
@@ -16,6 +16,7 @@ function StockContent() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all, in-stock, low, out
 
@@ -137,21 +138,6 @@ function StockContent() {
               <option value="low">مخزون منخفض</option>
               <option value="out">نفذ</option>
             </select>
-            {isAdmin && products.length > 0 && (
-              <ExportExcel
-                data={products.map((p) => ({
-                  'المنتج': p.name,
-                  'الفئة': p.category || '-',
-                  'الوحدة': p.unit || '-',
-                  'سعر الشراء': p.buy_price,
-                  'سعر البيع': p.sell_price,
-                  'الكمية': p.stock,
-                  'قيمة المخزون': (p.stock || 0) * (p.buy_price || 0),
-                }))}
-                fileName="المخزون"
-                sheetName="المخزون"
-              />
-            )}
           </div>
         </div>
 
@@ -183,7 +169,7 @@ function StockContent() {
                   const value = (p.stock || 0) * (p.buy_price || 0);
                   const status = !p.stock || p.stock <= 0 ? 'out' : p.stock <= 5 ? 'low' : 'ok';
                   return (
-                    <tr key={p.id} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
+                    <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
                       <td>{p.id}</td>
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
                       <td>{p.category || '-'}</td>
@@ -250,6 +236,24 @@ function StockContent() {
           </div>
         )}
       </div>
+
+      <DetailModal
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? `منتج: ${selectedRow.name}` : ''}
+        fields={selectedRow ? [
+          { label: 'اسم المنتج', value: selectedRow.name },
+          { label: 'الفئة', value: selectedRow.category || '-' },
+          { label: 'الوحدة', value: selectedRow.unit || '-' },
+          { type: 'divider' },
+          { label: 'سعر الشراء', type: 'money', value: selectedRow.buy_price },
+          { label: 'سعر البيع الموصى', type: 'money', value: selectedRow.sell_price, color: '#1e40af' },
+          { type: 'divider' },
+          { label: 'الكمية المتاحة', value: String(selectedRow.stock || 0), color: (selectedRow.stock || 0) > 5 ? '#16a34a' : (selectedRow.stock || 0) > 0 ? '#d97706' : '#dc2626' },
+          { label: 'قيمة المخزون', type: 'money', value: (selectedRow.stock || 0) * (selectedRow.buy_price || 0) },
+          ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
+        ] : []}
+      />
 
       <ConfirmModal
         isOpen={!!deleteId}

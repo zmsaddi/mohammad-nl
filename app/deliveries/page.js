@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
+import DetailModal from '@/components/DetailModal';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 
 const DELIVERY_STATUSES = [
@@ -39,6 +39,7 @@ function DeliveriesContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
 
@@ -299,9 +300,6 @@ function DeliveriesContent() {
                 + توصيلة جديدة
               </button>
             )}
-            {isAdmin && rows.length > 0 && (
-              <ExportExcel data={rows} fileName="التوصيلات" sheetName="التوصيل" />
-            )}
           </div>
         </div>
 
@@ -332,7 +330,7 @@ function DeliveriesContent() {
               </thead>
               <tbody>
                 {filtered.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
                     <td>{row.date}</td>
                     <td style={{ fontWeight: 600 }}>{row.client_name}</td>
@@ -375,6 +373,28 @@ function DeliveriesContent() {
           </div>
         )}
       </div>
+
+      <DetailModal
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? `توصيل ${selectedRow.ref_code || selectedRow.id}` : ''}
+        fields={selectedRow ? [
+          { label: 'الكود', value: selectedRow.ref_code || `DL-${selectedRow.id}`, color: '#6366f1' },
+          { label: 'التاريخ', value: selectedRow.date },
+          { type: 'divider' },
+          { label: 'العميل', value: selectedRow.client_name },
+          { label: 'الهاتف', value: selectedRow.client_phone, ltr: true },
+          { label: 'الإيميل', value: selectedRow.client_email, ltr: true },
+          { label: 'العنوان', value: selectedRow.address },
+          { type: 'divider' },
+          { label: 'الأصناف', value: selectedRow.items },
+          { label: 'المبلغ', type: 'money', value: selectedRow.total_amount },
+          { label: 'السائق', value: selectedRow.driver_name || selectedRow.assigned_driver || '-' },
+          { label: 'الحالة', type: 'badge', value: selectedRow.status, bg: selectedRow.status === 'تم التوصيل' ? '#dcfce7' : selectedRow.status === 'ملغي' ? '#fee2e2' : selectedRow.status === 'جاري التوصيل' ? '#dbeafe' : '#fef3c7', color: selectedRow.status === 'تم التوصيل' ? '#16a34a' : selectedRow.status === 'ملغي' ? '#dc2626' : selectedRow.status === 'جاري التوصيل' ? '#3b82f6' : '#d97706' },
+          ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
+          ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
+        ] : []}
+      />
 
       <ConfirmModal
         isOpen={!!deleteId}

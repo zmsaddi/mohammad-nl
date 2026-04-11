@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
 
@@ -184,21 +183,6 @@ function ClientsContent() {
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة عميل
               </button>
-            )}
-            {isAdmin && clients.length > 0 && (
-              <ExportExcel
-                data={clients.map((c) => ({
-                  'اسم العميل': c.name,
-                  'رقم الهاتف': c.phone,
-                  'الإيميل': c.email || '',
-                  'العنوان': c.address,
-                  'إجمالي المشتريات': c.totalSales,
-                  'المدفوع': c.totalPaid,
-                  'الدين المتبقي': c.remainingDebt,
-                }))}
-                fileName="العملاء"
-                sheetName="العملاء"
-              />
             )}
           </div>
         </div>

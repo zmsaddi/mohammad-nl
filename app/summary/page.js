@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ExportExcel from '@/components/ExportExcel';
 import { formatNumber } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -83,7 +82,7 @@ function SummaryContent() {
     { 'البند': 'الربح الإجمالي', 'المبلغ': data.grossProfit },
     { 'البند': 'المصاريف التشغيلية', 'المبلغ': data.totalExpenses },
     { 'البند': 'صافي الربح', 'المبلغ': data.netProfit },
-    { 'البند': 'رأس المال (المشتريات)', 'المبلغ': data.totalPurchases },
+    { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
     { 'البند': 'قيمة المخزون', 'المبلغ': data.inventoryValue },
     { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
     { 'البند': 'مبيعات نقدي', 'المبلغ': data.salesCash },
@@ -110,9 +109,6 @@ function SummaryContent() {
             <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisYear')}>هذه السنة</button>
             <button className="btn btn-outline btn-sm" onClick={() => handlePreset('all')}>الكل</button>
           </div>
-          {isAdmin && data && (
-            <ExportExcel data={exportData} fileName="تقرير_مالي" sheetName="الملخص" />
-          )}
         </div>
       </div>
 
@@ -172,7 +168,7 @@ function SummaryContent() {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#1e40af" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
               </div>
               <div className="summary-card-content">
-                <h3>رأس المال (المشتريات)</h3>
+                <h3>إجمالي المشتريات</h3>
                 <div className="value">{formatNumber(data.totalPurchases)}</div>
               </div>
             </div>

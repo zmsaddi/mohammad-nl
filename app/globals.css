@@ -634,6 +634,163 @@ body {
   accent-color: #1e40af;
 }
 
+/* Detail Modal */
+.detail-modal {
+  background: white;
+  border-radius: 18px;
+  width: 95%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.detail-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.detail-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #94a3b8;
+  border-radius: 8px;
+}
+
+.detail-modal-close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.detail-modal-body {
+  padding: 16px 24px;
+}
+
+.detail-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.detail-field:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 0.95rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.detail-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 8px 0;
+}
+
+.detail-modal-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Smart Select */
+.smart-select {
+  position: relative;
+  width: 100%;
+}
+
+.smart-select-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.9rem;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.smart-select-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.smart-select-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  background: white;
+  border: 1.5px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.smart-select-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.1s;
+}
+
+.smart-select-option:hover,
+.smart-select-option.highlighted {
+  background: #f1f5f9;
+}
+
+.smart-select-option-label {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.smart-select-option-sub {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.smart-select-new {
+  border-top: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+/* Clickable table rows */
+.data-table tbody tr.clickable-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.data-table tbody tr.clickable-row:hover {
+  background: #eff6ff !important;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;
