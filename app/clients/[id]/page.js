@@ -122,7 +122,11 @@ function ClientDetailContent({ params }) {
           </div>
           <div className="client-info-item">
             <label>رقم الهاتف</label>
-            <div className="value">{client.phone || '-'}</div>
+            <div className="value" style={{ direction: 'ltr', textAlign: 'right' }}>{client.phone || '-'}</div>
+          </div>
+          <div className="client-info-item">
+            <label>الإيميل</label>
+            <div className="value" style={{ direction: 'ltr', textAlign: 'right' }}>{client.email || '-'}</div>
           </div>
           <div className="client-info-item">
             <label>العنوان</label>

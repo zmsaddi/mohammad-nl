@@ -172,6 +172,7 @@ function ExpensesContent() {
                   <th>الفئة</th>
                   <th>الوصف</th>
                   <th>المبلغ</th>
+                  <th>الدفع</th>
                   <th>ملاحظات</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
@@ -184,6 +185,7 @@ function ExpensesContent() {
                     <td><span className="status-badge status-credit">{row.category}</span></td>
                     <td>{row.description}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
+                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'نقدي'}</span></td>
                     <td>{row.notes}</td>
                     {isAdmin && (
                       <td>

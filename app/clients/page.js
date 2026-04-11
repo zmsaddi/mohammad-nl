@@ -24,6 +24,7 @@ function ClientsContent() {
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    email: '',
     address: '',
     notes: '',
   });
@@ -57,7 +58,7 @@ function ClientsContent() {
       });
       if (res.ok) {
         addToast('تم إضافة العميل بنجاح');
-        setForm({ name: '', phone: '', address: '', notes: '' });
+        setForm({ name: '', phone: '', email: '', address: '', notes: '' });
         setShowForm(false);
         fetchData();
       } else {
@@ -140,11 +141,15 @@ function ClientsContent() {
               </div>
               <div className="form-group">
                 <label>رقم الهاتف</label>
-                <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="رقم الهاتف" />
+                <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+31612345678" style={{ direction: 'ltr', textAlign: 'right' }} />
+              </div>
+              <div className="form-group">
+                <label>الإيميل</label>
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
               </div>
               <div className="form-group">
                 <label>العنوان</label>
-                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="العنوان" />
+                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="العنوان الكامل" />
               </div>
               <div className="form-group">
                 <label>ملاحظات</label>
@@ -185,6 +190,7 @@ function ClientsContent() {
                 data={clients.map((c) => ({
                   'اسم العميل': c.name,
                   'رقم الهاتف': c.phone,
+                  'الإيميل': c.email || '',
                   'العنوان': c.address,
                   'إجمالي المشتريات': c.totalSales,
                   'المدفوع': c.totalPaid,

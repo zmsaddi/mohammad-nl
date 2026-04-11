@@ -261,20 +261,20 @@ function SummaryContent() {
                   <tbody>
                     {data.recentDeliveries.map((d, i) => (
                       <tr key={i}>
-                        <td>{d['التاريخ']}</td>
-                        <td style={{ fontWeight: 600 }}>{d['اسم العميل']}</td>
-                        <td>{d['العنوان']}</td>
-                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d['الأصناف']}</td>
+                        <td>{d.date}</td>
+                        <td style={{ fontWeight: 600 }}>{d.client_name}</td>
+                        <td>{d.address}</td>
+                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
                         <td>
                           <span style={{
                             padding: '2px 10px',
                             borderRadius: '20px',
                             fontSize: '0.8rem',
                             fontWeight: 600,
-                            background: d['الحالة'] === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
-                            color: d['الحالة'] === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
+                            background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
+                            color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
                           }}>
-                            {d['الحالة']}
+                            {d.status}
                           </span>
                         </td>
                       </tr>

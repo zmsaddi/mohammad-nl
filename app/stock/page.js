@@ -171,6 +171,7 @@ function StockContent() {
                   <th>المنتج</th>
                   <th>الفئة</th>
                   <th>سعر الشراء</th>
+                  <th>سعر البيع</th>
                   <th>الكمية</th>
                   <th>قيمة المخزون</th>
                   <th>الحالة</th>
@@ -187,6 +188,7 @@ function StockContent() {
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
                       <td>{p.category || '-'}</td>
                       <td className="number-cell">{formatNumber(p.buy_price)}</td>
+                      <td className="number-cell" style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</td>
                       <td className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
                         {formatNumber(p.stock)}
                       </td>

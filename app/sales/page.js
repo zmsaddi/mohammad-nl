@@ -114,7 +114,7 @@ function SalesContent() {
         // Ask if user wants to share via WhatsApp
         if (form.clientPhone) {
           const shareData = {
-            phone: form.clientPhone.replace(/^0/, '31').replace(/[^0-9]/g, ''),
+            phone: form.clientPhone.replace(/[^0-9+]/g, '').replace(/^00/, '+').replace(/^\+/, ''),
             refCode: result.refCode || '',
             item: form.item,
             quantity: form.quantity,
@@ -189,7 +189,7 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label>هاتف العميل</label>
-              <input type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="05xxxxxxxx" style={{ direction: 'ltr', textAlign: 'right' }} />
+              <input type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+31612345678 أو +966501234567" style={{ direction: 'ltr', textAlign: 'right' }} />
             </div>
             <div className="form-group">
               <label>إيميل العميل</label>
@@ -379,7 +379,7 @@ function SalesContent() {
                           style={{ background: '#25d366', color: 'white', padding: '4px 8px' }}
                           onClick={() => {
                             const client = clients.find((c) => c.name === row.client_name);
-                            const phone = (client?.phone || '').replace(/^0/, '31').replace(/[^0-9]/g, '');
+                            const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '+').replace(/^\+/, '');
                             if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
                             const msg = encodeURIComponent(
 `*Vitesse Eco*

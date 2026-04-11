@@ -46,6 +46,7 @@ function DeliveriesContent() {
     date: getTodayDate(),
     clientName: '',
     clientPhone: '',
+    clientEmail: '',
     address: '',
     items: '',
     totalAmount: '',
@@ -80,6 +81,7 @@ function DeliveriesContent() {
         ...prev,
         clientName: name,
         clientPhone: client ? client.phone || '' : prev.clientPhone,
+        clientEmail: client ? client.email || '' : prev.clientEmail,
         address: client ? client.address || '' : prev.address,
       };
     });
