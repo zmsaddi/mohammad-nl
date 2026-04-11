@@ -168,24 +168,65 @@ function SalesContent() {
               </datalist>
             </div>
             <div className="form-group">
-              <label>اسم الصنف *</label>
-              <input type="text" list="sales-products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
-              <datalist id="sales-products-list">
-                {products.map((p) => <option key={p.id} value={p.name} />)}
-              </datalist>
+              <label>الصنف * (من المخزون)</label>
+              <select
+                value={form.item}
+                onChange={(e) => {
+                  const p = products.find((pr) => pr.name === e.target.value);
+                  setForm({ ...form, item: e.target.value, unitPrice: p?.sell_price || p?.buy_price || form.unitPrice });
+                }}
+                required
+                style={{ padding: '10px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.9rem', background: 'white' }}
+              >
+                <option value="">اختر صنف من المخزون</option>
+                {products.filter((p) => p.stock > 0).map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} (متاح: {p.stock} | تكلفة: {p.buy_price})
+                  </option>
+                ))}
+                {products.filter((p) => !p.stock || p.stock <= 0).length > 0 && (
+                  <optgroup label="-- نفذ المخزون --">
+                    {products.filter((p) => !p.stock || p.stock <= 0).map((p) => (
+                      <option key={p.id} value={p.name} disabled style={{ color: '#999' }}>
+                        {p.name} (نفذ)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
             </div>
             <div className="form-group">
-              <label>الكمية *</label>
-              <input type="number" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <label>الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
+              <input type="number" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
-              <label>سعر الوحدة *</label>
+              <label>سعر البيع *</label>
               <input type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label>الإجمالي</label>
               <input type="text" value={formatNumber(total)} readOnly />
             </div>
+            {form.item && (() => {
+              const p = products.find((pr) => pr.name === form.item);
+              const costPrice = p?.buy_price || 0;
+              const qty = parseFloat(form.quantity) || 0;
+              const costTotal = qty * costPrice;
+              const saleProfit = total - costTotal;
+              return (
+                <div className="form-group">
+                  <label>الربح المتوقع</label>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '0.85rem', marginTop: '4px' }}>
+                    <span style={{ background: '#fee2e2', padding: '4px 10px', borderRadius: '8px', color: '#dc2626' }}>
+                      التكلفة: {formatNumber(costTotal)}
+                    </span>
+                    <span style={{ background: saleProfit >= 0 ? '#dcfce7' : '#fee2e2', padding: '4px 10px', borderRadius: '8px', color: saleProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+                      الربح: {formatNumber(saleProfit)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="form-group">
               <label>حالة الدفع *</label>
               <div className="radio-group" style={{ marginTop: '6px' }}>
@@ -265,8 +306,9 @@ function SalesContent() {
                   <th>الكمية</th>
                   <th>سعر الوحدة</th>
                   <th>الإجمالي</th>
+                  <th>التكلفة</th>
+                  <th>الربح</th>
                   <th>الدفع</th>
-                  <th>المدفوع</th>
                   <th>المتبقي</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
@@ -281,12 +323,15 @@ function SalesContent() {
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>
+                    <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+                      {formatNumber(row.profit)}
+                    </td>
                     <td>
                       <span className={`status-badge ${row.payment_method === 'نقدي' ? 'status-cash' : 'status-credit'}`}>
                         {row.payment_method}
                       </span>
                     </td>
-                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
                     <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                       {formatNumber(row.remaining)}
                     </td>

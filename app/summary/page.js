@@ -78,15 +78,16 @@ function SummaryContent() {
     : [];
 
   const exportData = data ? [
-    { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
-    { 'البند': 'إجمالي المبيعات', 'المبلغ': data.totalSales },
-    { 'البند': 'إجمالي المصاريف', 'المبلغ': data.totalExpenses },
+    { 'البند': 'إيرادات المبيعات', 'المبلغ': data.totalRevenue },
+    { 'البند': 'تكلفة البضاعة المباعة', 'المبلغ': data.totalCOGS },
     { 'البند': 'الربح الإجمالي', 'المبلغ': data.grossProfit },
+    { 'البند': 'المصاريف التشغيلية', 'المبلغ': data.totalExpenses },
     { 'البند': 'صافي الربح', 'المبلغ': data.netProfit },
-    { 'البند': 'ربح بعد التوصيل', 'المبلغ': data.deliveredProfit },
+    { 'البند': 'رأس المال (المشتريات)', 'المبلغ': data.totalPurchases },
+    { 'البند': 'قيمة المخزون', 'المبلغ': data.inventoryValue },
+    { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
     { 'البند': 'مبيعات نقدي', 'المبلغ': data.salesCash },
     { 'البند': 'مبيعات بنك', 'المبلغ': data.salesBank },
-    { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
   ] : [];
 
   return (
@@ -119,101 +120,69 @@ function SummaryContent() {
         <div className="loading-overlay"><div className="spinner"></div></div>
       ) : data ? (
         <>
-          {/* Summary Cards */}
+          {/* Accounting P&L Cards */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#1e293b' }}>قائمة الأرباح والخسائر</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات المبيعات</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalRevenue)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGS)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف التشغيلية</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses)}</div>
+              </div>
+              <div style={{ padding: '16px', background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
+                <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Assets & Liabilities */}
           <div className="summary-cards">
             <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                </svg>
+              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#1e40af" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
               </div>
               <div className="summary-card-content">
-                <h3>إجمالي المشتريات</h3>
+                <h3>رأس المال (المشتريات)</h3>
                 <div className="value">{formatNumber(data.totalPurchases)}</div>
               </div>
             </div>
-
             <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                </svg>
+              <div className="summary-card-icon" style={{ background: '#e0e7ff' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#4f46e5" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
               </div>
               <div className="summary-card-content">
-                <h3>إجمالي المبيعات</h3>
-                <div className="value" style={{ color: '#16a34a' }}>{formatNumber(data.totalSales)}</div>
+                <h3>قيمة المخزون</h3>
+                <div className="value" style={{ color: '#4f46e5' }}>{formatNumber(data.inventoryValue)}</div>
               </div>
             </div>
-
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#fef3c7' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
-                </svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>إجمالي المصاريف</h3>
-                <div className="value" style={{ color: '#f59e0b' }}>{formatNumber(data.totalExpenses)}</div>
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#1e40af" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                </svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>الربح الإجمالي</h3>
-                <div className="value" style={{ color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={data.netProfit >= 0 ? '#16a34a' : '#dc2626'} width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>صافي الربح</h3>
-                <div className="value" style={{ color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
-              </div>
-            </div>
-
             <div className="summary-card">
               <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
               </div>
               <div className="summary-card-content">
                 <h3>الديون المستحقة</h3>
                 <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
               </div>
             </div>
-
             <div className="summary-card">
               <div className="summary-card-icon" style={{ background: '#fef3c7' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
               <div className="summary-card-content">
                 <h3>توصيلات معلقة</h3>
                 <div className="value" style={{ color: '#f59e0b' }}>{data.pendingDeliveries || 0}</div>
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#3b82f6" width="24" height="24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-                </svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>جاري التوصيل</h3>
-                <div className="value" style={{ color: '#3b82f6' }}>{data.inTransitDeliveries || 0}</div>
               </div>
             </div>
           </div>
