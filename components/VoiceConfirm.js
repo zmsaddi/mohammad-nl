@@ -8,34 +8,24 @@ export default function VoiceConfirm({ result, onConfirm, onCancel }) {
 
   const { action, data, warnings, transcript, question, missing_fields } = result;
 
-  // Clarification → show as info then let user try again
-  if (action === 'clarification') {
-    return (
-      <div className="modal-overlay" onClick={onCancel}>
-        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-          <h3 style={{ textAlign: 'center' }}>معلومات ناقصة</h3>
-          {transcript && <p style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>سمعت: "{transcript}"</p>}
-          <div style={{ background: '#fefce8', padding: '12px', borderRadius: '10px', margin: '12px 0', textAlign: 'center', fontSize: '1rem', fontWeight: 600, color: '#92400e' }}>
-            {question || 'لم أفهم - حاول مرة أخرى'}
-          </div>
-          <div className="modal-actions">
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={onCancel}>حاول مرة أخرى</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ALWAYS open editable form - even with partial data
+  const formAction = action === 'clarification' ? 'register_expense' : action;
+  const formData = action === 'clarification' ? (data || {}) : data;
+  const formWarnings = action === 'clarification'
+    ? [question || 'أكمل الحقول الفارغة', ...(warnings || [])]
+    : (warnings || []);
 
-  // Data extracted → editable form
-  return <EditableForm action={action} data={data} warnings={warnings} transcript={transcript} onConfirm={onConfirm} onCancel={onCancel} />;
+  return <EditableForm action={formAction} data={formData} warnings={formWarnings} transcript={transcript} onConfirm={onConfirm} onCancel={onCancel} />;
 }
 
-function EditableForm({ action, data, warnings, transcript, onConfirm, onCancel }) {
+function EditableForm({ action: initialAction, data, warnings, transcript, onConfirm, onCancel }) {
   const [form, setForm] = useState({});
+  const [action, setAction] = useState(initialAction);
 
   useEffect(() => {
     if (data) setForm({ ...data });
-  }, [data]);
+    setAction(initialAction);
+  }, [data, initialAction]);
 
   const actionLabels = { register_sale: 'بيع', register_purchase: 'شراء', register_expense: 'مصروف' };
   const actionColors = { register_sale: '#16a34a', register_purchase: '#1e40af', register_expense: '#f59e0b' };
@@ -71,12 +61,17 @@ function EditableForm({ action, data, warnings, transcript, onConfirm, onCancel 
     <div className="modal-overlay" onClick={onCancel}>
       <div className="detail-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
         <div className="detail-modal-header">
-          <h3>
-            <span className="status-badge" style={{ background: `${color}20`, color, marginLeft: '8px' }}>
-              {actionLabels[action]}
-            </span>
-            تأكيد ومراجعة
-          </h3>
+          <div>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+              {Object.entries(actionLabels).map(([key, label]) => (
+                <button key={key} onClick={() => setAction(key)} className="status-badge" style={{
+                  background: action === key ? `${actionColors[key]}` : `${actionColors[key]}15`,
+                  color: action === key ? 'white' : actionColors[key],
+                  border: 'none', cursor: 'pointer', padding: '4px 12px', fontSize: '0.8rem',
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
           <button className="detail-modal-close" onClick={onCancel}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="20" height="20">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
