@@ -15,6 +15,7 @@ function SalesContent() {
 
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -36,14 +37,17 @@ function SalesContent() {
 
   const fetchData = async () => {
     try {
-      const [salesRes, clientsRes] = await Promise.all([
+      const [salesRes, clientsRes, productsRes] = await Promise.all([
         fetch('/api/sales'),
         fetch('/api/clients'),
+        fetch('/api/products'),
       ]);
       const salesData = await salesRes.json();
       const clientsData = await clientsRes.json();
+      const productsData = await productsRes.json();
       setRows(Array.isArray(salesData) ? salesData.reverse() : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
@@ -61,13 +65,23 @@ function SalesContent() {
     }
     setSubmitting(true);
     try {
-      // Check if client exists, if not add them
+      // Auto-create client if new
       const clientExists = clients.some((c) => c['اسم العميل'] === form.clientName);
       if (!clientExists) {
         await fetch('/api/clients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.clientName }),
+        });
+      }
+
+      // Auto-create product if new
+      const productExists = products.some((p) => p['اسم المنتج'] === form.item);
+      if (!productExists && form.item) {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.item }),
         });
       }
 
@@ -141,7 +155,10 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label>اسم الصنف *</label>
-              <input type="text" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="أدخل اسم الصنف" required />
+              <input type="text" list="sales-products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
+              <datalist id="sales-products-list">
+                {products.map((p) => <option key={p['معرف']} value={p['اسم المنتج']} />)}
+              </datalist>
             </div>
             <div className="form-group">
               <label>الكمية *</label>

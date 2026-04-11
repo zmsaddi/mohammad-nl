@@ -16,11 +16,12 @@ export async function GET(request) {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
 
-    let [purchases, sales, expenses, payments] = await Promise.all([
+    let [purchases, sales, expenses, payments, deliveries] = await Promise.all([
       getRows(SHEETS.PURCHASES),
       getRows(SHEETS.SALES),
       getRows(SHEETS.EXPENSES),
       getRows(SHEETS.PAYMENTS),
+      getRows(SHEETS.DELIVERIES),
     ]);
 
     // Apply date filters
@@ -117,6 +118,10 @@ export async function GET(request) {
       .sort((a, b) => b.debt - a.debt)
       .slice(0, 10);
 
+    // Delivery stats
+    const pendingDeliveries = deliveries.filter((d) => d['الحالة'] === 'قيد الانتظار');
+    const inTransitDeliveries = deliveries.filter((d) => d['الحالة'] === 'جاري التوصيل');
+
     return NextResponse.json({
       totalPurchases,
       totalSales,
@@ -127,6 +132,9 @@ export async function GET(request) {
       monthlyData,
       expenseByCategory,
       topDebtors,
+      pendingDeliveries: pendingDeliveries.length,
+      inTransitDeliveries: inTransitDeliveries.length,
+      recentDeliveries: [...pendingDeliveries, ...inTransitDeliveries].slice(0, 5),
     });
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });

@@ -14,6 +14,8 @@ function PurchasesContent() {
   const isAdmin = session?.user?.role === 'admin';
 
   const [rows, setRows] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -31,9 +33,17 @@ function PurchasesContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/purchases');
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data.reverse() : []);
+      const [purchasesRes, productsRes, suppliersRes] = await Promise.all([
+        fetch('/api/purchases'),
+        fetch('/api/products'),
+        fetch('/api/suppliers'),
+      ]);
+      const purchasesData = await purchasesRes.json();
+      const productsData = await productsRes.json();
+      const suppliersData = await suppliersRes.json();
+      setRows(Array.isArray(purchasesData) ? purchasesData.reverse() : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
@@ -51,6 +61,26 @@ function PurchasesContent() {
     }
     setSubmitting(true);
     try {
+      // Auto-create product if new
+      const productExists = products.some((p) => p['اسم المنتج'] === form.item);
+      if (!productExists && form.item) {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.item }),
+        });
+      }
+
+      // Auto-create supplier if new
+      const supplierExists = suppliers.some((s) => s['اسم المورد'] === form.supplier);
+      if (!supplierExists && form.supplier) {
+        await fetch('/api/suppliers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.supplier }),
+        });
+      }
+
       const res = await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,9 +117,6 @@ function PurchasesContent() {
     setDeleteId(null);
   };
 
-  // Unique suppliers for autocomplete
-  const suppliers = [...new Set(rows.map((r) => r['اسم المورد']).filter(Boolean))];
-
   return (
     <AppLayout>
       <div className="page-header">
@@ -115,16 +142,19 @@ function PurchasesContent() {
                 list="suppliers-list"
                 value={form.supplier}
                 onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                placeholder="أدخل اسم المورد"
+                placeholder="اكتب للبحث أو أضف مورد جديد"
                 required
               />
               <datalist id="suppliers-list">
-                {suppliers.map((s) => <option key={s} value={s} />)}
+                {suppliers.map((s) => <option key={s['معرف'] || s} value={s['اسم المورد'] || s} />)}
               </datalist>
             </div>
             <div className="form-group">
               <label>اسم الصنف *</label>
-              <input type="text" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="أدخل اسم الصنف" required />
+              <input type="text" list="products-list" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="اكتب للبحث أو أضف صنف جديد" required />
+              <datalist id="products-list">
+                {products.map((p) => <option key={p['معرف']} value={p['اسم المنتج']} />)}
+              </datalist>
             </div>
             <div className="form-group">
               <label>الكمية *</label>

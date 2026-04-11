@@ -189,7 +189,78 @@ function SummaryContent() {
                 <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
               </div>
             </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#fef3c7' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>توصيلات معلقة</h3>
+                <div className="value" style={{ color: '#f59e0b' }}>{data.pendingDeliveries || 0}</div>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#3b82f6" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                </svg>
+              </div>
+              <div className="summary-card-content">
+                <h3>جاري التوصيل</h3>
+                <div className="value" style={{ color: '#3b82f6' }}>{data.inTransitDeliveries || 0}</div>
+              </div>
+            </div>
           </div>
+
+          {/* Pending Deliveries */}
+          {data.recentDeliveries?.length > 0 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="20" height="20">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                </svg>
+                التوصيلات المعلقة والجارية
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>التاريخ</th>
+                      <th>العميل</th>
+                      <th>العنوان</th>
+                      <th>الأصناف</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentDeliveries.map((d, i) => (
+                      <tr key={i}>
+                        <td>{d['التاريخ']}</td>
+                        <td style={{ fontWeight: 600 }}>{d['اسم العميل']}</td>
+                        <td>{d['العنوان']}</td>
+                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d['الأصناف']}</td>
+                        <td>
+                          <span style={{
+                            padding: '2px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            background: d['الحالة'] === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
+                            color: d['الحالة'] === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
+                          }}>
+                            {d['الحالة']}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Charts */}
           <div className="charts-grid">
