@@ -33,13 +33,18 @@ export async function POST(request) {
       'كاش', 'بنك', 'آجل', 'دراجة', 'بطارية', 'شاحن',
     ].join('، ');
 
+    // Convert to proper File for Groq
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const file = new File([buffer], 'audio.webm', { type: 'audio/webm' });
+
     // Transcribe with Whisper
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
+      file: file,
       model: 'whisper-large-v3',
       language: 'ar',
-      prompt: vocab,
+      prompt: vocab.slice(0, 200),
     });
 
     const rawText = transcription.text || '';
@@ -50,6 +55,7 @@ export async function POST(request) {
       normalized: normalizedText,
     });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في التحويل: ' + error.message }, { status: 500 });
+    console.error('Voice transcribe error:', error);
+    return NextResponse.json({ error: 'خطأ في التحويل: ' + (error?.message || error?.error?.message || 'غير معروف') }, { status: 500 });
   }
 }
