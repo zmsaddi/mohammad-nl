@@ -19,6 +19,7 @@ function SalesContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [whatsappShare, setWhatsappShare] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -110,24 +111,18 @@ function SalesContent() {
         const result = await res.json();
         addToast('تم تسجيل عملية البيع وإنشاء توصيلة تلقائياً');
 
-        // Offer to share via WhatsApp
+        // Ask if user wants to share via WhatsApp
         if (form.clientPhone) {
-          const phone = form.clientPhone.replace(/^0/, '31').replace(/[^0-9]/g, '');
-          const msg = encodeURIComponent(
-`*Mohammad NL - تأكيد طلب*
-━━━━━━━━━━━━━━━━━
-*الكود:* ${result.refCode || ''}
-*المنتج:* ${form.item}
-*الكمية:* ${form.quantity}
-*السعر:* ${total}
-*الدفع:* ${form.paymentMethod === 'نقدي' ? 'مدفوع' : 'آجل'}
-━━━━━━━━━━━━━━━━━
-*التوصيل إلى:* ${form.clientAddress || '-'}
-*حالة التوصيل:* قيد الانتظار
-
-شكراً لتعاملكم معنا!`
-          );
-          window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+          const shareData = {
+            phone: form.clientPhone.replace(/^0/, '31').replace(/[^0-9]/g, ''),
+            refCode: result.refCode || '',
+            item: form.item,
+            quantity: form.quantity,
+            total,
+            paymentMethod: form.paymentMethod,
+            address: form.clientAddress,
+          };
+          setWhatsappShare(shareData);
         }
 
         setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentMethod: 'نقدي', paymentType: 'نقدي', paidAmount: '', notes: '' });
@@ -414,6 +409,54 @@ function SalesContent() {
           </div>
         )}
       </div>
+
+      {/* WhatsApp Share Modal */}
+      {whatsappShare && (
+        <div className="modal-overlay" onClick={() => setWhatsappShare(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.737.813.813-2.737-.149-.252A8 8 0 1112 20z"/></svg>
+            </div>
+            <h3>تم تسجيل البيع بنجاح!</h3>
+            <p>هل تريد مشاركة تفاصيل الطلب مع العميل عبر واتساب؟</p>
+            <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', margin: '16px 0', textAlign: 'right', fontSize: '0.85rem', lineHeight: 1.8 }}>
+              <div><strong>الكود:</strong> {whatsappShare.refCode}</div>
+              <div><strong>المنتج:</strong> {whatsappShare.item}</div>
+              <div><strong>الكمية:</strong> {whatsappShare.quantity}</div>
+              <div><strong>المبلغ:</strong> {formatNumber(whatsappShare.total)}</div>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="btn"
+                style={{ background: '#25d366', color: 'white', flex: 1 }}
+                onClick={() => {
+                  const s = whatsappShare;
+                  const msg = encodeURIComponent(
+`*Mohammad NL - تأكيد طلب*
+━━━━━━━━━━━━━━━━━
+*الكود:* ${s.refCode}
+*المنتج:* ${s.item}
+*الكمية:* ${s.quantity}
+*المبلغ:* ${s.total}
+*الدفع:* ${s.paymentMethod === 'نقدي' ? 'مدفوع' : 'آجل'}
+━━━━━━━━━━━━━━━━━
+*التوصيل إلى:* ${s.address || '-'}
+
+شكراً لتعاملكم معنا!`
+                  );
+                  window.open(`https://wa.me/${s.phone}?text=${msg}`, '_blank');
+                  setWhatsappShare(null);
+                }}
+              >
+                إرسال عبر واتساب
+              </button>
+              <button className="btn btn-outline" onClick={() => setWhatsappShare(null)}>
+                لا، شكراً
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={!!deleteId}
