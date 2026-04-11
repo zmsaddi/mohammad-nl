@@ -20,6 +20,7 @@ function SalesContent() {
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
+  const [bonusSettings, setBonusSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -55,17 +56,16 @@ function SalesContent() {
 
   const fetchData = async () => {
     try {
-      const [salesRes, clientsRes, productsRes] = await Promise.all([
-        fetch('/api/sales'),
-        fetch('/api/clients'),
-        fetch('/api/products'),
-      ]);
-      const salesData = await salesRes.json();
-      const clientsData = await clientsRes.json();
-      const productsData = await productsRes.json();
+      const fetches = [fetch('/api/sales'), fetch('/api/clients'), fetch('/api/products')];
+      if (isSeller) fetches.push(fetch('/api/settings'));
+      const results = await Promise.all(fetches);
+      const salesData = await results[0].json();
+      const clientsData = await results[1].json();
+      const productsData = await results[2].json();
       setRows(Array.isArray(salesData) ? salesData.reverse() : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
+      if (isSeller && results[3]) setBonusSettings(await results[3].json());
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
@@ -252,6 +252,40 @@ function SalesContent() {
               <label>الإجمالي</label>
               <input type="text" value={formatNumber(total)} readOnly />
             </div>
+            {isSeller && form.item && form.unitPrice && (() => {
+              const p = products.find((pr) => pr.name === form.item);
+              const recommended = p?.sell_price || 0;
+              const price = parseFloat(form.unitPrice) || 0;
+              const qty = parseFloat(form.quantity) || 0;
+              const fixedBonus = parseFloat(bonusSettings.seller_bonus_fixed) || 0;
+              const pct = parseFloat(bonusSettings.seller_bonus_percentage) || 0;
+              const extra = Math.max(0, price - recommended) * qty;
+              const extraBonus = extra * pct / 100;
+              const totalBonus = fixedBonus + extraBonus;
+              return (
+                <div className="form-group">
+                  <label>البونص المتوقع (بعد التوصيل)</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', fontSize: '0.82rem', marginTop: '4px' }}>
+                    <span style={{ background: '#dcfce7', padding: '4px 10px', borderRadius: '8px', color: '#16a34a' }}>
+                      ثابت: {formatNumber(fixedBonus)}
+                    </span>
+                    {extraBonus > 0 && (
+                      <span style={{ background: '#dbeafe', padding: '4px 10px', borderRadius: '8px', color: '#1e40af' }}>
+                        إضافي ({pct}% من {formatNumber(extra)}): {formatNumber(extraBonus)}
+                      </span>
+                    )}
+                    <span style={{ background: '#f0fdf4', padding: '6px 12px', borderRadius: '8px', color: '#15803d', fontWeight: 700, border: '1.5px solid #16a34a' }}>
+                      المجموع: {formatNumber(totalBonus)}
+                    </span>
+                  </div>
+                  {price < recommended && recommended > 0 && (
+                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#dc2626' }}>
+                      السعر أقل من الموصى ({formatNumber(recommended)}) - لن يُقبل
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {form.item && canSeeCosts && (() => {
               const p = products.find((pr) => pr.name === form.item);
               const costPrice = p?.buy_price || 0;

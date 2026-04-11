@@ -10,6 +10,7 @@ const PAGE_ROLES = {
   '/clients': ['admin', 'manager'],
   '/sales': ['admin', 'manager', 'seller'],
   '/invoices': ['admin', 'manager', 'seller'],
+  '/my-bonus': ['seller', 'driver'],
   '/deliveries': ['admin', 'manager', 'seller', 'driver'],
   '/users': ['admin'],
   '/settlements': ['admin'],
