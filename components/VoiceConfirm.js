@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
+import { formatNumber, getTodayDate, EXPENSE_CATEGORIES, PRODUCT_CATEGORIES } from '@/lib/utils';
 
 export default function VoiceConfirm({ result, onConfirm, onCancel }) {
   if (!result) return null;
@@ -95,7 +95,8 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
       if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {}));
     } else if (action === 'register_purchase') {
       if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }) }).catch(() => {}));
-      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {}));
+      // DONE: Step 7 — pass the chosen category through so the product is filed correctly on first creation
+      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }) }).catch(() => {}));
     }
     if (creates.length) await Promise.all(creates);
 
@@ -192,6 +193,48 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                   setForm({ ...form, client_name: e.target.value, client_phone: client?.phone || form.client_phone || '', client_email: client?.email || form.client_email || '', client_address: client?.address || form.client_address || '' });
                 }} autoComplete="off" />
                 <datalist id="vc-clients">{dbData.clients.map((c) => <option key={c.id} value={c.name} label={c.phone || ''} />)}</datalist>
+                {/* DONE: Bug 1 — clientCandidates selector when same name has multiple matches */}
+                {form.clientCandidates?.length > 0 && !form.client_name && (
+                  <div style={{
+                    background: '#fef3c7', border: '1px solid #f59e0b',
+                    borderRadius: '8px', padding: '10px', marginTop: '6px',
+                  }}>
+                    <div style={{ fontSize: '0.78rem', color: '#92400e', marginBottom: '8px' }}>
+                      ⚠ يوجد {form.clientCandidates.length} عملاء بهذا الاسم — اختر الصحيح:
+                    </div>
+                    {form.clientCandidates.map((name, i) => {
+                      const client = dbData.clients.find((c) => c.name === name);
+                      return (
+                        <button key={i} type="button"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              client_name: name,
+                              client_phone: client?.phone || '',
+                              client_email: client?.email || '',
+                              client_address: client?.address || '',
+                              clientCandidates: [],
+                            });
+                          }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'right',
+                            padding: '8px 12px', margin: '4px 0',
+                            background: 'white', border: '1px solid #d1d5db',
+                            borderRadius: '6px', cursor: 'pointer',
+                            fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem',
+                          }}
+                        >
+                          {name}
+                          {client?.phone && (
+                            <span style={{ color: '#94a3b8', marginRight: '8px', fontSize: '0.75rem' }}>
+                              {client.phone}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
@@ -213,6 +256,16 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 </label>
                 <input style={fi('item')} list="vc-products" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
                 <datalist id="vc-products">{dbData.products.filter((p) => p.stock > 0).map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock}`} />)}</datalist>
+                {/* DONE: Bug 2 — surface "this product will be added" notice when AI detected a new product */}
+                {form.suggestAddProduct && form.item && (
+                  <div style={{
+                    fontSize: '0.75rem', color: '#1e40af',
+                    background: '#dbeafe', padding: '6px 10px',
+                    borderRadius: '6px', marginTop: '4px',
+                  }}>
+                    💡 المنتج "{form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.
+                  </div>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
@@ -258,6 +311,16 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 </label>
                 <input style={fi('item')} list="vc-products2" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
                 <datalist id="vc-products2">{dbData.products.map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock || 0}`} />)}</datalist>
+                {/* DONE: Bug 2 — same notice in PURCHASE FORM */}
+                {form.suggestAddProduct && form.item && (
+                  <div style={{
+                    fontSize: '0.75rem', color: '#1e40af',
+                    background: '#dbeafe', padding: '6px 10px',
+                    borderRadius: '6px', marginTop: '4px',
+                  }}>
+                    💡 المنتج "{form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.
+                  </div>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
@@ -272,6 +335,20 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>سعر البيع الموصى</label>
                 <input style={{ ...inputStyle, border: '1.5px solid #d1d5db' }} type="number" min="0" value={form.sellPrice || ''} onChange={(e) => setForm({ ...form, sellPrice: parseFloat(e.target.value) || 0 })} placeholder="اختياري" />
+              </div>
+              {/* DONE: Step 7 — category select for the purchase form */}
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>فئة المنتج</label>
+                <select
+                  style={fi('category')}
+                  value={form.category || ''}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  <option value="">اختر فئة...</option>
+                  {PRODUCT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 700, color }}>
                 الإجمالي: {formatNumber((form.quantity || 0) * (form.unit_price || 0))}

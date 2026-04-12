@@ -30,6 +30,24 @@ export async function POST(request) {
     const parsed = PaymentSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
 
+    // BUG 5A — block payments against cancelled or non-credit sales.
+    // Without this guard, an admin could record a debt payment on a refunded
+    // sale and silently corrupt the client's balance.
+    if (parsed.data.saleId) {
+      const { rows } = await sql`
+        SELECT status, payment_type FROM sales WHERE id = ${parsed.data.saleId}
+      `;
+      if (!rows.length) {
+        return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
+      }
+      if (rows[0].status === 'ملغي') {
+        return NextResponse.json({ error: 'لا يمكن تسجيل دفعة على طلب ملغي' }, { status: 400 });
+      }
+      if (rows[0].payment_type !== 'آجل') {
+        return NextResponse.json({ error: 'هذا الطلب ليس آجلاً — لا يوجد دين لتسديده' }, { status: 400 });
+      }
+    }
+
     const id = await addPayment({ ...parsed.data, createdBy: token.username });
     return NextResponse.json({ success: true, id });
   } catch {

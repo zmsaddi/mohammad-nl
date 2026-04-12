@@ -6,12 +6,14 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
 
 function StockContent() {
   const { data: session } = useSession();
   const addToast = useToast();
   const isAdmin = session?.user?.role === 'admin';
+  // DONE: Bug 4 — only admin/manager may see cost data
+  const canSeeCosts = ['admin', 'manager'].includes(session?.user?.role);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +21,16 @@ function StockContent() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all, in-stock, low, out
+  // DONE: Step 2 — category filter
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  // DONE: Step 2 — product-specific stock status (uses per-product threshold, default 3)
+  const getStatus = (p) => {
+    const threshold = p.low_stock_threshold ?? 3;
+    if (!p.stock || p.stock <= 0) return 'out';
+    if (p.stock <= threshold) return 'low';
+    return 'ok';
+  };
 
   const fetchData = async () => {
     try {
@@ -54,15 +66,25 @@ function StockContent() {
     p.category?.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (filter === 'in-stock') filtered = filtered.filter((p) => p.stock > 5);
-  else if (filter === 'low') filtered = filtered.filter((p) => p.stock > 0 && p.stock <= 5);
-  else if (filter === 'out') filtered = filtered.filter((p) => !p.stock || p.stock <= 0);
+  // DONE: Step 2 — status filter now uses product-specific threshold via getStatus()
+  if (filter === 'in-stock') filtered = filtered.filter((p) => getStatus(p) === 'ok');
+  else if (filter === 'low') filtered = filtered.filter((p) => getStatus(p) === 'low');
+  else if (filter === 'out') filtered = filtered.filter((p) => getStatus(p) === 'out');
+
+  // DONE: Step 2 — category filter
+  if (categoryFilter !== 'all') {
+    filtered = filtered.filter((p) => p.category === categoryFilter);
+  }
 
   const totalProducts = products.length;
   const totalStock = products.reduce((s, p) => s + (p.stock || 0), 0);
-  const totalValue = products.reduce((s, p) => s + ((p.stock || 0) * (p.buy_price || 0)), 0);
-  const outOfStock = products.filter((p) => !p.stock || p.stock <= 0).length;
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
+  // DONE: Bug 4 — sellers receive products with buy_price stripped server-side, so total = 0 for them
+  const totalValue = canSeeCosts
+    ? products.reduce((s, p) => s + ((p.stock || 0) * (p.buy_price || 0)), 0)
+    : 0;
+  // DONE: Step 2 — out/low counts also use the per-product threshold
+  const outOfStock = products.filter((p) => getStatus(p) === 'out').length;
+  const lowStock = products.filter((p) => getStatus(p) === 'low').length;
 
   return (
     <AppLayout>
@@ -91,15 +113,18 @@ function StockContent() {
             <div className="value" style={{ color: '#16a34a' }}>{formatNumber(totalStock)}</div>
           </div>
         </div>
-        <div className="summary-card">
-          <div className="summary-card-icon" style={{ background: '#e0e7ff' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#4f46e5" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        {/* DONE: Bug 4 — hide entire inventory-value card from sellers */}
+        {canSeeCosts && (
+          <div className="summary-card">
+            <div className="summary-card-icon" style={{ background: '#e0e7ff' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#4f46e5" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div className="summary-card-content">
+              <h3>قيمة المخزون</h3>
+              <div className="value" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</div>
+            </div>
           </div>
-          <div className="summary-card-content">
-            <h3>قيمة المخزون</h3>
-            <div className="value" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</div>
-          </div>
-        </div>
+        )}
         <div className="summary-card">
           <div className="summary-card-icon" style={{ background: lowStock > 0 || outOfStock > 0 ? '#fee2e2' : '#dcfce7' }}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={outOfStock > 0 ? '#dc2626' : '#16a34a'} width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
@@ -115,6 +140,55 @@ function StockContent() {
           </div>
         </div>
       </div>
+
+      {/* DONE: Step 5 — low/out stock alert banner. Click-through filters the table */}
+      {(lowStock > 0 || outOfStock > 0) && (
+        <div style={{
+          background: outOfStock > 0 ? '#fef2f2' : '#fffbeb',
+          border: `1px solid ${outOfStock > 0 ? '#fca5a5' : '#fcd34d'}`,
+          borderRadius: '12px',
+          padding: '14px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          <span style={{ fontSize: '1.4rem' }}>{outOfStock > 0 ? '🔴' : '🟡'}</span>
+          <div>
+            <div style={{
+              fontWeight: 700,
+              color: outOfStock > 0 ? '#dc2626' : '#d97706',
+              fontSize: '0.95rem',
+            }}>
+              {outOfStock > 0
+                ? `${outOfStock} منتج نفذ من المخزون`
+                : `${lowStock} منتج وصل للحد الأدنى`}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '2px' }}>
+              {outOfStock > 0 && lowStock > 0
+                ? `بالإضافة إلى ${lowStock} منتج بمخزون منخفض`
+                : 'راجع المخزون وأضف كميات عند الحاجة'}
+            </div>
+          </div>
+          <button
+            onClick={() => setFilter(outOfStock > 0 ? 'out' : 'low')}
+            style={{
+              marginRight: 'auto',
+              padding: '6px 14px',
+              background: outOfStock > 0 ? '#dc2626' : '#d97706',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              fontFamily: "'Cairo', sans-serif",
+              fontWeight: 600,
+            }}
+          >
+            عرض المنتجات
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="card">
@@ -140,6 +214,17 @@ function StockContent() {
               <option value="low">مخزون منخفض</option>
               <option value="out">نفذ</option>
             </select>
+            {/* DONE: Step 2 — category filter dropdown */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+            >
+              <option value="all">كل الفئات</option>
+              {PRODUCT_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -158,10 +243,13 @@ function StockContent() {
                   <th>#</th>
                   <th>المنتج</th>
                   <th>الفئة</th>
-                  <th>سعر الشراء</th>
+                  {/* DONE: Bug 4 — buy_price + inventory value columns hidden from sellers */}
+                  {canSeeCosts && <th>سعر الشراء</th>}
                   <th>سعر البيع</th>
+                  {/* DONE: Step 2G — admin can tune the per-product low-stock threshold */}
+                  {isAdmin && <th>حد التنبيه</th>}
                   <th>الكمية</th>
-                  <th>قيمة المخزون</th>
+                  {canSeeCosts && <th>قيمة المخزون</th>}
                   <th>الحالة</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
@@ -169,13 +257,14 @@ function StockContent() {
               <tbody>
                 {filtered.map((p) => {
                   const value = (p.stock || 0) * (p.buy_price || 0);
-                  const status = !p.stock || p.stock <= 0 ? 'out' : p.stock <= 5 ? 'low' : 'ok';
+                  // DONE: Step 2F — replace hardcoded ≤5 threshold with per-product getStatus()
+                  const status = getStatus(p);
                   return (
                     <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
                       <td>{p.id}</td>
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
                       <td>{p.category || '-'}</td>
-                      <td className="number-cell">{formatNumber(p.buy_price)}</td>
+                      {canSeeCosts && <td className="number-cell">{formatNumber(p.buy_price)}</td>}
                       <td className="number-cell">
                         {isAdmin ? (
                           <input
@@ -205,10 +294,41 @@ function StockContent() {
                           <span style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</span>
                         )}
                       </td>
+                      {/* DONE: Step 2G — inline editable low-stock threshold (admin only) */}
+                      {isAdmin && (
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="number"
+                            min="0"
+                            defaultValue={p.low_stock_threshold ?? 3}
+                            style={{
+                              width: '60px', padding: '4px 6px',
+                              border: '1.5px solid #d1d5db', borderRadius: '6px',
+                              fontSize: '0.8rem', textAlign: 'center',
+                              fontFamily: "'Cairo', sans-serif",
+                            }}
+                            onBlur={async (e) => {
+                              const val = parseInt(e.target.value, 10);
+                              const safe = Number.isFinite(val) && val >= 0 ? val : 3;
+                              if (safe !== (p.low_stock_threshold ?? 3)) {
+                                try {
+                                  await fetch('/api/products', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: p.id, low_stock_threshold: safe }),
+                                  });
+                                  addToast('تم تحديث حد التنبيه');
+                                  fetchData();
+                                } catch { addToast('خطأ في التحديث', 'error'); }
+                              }
+                            }}
+                          />
+                        </td>
+                      )}
                       <td className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
                         {formatNumber(p.stock)}
                       </td>
-                      <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(value)}</td>
+                      {canSeeCosts && <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(value)}</td>}
                       <td>
                         <span className="status-badge" style={{
                           background: status === 'out' ? '#fee2e2' : status === 'low' ? '#fef3c7' : '#dcfce7',
@@ -227,11 +347,12 @@ function StockContent() {
                 })}
               </tbody>
               <tfoot>
+                {/* DONE: Step 2 — colspan recomputed for the new "حد التنبيه" admin-only column */}
                 <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                  <td colSpan={4} style={{ textAlign: 'center' }}>الإجمالي</td>
+                  <td colSpan={(canSeeCosts ? 4 : 3) + (isAdmin ? 1 : 0)} style={{ textAlign: 'center' }}>الإجمالي</td>
                   <td className="number-cell">{formatNumber(totalStock)}</td>
-                  <td className="number-cell" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</td>
-                  <td colSpan={2}></td>
+                  {canSeeCosts && <td className="number-cell" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</td>}
+                  <td colSpan={isAdmin ? 2 : 1}></td>
                 </tr>
               </tfoot>
             </table>
@@ -248,11 +369,12 @@ function StockContent() {
           { label: 'الفئة', value: selectedRow.category || '-' },
           { label: 'الوحدة', value: selectedRow.unit || '-' },
           { type: 'divider' },
-          { label: 'سعر الشراء', type: 'money', value: selectedRow.buy_price },
+          // DONE: Bug 4 — strip cost-related fields from the detail modal for sellers
+          ...(canSeeCosts ? [{ label: 'سعر الشراء', type: 'money', value: selectedRow.buy_price }] : []),
           { label: 'سعر البيع الموصى', type: 'money', value: selectedRow.sell_price, color: '#1e40af' },
           { type: 'divider' },
           { label: 'الكمية المتاحة', value: String(selectedRow.stock || 0), color: (selectedRow.stock || 0) > 5 ? '#16a34a' : (selectedRow.stock || 0) > 0 ? '#d97706' : '#dc2626' },
-          { label: 'قيمة المخزون', type: 'money', value: (selectedRow.stock || 0) * (selectedRow.buy_price || 0) },
+          ...(canSeeCosts ? [{ label: 'قيمة المخزون', type: 'money', value: (selectedRow.stock || 0) * (selectedRow.buy_price || 0) }] : []),
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
         ] : []}
       />

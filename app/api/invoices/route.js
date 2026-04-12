@@ -11,12 +11,17 @@ export async function GET(request) {
       const rows = await getInvoices();
       return NextResponse.json(rows);
     }
+    // BUG 4A — drivers can see invoices for deliveries they personally completed
+    if (token.role === 'driver') {
+      const rows = await getInvoices(token.username, 'driver');
+      return NextResponse.json(rows);
+    }
     if (token.role === 'seller') {
       const rows = await getInvoices(token.username);
       return NextResponse.json(rows);
     }
     return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }

@@ -7,8 +7,9 @@ export async function GET(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
 
   try {
-    // Admin sees all, others see only their own
-    if (token.role === 'admin') {
+    // BUG 6B — managers also need full bonus visibility for payroll oversight.
+    // Sellers and drivers continue to see only their own rows.
+    if (['admin', 'manager'].includes(token.role)) {
       const rows = await getBonuses();
       return NextResponse.json(rows);
     }

@@ -3,17 +3,19 @@ import { NextResponse } from 'next/server';
 
 // Role-based page access
 const PAGE_ROLES = {
-  '/summary': ['admin', 'manager'],
+  '/summary': ['admin', 'manager', 'seller'],
   '/purchases': ['admin', 'manager'],
   '/expenses': ['admin', 'manager'],
   '/stock': ['admin', 'manager'],
   '/clients': ['admin', 'manager'],
   '/sales': ['admin', 'manager', 'seller'],
-  '/invoices': ['admin', 'manager', 'seller'],
+  '/invoices': ['admin', 'manager', 'seller', 'driver'],
   '/my-bonus': ['seller', 'driver'],
   '/deliveries': ['admin', 'manager', 'seller', 'driver'],
   '/users': ['admin'],
   '/settlements': ['admin'],
+  // DONE: Step 5 — invoice settings page (admin only)
+  '/settings': ['admin'],
 };
 
 // Default page per role (redirect when accessing unauthorized page)

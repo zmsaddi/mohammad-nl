@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
 import {
@@ -19,12 +19,16 @@ function SummaryContent() {
   const { data: session } = useSession();
   const addToast = useToast();
   const isAdmin = session?.user?.role === 'admin';
+  // DONE: Step 8 — inventory breakdown is admin/manager only (cost data)
+  const canSeeCosts = ['admin', 'manager'].includes(session?.user?.role);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [voiceResult, setVoiceResult] = useState(null);
+  // DONE: Step 8 — products fetched separately for the category breakdown card
+  const [productList, setProductList] = useState([]);
   const canUseVoice = ['admin', 'manager', 'seller'].includes(session?.user?.role);
 
   const fetchData = async (from, to) => {
@@ -36,15 +40,79 @@ function SummaryContent() {
       if (to) params.set('to', to);
       if (params.toString()) url += `?${params}`;
 
-      const res = await fetch(url);
-      const result = await res.json();
+      // DONE: Step 8 — fetch products in parallel with the summary
+      const [summaryRes, productsRes] = await Promise.all([
+        fetch(url),
+        fetch('/api/products'),
+      ]);
+      const result = await summaryRes.json();
+      const products = await productsRes.json();
       setData(result);
+      setProductList(Array.isArray(products) ? products : []);
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
     }
   };
+
+  // DONE: Fix 4 — CSV export of the P&L summary, BOM-prefixed for correct Arabic in Excel
+  const exportCSV = () => {
+    if (!data) return;
+    const rows = [
+      ['البند', 'المبلغ'],
+      ['إيرادات مؤكدة', data.totalRevenue],
+      ['تكلفة البضاعة المباعة', data.totalCOGS],
+      ['الربح الإجمالي', data.grossProfit],
+      ['المصاريف التشغيلية', data.totalExpenses],
+      ['بونص مدفوع', data.totalBonusPaid],
+      ['بونص مستحق', data.totalBonusOwed],
+      ['صافي الربح', data.netProfit],
+      [''],
+      ['إجمالي المشتريات', data.totalPurchases],
+      ['قيمة المخزون', data.inventoryValue],
+      ['الديون المستحقة', data.totalDebt],
+      [''],
+      ['مبيعات كاش', data.salesCash],
+      ['مبيعات بنك', data.salesBank],
+      ['مبيعات آجل', data.salesCredit],
+    ];
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : new Date().toISOString().split('T')[0];
+    a.download = `vitesse-eco-report-${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // DONE: Fix 3 — branch on seller payload
+  const isSellerView = data?.sellerView === true;
+
+  // DONE: Fix 6 — gross + net margin (used inside the P&L cards)
+  const grossMargin = data && data.totalRevenue > 0
+    ? ((data.grossProfit / data.totalRevenue) * 100).toFixed(1)
+    : '0';
+  const netMargin = data && data.totalRevenue > 0
+    ? ((data.netProfit / data.totalRevenue) * 100).toFixed(1)
+    : '0';
+
+  // DONE: Step 8 — category breakdown computed from the product list
+  const categoryBreakdown = canSeeCosts
+    ? PRODUCT_CATEGORIES.map((cat) => {
+        const items = productList.filter((p) => p.category === cat);
+        return {
+          category: cat,
+          count: items.length,
+          totalStock: items.reduce((s, p) => s + (p.stock || 0), 0),
+          totalValue: items.reduce((s, p) => s + ((p.stock || 0) * (p.buy_price || 0)), 0),
+          lowCount: items.filter((p) => p.stock > 0 && p.stock <= (p.low_stock_threshold ?? 3)).length,
+          outCount: items.filter((p) => !p.stock || p.stock <= 0).length,
+        };
+      }).filter((c) => c.count > 0)
+    : [];
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
@@ -127,24 +195,65 @@ function SummaryContent() {
         onRetry={() => setVoiceResult(null)}
       />
 
-      {/* Date Filters */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div className="filters-bar">
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          <span style={{ color: '#64748b' }}>إلى</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          <button className="btn btn-primary btn-sm" onClick={handleFilter}>تصفية</button>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
-            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
-            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisYear')}>هذه السنة</button>
-            <button className="btn btn-outline btn-sm" onClick={() => handlePreset('all')}>الكل</button>
+      {/* Date Filters — hidden for seller view (their data is all-time) */}
+      {!isSellerView && (
+        <div className="card" style={{ marginBottom: '24px' }}>
+          <div className="filters-bar">
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <span style={{ color: '#64748b' }}>إلى</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <button className="btn btn-primary btn-sm" onClick={handleFilter}>تصفية</button>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
+              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
+              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisYear')}>هذه السنة</button>
+              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('all')}>الكل</button>
+            </div>
+            {/* DONE: Fix 4 — CSV export button (admin/manager only) */}
+            {data && canSeeCosts && (
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={exportCSV}
+                style={{ marginRight: 'auto' }}
+              >
+                📥 تصدير CSV
+              </button>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {loading ? (
         <div className="loading-overlay"><div className="spinner"></div></div>
+      ) : data && isSellerView ? (
+        /* DONE: Fix 3 — seller-only personal dashboard */
+        <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#1e293b' }}>
+            إحصائياتي الشخصية
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+            <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>مبيعات مؤكدة</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#15803d' }}>{data.totalSales}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#1e40af' }}>إيراداتي</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af' }}>{formatNumber(data.totalRevenue)}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#d97706' }}>محجوز ({data.reservedCount})</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#d97706' }}>{formatNumber(data.reservedRevenue)}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>بونص مستحق</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#15803d' }}>{formatNumber(data.totalBonusOwed)}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', textAlign: 'center', border: '1px solid #bbf7d0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>بونص تم صرفه</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid)}</div>
+            </div>
+          </div>
+        </div>
       ) : data ? (
         <>
           {/* Accounting P&L Cards */}
@@ -165,6 +274,8 @@ function SummaryContent() {
               <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
+                {/* DONE: Fix 6 — gross profit margin */}
+                <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '4px' }}>هامش: {grossMargin}%</div>
               </div>
               <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف التشغيلية</div>
@@ -181,6 +292,8 @@ function SummaryContent() {
               <div style={{ padding: '16px', background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
                 <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
+                {/* DONE: Fix 6 — net profit margin */}
+                <div style={{ fontSize: '0.75rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', marginTop: '4px' }}>هامش: {netMargin}%</div>
               </div>
             </div>
           </div>
@@ -381,9 +494,44 @@ function SummaryContent() {
             </div>
           </div>
 
+          {/* DONE: Step 8 — inventory breakdown by category (admin/manager only) */}
+          {canSeeCosts && categoryBreakdown.length > 0 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                المخزون حسب الفئة
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>الفئة</th>
+                      <th>عدد المنتجات</th>
+                      <th>إجمالي القطع</th>
+                      <th>قيمة المخزون</th>
+                      <th>منخفض</th>
+                      <th>نفذ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryBreakdown.map((c) => (
+                      <tr key={c.category}>
+                        <td style={{ fontWeight: 600 }}>{c.category}</td>
+                        <td className="number-cell">{c.count}</td>
+                        <td className="number-cell">{formatNumber(c.totalStock)}</td>
+                        <td className="number-cell" style={{ color: '#4f46e5', fontWeight: 600 }}>{formatNumber(c.totalValue)}</td>
+                        <td className="number-cell" style={{ color: c.lowCount > 0 ? '#d97706' : '#94a3b8' }}>{c.lowCount}</td>
+                        <td className="number-cell" style={{ color: c.outCount > 0 ? '#dc2626' : '#94a3b8' }}>{c.outCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Top Debtors */}
           {data.topDebtors?.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 أعلى المدينين
               </h3>
@@ -402,6 +550,109 @@ function SummaryContent() {
                         <td>{i + 1}</td>
                         <td style={{ fontWeight: 600 }}>{debtor.name}</td>
                         <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(debtor.debt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* DONE: Fix 1 — top products by revenue */}
+          {data.topProducts?.length > 0 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                أكثر المنتجات مبيعاً
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>الترتيب</th>
+                      <th>المنتج</th>
+                      <th>الكمية</th>
+                      <th>الإيرادات</th>
+                      {canSeeCosts && <th>الربح</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topProducts.map((p, i) => (
+                      <tr key={p.item}>
+                        <td style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{p.item}</td>
+                        <td className="number-cell">{formatNumber(p.count)}</td>
+                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(p.revenue)}</td>
+                        {canSeeCosts && (
+                          <td className="number-cell" style={{ color: p.profit >= 0 ? '#1e40af' : '#dc2626', fontWeight: 600 }}>
+                            {formatNumber(p.profit)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* DONE: Fix 2 — top clients by confirmed revenue */}
+          {data.topClients?.length > 0 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                أفضل العملاء
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>الترتيب</th>
+                      <th>العميل</th>
+                      <th>عدد الطلبات</th>
+                      <th>إجمالي الشراء</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topClients.map((c, i) => (
+                      <tr key={c.name}>
+                        <td style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{c.name}</td>
+                        <td className="number-cell">{c.count}</td>
+                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(c.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* DONE: Fix 5 — supplier performance (admin only) */}
+          {isAdmin && data.topSuppliers?.length > 0 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                أداء الموردين
+              </h3>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>المورد</th>
+                      <th>عدد الطلبات</th>
+                      <th>أنواع المنتجات</th>
+                      <th>إجمالي المدفوع</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topSuppliers.map((s) => (
+                      <tr key={s.name}>
+                        <td style={{ fontWeight: 600 }}>{s.name}</td>
+                        <td className="number-cell">{s.orders}</td>
+                        <td className="number-cell">{s.itemCount}</td>
+                        <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(s.totalSpent)}</td>
                       </tr>
                     ))}
                   </tbody>

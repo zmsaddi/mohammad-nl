@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, PRODUCT_CATEGORIES } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 
@@ -26,6 +26,7 @@ function PurchasesContent() {
     date: getTodayDate(),
     supplier: '',
     item: '',
+    category: '', // DONE: Step 3 — required category for new purchases
     quantity: '',
     unitPrice: '',
     sellPrice: '',
@@ -64,15 +65,20 @@ function PurchasesContent() {
       addToast('يرجى ملء جميع الحقول المطلوبة', 'error');
       return;
     }
+    // DONE: Step 3F — category required so the inventory taxonomy stays clean
+    if (!form.category) {
+      addToast('يرجى اختيار فئة المنتج', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
-      // Auto-create product if new
+      // Auto-create product if new — DONE: Step 3E pass category through
       const productExists = products.some((p) => p.name === form.item);
       if (!productExists && form.item) {
         await fetch('/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: form.item }),
+          body: JSON.stringify({ name: form.item, category: form.category }),
         });
       }
 
@@ -93,7 +99,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '' });
         fetchData();
       } else {
         const err = await res.json();
@@ -157,13 +163,33 @@ function PurchasesContent() {
               <label>المنتج *</label>
               <SmartSelect
                 value={form.item}
-                onChange={(val) => setForm({ ...form, item: val })}
+                onChange={(val) => {
+                  // DONE: Step 3 — auto-fill category from existing product when picked
+                  const existing = products.find((p) => p.name === val);
+                  setForm({ ...form, item: val, category: existing?.category || form.category });
+                }}
                 options={products.map((p) => ({ name: p.name, value: p.name, label: p.name, sub: `مخزون: ${p.stock || 0}` }))}
                 placeholder="اكتب اسم المنتج..."
                 allowNew
                 newLabel="منتج جديد"
                 required
               />
+            </div>
+            {/* DONE: Step 3C — category select right after the product field */}
+            <div className="form-group">
+              <label htmlFor="pur-category">فئة المنتج *</label>
+              <select
+                id="pur-category"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                required
+                style={{ padding: '10px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.9rem', background: 'white' }}
+              >
+                <option value="">اختر فئة...</option>
+                {PRODUCT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label htmlFor="pur-qty">الكمية *</label>
@@ -229,6 +255,8 @@ function PurchasesContent() {
                   <th>التاريخ</th>
                   <th>المورد</th>
                   <th>المنتج</th>
+                  {/* DONE: Step 6 — category column */}
+                  <th>الفئة</th>
                   <th>الكمية</th>
                   <th>سعر الوحدة</th>
                   <th>الإجمالي</th>
@@ -244,6 +272,18 @@ function PurchasesContent() {
                     <td>{row.date}</td>
                     <td>{row.supplier}</td>
                     <td>{row.item}</td>
+                    {/* DONE: Step 6 — category cell (legacy rows show '-') */}
+                    <td>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        background: '#f1f5f9',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        color: '#475569',
+                      }}>
+                        {row.category || '-'}
+                      </span>
+                    </td>
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>

@@ -56,13 +56,21 @@ function ClientsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
+      const result = await res.json().catch(() => ({}));
+      // DONE: Bug 9 — addClient() returns { ambiguous: true, candidates, message }
+      // when the name already exists with no phone/email. Surface it to the user
+      // and keep the form open so they can add a phone/email and retry.
+      if (result?.ambiguous) {
+        addToast(result.message || 'يوجد عميل بنفس الاسم — أضف رقم هاتف أو إيميل للتمييز', 'error');
+        return;
+      }
       if (res.ok) {
         addToast('تم إضافة العميل بنجاح');
         setForm({ name: '', phone: '', email: '', address: '', notes: '' });
         setShowForm(false);
         fetchData();
       } else {
-        addToast('خطأ في إضافة العميل', 'error');
+        addToast(result?.error || 'خطأ في إضافة العميل', 'error');
       }
     } catch {
       addToast('خطأ في الاتصال', 'error');

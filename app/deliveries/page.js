@@ -29,6 +29,14 @@ function TruckIcon({ size = 24, color = 'currentColor' }) {
   );
 }
 
+// DONE: Bug 5 — bike SKU detector. The backend already enforces this on PUT
+// (returns 400 if bike + missing VIN). The UI mirrors the rule so we don't
+// surface a "skip" button when the API will reject the request anyway.
+function isBikeDelivery(delivery) {
+  const keywords = ['bike', 'دراجة', 'ebike', 'e-bike', 'scooter', 'sur-ron', 'aperyder'];
+  return keywords.some((k) => (delivery?.items || '').toLowerCase().includes(k));
+}
+
 function DeliveriesContent() {
   const { data: session } = useSession();
   const addToast = useToast();
@@ -447,34 +455,59 @@ function DeliveriesContent() {
         </div>
       )}
 
-      {confirmDelivery && confirmDelivery.step === 'vin' && (
-        <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <h3>رقم الهيكل (VIN)</h3>
-            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>إذا المنتج دراجة كهربائية، أدخل رقم الهيكل. أو اضغط تخطي.</p>
-            <div className="form-group" style={{ margin: '16px 0' }}>
-              <input
-                type="text"
-                value={vinInput}
-                onChange={(e) => setVinInput(e.target.value.toUpperCase())}
-                placeholder="مثال: WB10A1234Z5678"
-                style={{ direction: 'ltr', textAlign: 'center', fontSize: '1.1rem', fontWeight: 600, letterSpacing: '2px' }}
-                autoFocus
-              />
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
-                await doStatusChange(confirmDelivery.row, 'تم التوصيل', vinInput);
-                setConfirmDelivery(null);
-                setVinInput('');
-              }}>
-                {vinInput ? 'تأكيد مع VIN' : 'تخطي وتأكيد'}
-              </button>
-              <button className="btn btn-outline" onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}>رجوع</button>
+      {/* DONE: Bug 5 — VIN required for bikes; non-bike deliveries can still skip */}
+      {confirmDelivery && confirmDelivery.step === 'vin' && (() => {
+        const requireVin = isBikeDelivery(confirmDelivery.row);
+        const vinReady = vinInput.trim().length > 0;
+        return (
+          <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+              <h3>
+                رقم الهيكل (VIN)
+                {requireVin && <span style={{ color: '#dc2626', fontSize: '0.85rem' }}> *مطلوب للدراجات</span>}
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                {requireVin
+                  ? 'هذه دراجة — يجب إدخال رقم الهيكل قبل تأكيد التوصيل.'
+                  : 'هذا المنتج ليس دراجة — يمكنك تخطي رقم الهيكل.'}
+              </p>
+              <div className="form-group" style={{ margin: '16px 0' }}>
+                <input
+                  type="text"
+                  value={vinInput}
+                  onChange={(e) => setVinInput(e.target.value.toUpperCase())}
+                  placeholder="مثال: WB10A1234Z5678"
+                  style={{
+                    direction: 'ltr', textAlign: 'center', fontSize: '1.1rem',
+                    fontWeight: 600, letterSpacing: '2px',
+                    border: requireVin && !vinReady ? '2px solid #dc2626' : undefined,
+                  }}
+                  autoFocus
+                />
+              </div>
+              <div className="modal-actions">
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  disabled={requireVin && !vinReady}
+                  onClick={async () => {
+                    if (requireVin && !vinReady) {
+                      addToast('رقم VIN مطلوب لتأكيد توصيل الدراجة', 'error');
+                      return;
+                    }
+                    await doStatusChange(confirmDelivery.row, 'تم التوصيل', vinInput);
+                    setConfirmDelivery(null);
+                    setVinInput('');
+                  }}
+                >
+                  {requireVin ? 'تأكيد مع VIN' : (vinReady ? 'تأكيد مع VIN' : 'تخطي وتأكيد')}
+                </button>
+                <button className="btn btn-outline" onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}>رجوع</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <ConfirmModal
         isOpen={!!deleteId}

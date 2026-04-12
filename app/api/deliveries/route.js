@@ -15,14 +15,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
 
-    // Push role filters into SQL — no full-table scan in JS
+    // BUG 3A — push every role filter down to SQL. No JS-side filtering.
     if (token.role === 'driver') {
       const rows = await getDeliveries(statusFilter, token.username);
       return NextResponse.json(rows);
     }
-
-    let rows = await getDeliveries(statusFilter);
-    if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
+    if (token.role === 'seller') {
+      const rows = await getDeliveries(statusFilter, null, token.username);
+      return NextResponse.json(rows);
+    }
+    const rows = await getDeliveries(statusFilter);
     return NextResponse.json(rows);
   } catch {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
@@ -62,6 +64,29 @@ export async function PUT(request) {
 
     const parsed = DeliveryUpdateSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    // BUG 3B — pre-check terminal status at the route layer (defense in depth).
+    // updateDelivery() also blocks this, but a 404/403 here gives a cleaner UX
+    // and avoids opening a transaction for a request that can't succeed.
+    if (token.role !== 'driver') {
+      const { rows: cur } = await sql`SELECT status FROM deliveries WHERE id = ${parsed.data.id}`;
+      if (!cur.length) {
+        return NextResponse.json({ error: 'التوصيل غير موجود' }, { status: 404 });
+      }
+      if (['تم التوصيل', 'ملغي'].includes(cur[0].status) && cur[0].status !== parsed.data.status) {
+        return NextResponse.json({ error: 'لا يمكن تغيير حالة توصيل مؤكد أو ملغي' }, { status: 403 });
+      }
+    }
+
+    // BUG 3C — VIN is required when confirming delivery of any e-bike / scooter.
+    // Without it the invoice has no traceable serial number for warranty / theft reports.
+    if (parsed.data.status === 'تم التوصيل') {
+      const bikeKeywords = ['bike', 'دراجة', 'ebike', 'e-bike', 'scooter', 'sur-ron', 'aperyder'];
+      const isBike = bikeKeywords.some((k) => (parsed.data.items || '').toLowerCase().includes(k));
+      if (isBike && !parsed.data.vin?.trim()) {
+        return NextResponse.json({ error: 'رقم VIN مطلوب لتأكيد توصيل الدراجة' }, { status: 400 });
+      }
+    }
 
     await updateDelivery(parsed.data);
     return NextResponse.json({ success: true });

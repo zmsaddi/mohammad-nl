@@ -12,6 +12,10 @@ function InvoicesContent() {
   const addToast = useToast();
   const role = session?.user?.role;
   const canSeeCosts = role === 'admin' || role === 'manager';
+  // DONE: Bug 6 — drivers may now reach this page; the API filters their invoices
+  // by joining on deliveries.assigned_driver. No client-side gating needed beyond auth.
+  // eslint-disable-next-line no-unused-vars
+  const canView = ['admin', 'manager', 'seller', 'driver'].includes(role);
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,8 @@ function InvoicesContent() {
                   <th>الدفع</th>
                   <th>VIN</th>
                   <th>البائع</th>
+                  {/* DONE: Step 4 — PDF action column */}
+                  <th>الفاتورة</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,6 +106,20 @@ function InvoicesContent() {
                     </td>
                     <td style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
                     <td>{inv.seller_name}</td>
+                    {/* DONE: Step 4 — open the French invoice in a new tab; user prints with Ctrl+P */}
+                    <td>
+                      <button
+                        className="btn btn-sm"
+                        style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/api/invoices/${inv.ref_code}/pdf`, '_blank');
+                        }}
+                        title="Télécharger la facture PDF"
+                      >
+                        📄 PDF
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -43,14 +43,30 @@ export async function POST(request) {
   }
 }
 
+// DONE: Step 4 — admin can edit category, unit, sell_price, notes, low_stock_threshold.
+// buy_price and stock are deliberately NOT editable here — they are computed from purchases
+// (weighted average) and adjusted only via purchase movements.
+//
+// COALESCE pattern: each field is updated only when the caller explicitly provides it.
+// When the caller omits a field it stays unchanged, so legacy callers that send only
+// { id, sell_price } don't accidentally wipe the other columns.
 export async function PUT(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
+    if (!data.id) return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
     const { sql } = await import('@vercel/postgres');
-    await sql`UPDATE products SET sell_price = ${data.sell_price || 0} WHERE id = ${data.id}`;
+    await sql`
+      UPDATE products SET
+        sell_price          = COALESCE(${data.sell_price ?? null},          sell_price),
+        category            = COALESCE(${data.category ?? null},            category),
+        unit                = COALESCE(${data.unit ?? null},                unit),
+        notes               = COALESCE(${data.notes ?? null},               notes),
+        low_stock_threshold = COALESCE(${data.low_stock_threshold ?? null}, low_stock_threshold)
+      WHERE id = ${data.id}
+    `;
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch {

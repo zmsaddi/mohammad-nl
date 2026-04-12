@@ -1,45 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+// DONE: Step 4A — callGemini and callGroqFallback removed; Groq is imported directly
+import Groq from 'groq-sdk';
 import { getProducts, getClients, getSuppliers, getAIPatterns, getRecentCorrections } from '@/lib/db';
 import { sql } from '@vercel/postgres';
-import { EXPENSE_CATEGORIES } from '@/lib/utils';
+import { EXPENSE_CATEGORIES, PAYMENT_MAP, CATEGORY_MAP } from '@/lib/utils';
 import { resolveEntity } from '@/lib/entity-resolver';
-
-const CATEGORY_MAP = {
-  rent: 'إيجار', salaries: 'رواتب', transport: 'نقل وشحن',
-  maintenance: 'صيانة وإصلاح', marketing: 'تسويق وإعلان',
-  utilities: 'كهرباء وماء', insurance: 'تأمين', tools: 'أدوات ومعدات',
-  other: 'أخرى', 'إيجار': 'إيجار', 'رواتب': 'رواتب',
-};
-
-const PAYMENT_MAP = {
-  cash: 'كاش', bank: 'بنك', credit: 'آجل',
-  'كاش': 'كاش', 'بنك': 'بنك', 'آجل': 'آجل',
-};
-
-async function callGemini(systemPrompt, userText) {
-  const { GoogleGenerativeAI } = await import('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    systemInstruction: systemPrompt,
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
-  });
-  const result = await model.generateContent(userText);
-  return JSON.parse(result.response.text());
-}
-
-async function callGroqFallback(systemPrompt, userText) {
-  const Groq = (await import('groq-sdk')).default;
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userText }],
-    temperature: 0.1, max_tokens: 300,
-    response_format: { type: 'json_object' },
-  });
-  return JSON.parse(completion.choices[0]?.message?.content || '{}');
-}
+// DONE: Step 4B — single source of truth for the voice extraction prompt
+import { buildVoiceSystemPrompt } from '@/lib/voice-prompt-builder';
 
 export async function POST(request) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -59,125 +27,50 @@ export async function POST(request) {
     try { patterns = await getAIPatterns(15); } catch {}
     try { recentCorrections = await getRecentCorrections(5); } catch {}
 
-    // Build learned knowledge
-    let learnedRules = '';
-    if (patterns.length > 0) {
-      learnedRules = '\nLEARNED (apply these):\n' + patterns.map((p) =>
-        `"${p.spoken_text}" for ${p.field_name} → "${p.correct_value}" (${p.frequency}x)`
-      ).join('\n');
-    }
-
-    let corrections = '';
-    if (recentCorrections.length > 0) {
-      corrections = '\nRECENT CORRECTIONS:\n' + recentCorrections.map((c) =>
-        `"${c.transcript}" → ${c.field_name}: AI said "${c.ai_output}", correct is "${c.user_correction}"`
-      ).join('\n');
-    }
-
-    // Context Boosting: recent transactions + frequent clients
-    let recentContext = '';
+    // Pre-fetch context arrays the prompt builder needs (recent sales + top clients).
+    let recentSales = [], topClients = [];
     try {
-      // Last 5 transactions (sales + purchases)
-      const recentSales = await sql`SELECT client_name, item, unit_price, payment_type, date FROM sales ORDER BY id DESC LIMIT 5`;
-      const recentPurchases = await sql`SELECT supplier, item, unit_price, date FROM purchases ORDER BY id DESC LIMIT 3`;
-
-      // Most frequent clients (for disambiguation: "أحمد" who?)
-      const topClients = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 5`;
-
-      if (recentSales.rows.length || recentPurchases.rows.length || topClients.rows.length) {
-        recentContext = '\n\n## سياق مهم (استخدمه لفهم أفضل):';
-        if (recentSales.rows.length) {
-          recentContext += '\nآخر المبيعات:\n' + recentSales.rows.map((s) =>
-            `- بعنا "${s.item}" لـ "${s.client_name}" بسعر ${s.unit_price} (${s.payment_type}) بتاريخ ${s.date}`
-          ).join('\n');
-        }
-        if (recentPurchases.rows.length) {
-          recentContext += '\nآخر المشتريات:\n' + recentPurchases.rows.map((p) =>
-            `- اشترينا "${p.item}" من "${p.supplier}" بسعر ${p.unit_price}`
-          ).join('\n');
-        }
-        if (topClients.rows.length) {
-          recentContext += '\nأكثر العملاء تكراراً:\n' + topClients.rows.map((c) =>
-            `- "${c.client_name}" (${c.cnt} عمليات)`
-          ).join('\n');
-        }
-      }
+      const rs = await sql`SELECT client_name, item, unit_price, payment_type, date FROM sales ORDER BY id DESC LIMIT 5`;
+      const tc = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 5`;
+      recentSales = rs.rows;
+      topClients = tc.rows;
     } catch {}
 
-    const productNames = products.map((p) => p.name).join('، ') || 'لا يوجد';
-    const clientNames = clients.map((c) => c.name).join('، ') || 'لا يوجد';
-    const supplierNames = suppliers.map((s) => s.name).join('، ') || 'لا يوجد';
+    // DONE: Step 4C — system prompt now built from the shared lib/voice-prompt-builder.js
+    const systemPrompt = buildVoiceSystemPrompt({
+      products,
+      clients,
+      suppliers,
+      patterns,
+      corrections: recentCorrections,
+      recentSales,
+      topClients,
+    });
 
-    const systemPrompt = `أنت مساعد ذكي لمتجر "Vitesse Eco" للدراجات الكهربائية. تفهم اللهجات العربية (شامي، خليجي، مصري).
-
-مهمتك: المستخدم يتكلم عن عملية تجارية. استخرج البيانات وارجعها JSON.
-
-## كيف تحدد نوع العملية:
-- إذا قال "بعت" أو "بايع" أو "بيع" → action = "sale"
-- إذا قال "اشتريت" أو "شريت" أو "جبت" أو "شراء" → action = "purchase"
-- إذا قال "مصروف" أو "صرفت" أو "دفعت" أو "حساب" → action = "expense"
-
-## طريقة الدفع:
-- "كاش" أو "نقدي" أو "نقد" → payment_type = "cash"
-- "بنك" أو "تحويل" أو "حوالة" → payment_type = "bank"
-- "آجل" أو "دين" أو "بعدين" → payment_type = "credit"
-
-## فئات المصاريف:
-إيجار=rent، رواتب=salaries، نقل/شحن=transport، صيانة=maintenance، تسويق/إعلان=marketing، كهرباء/ماء=utilities، تأمين=insurance، أدوات/معدات=tools، أخرى=other
-
-## الأرقام بالعامي:
-مية=100، ميتين=200، تلتمية=300، أربعمية=400، خمسمية=500، ستمية=600، سبعمية=700، ثمنمية=800، تسعمية=900، ألف=1000، ألفين=2000
-
-## البيانات المتاحة:
-المنتجات: ${productNames}
-العملاء: ${clientNames}
-الموردين: ${supplierNames}
-${learnedRules}${corrections}${recentContext}
-
-## أمثلة:
-
-المستخدم: "اشتريت من المصنع عشر بطاريات بمية وخمسين كاش"
-الجواب: {"action":"purchase","supplier":"المصنع","item":"بطاريات","quantity":10,"unit_price":150,"payment_type":"cash"}
-
-المستخدم: "مصروف إيجار ألفين كاش"
-الجواب: {"action":"expense","category":"rent","description":"إيجار","amount":2000,"payment_type":"cash"}
-
-المستخدم: "بعت لأحمد دراجة بسبعمية كاش"
-الجواب: {"action":"sale","client_name":"أحمد","item":"دراجة","quantity":1,"unit_price":700,"payment_type":"cash"}
-
-المستخدم: "بعت دراجتين"
-الجواب: {"action":"sale","item":"دراجة","quantity":2,"client_name":null,"unit_price":null,"payment_type":null}
-
-## قواعد مهمة:
-- ارجع JSON فقط بدون أي نص إضافي
-- اكتب الأسماء العربية كما قالها المستخدم
-- إذا ما فهمت قيمة حقل، حطه null
-- لا ترفض أبداً - دائماً ارجع أفضل فهمك
-- إذا المستخدم ذكر اسم قريب من اسم موجود بالقائمة، استخدم الاسم الموجود`;
-
-    // Try Gemini first, fallback to Groq
+    // DONE: Step 3 — Groq Llama is the only extraction model (no Gemini fallback)
     let parsed;
-    let usedModel = 'unknown';
-    let geminiError = '';
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        parsed = await callGemini(systemPrompt, text);
-        usedModel = 'gemini';
-      } catch (e) {
-        geminiError = e.message || 'unknown error';
-        console.error('Gemini failed:', geminiError);
-      }
-    }
-    if (!parsed && process.env.GROQ_API_KEY) {
-      try {
-        parsed = await callGroqFallback(systemPrompt, text);
-        usedModel = 'groq';
-      } catch (e) {
-        console.error('Groq also failed:', e.message);
-      }
-    }
-    if (!parsed) {
-      return NextResponse.json({ action: 'register_expense', data: {}, warnings: ['لم يتم الاتصال بأي نموذج AI'], transcript: text });
+    let usedModel = 'groq-llama';
+    try {
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: text },
+        ],
+        temperature: 0.1,
+        max_tokens: 400,
+        response_format: { type: 'json_object' },
+      });
+      parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    } catch (e) {
+      console.error('Groq extract error:', e.message);
+      return NextResponse.json({
+        action: 'register_expense',
+        data: {},
+        warnings: ['فشل الاتصال بالذكاء الاصطناعي'],
+        transcript: text,
+      });
     }
 
     // Map values
@@ -215,8 +108,10 @@ ${learnedRules}${corrections}${recentContext}
         if (parsed.client_name !== match.entity.name) warnings.push(`العميل: "${parsed.client_name}" → "${match.entity.name}" (${match.method})`);
         parsed.client_name = match.entity.name;
       } else if (match.status === 'ambiguous') {
-        warnings.push(`العميل "${parsed.client_name}" - عدة نتائج: ${match.candidates.map((c) => c.entity.name).join('، ')}`);
-        parsed.client_name = match.candidates[0].entity.name;
+        // DONE: Step 4 — never auto-pick on ambiguous matches; surface top 3 candidates with count
+        parsed.client_name = null;
+        parsed.clientCandidates = match.candidates.slice(0, 3).map((c) => c.entity.name);
+        warnings.push(`يوجد ${match.candidates.length} عملاء بهذا الاسم — يجب اختيار العميل الصحيح`);
       } else {
         parsed.isNewClient = true;
         warnings.push(`العميل "${parsed.client_name}" جديد`);
@@ -228,6 +123,9 @@ ${learnedRules}${corrections}${recentContext}
       if (match.status === 'matched') {
         if (parsed.item !== match.entity.name) warnings.push(`المنتج: "${parsed.item}" → "${match.entity.name}" (${match.method})`);
         parsed.item = match.entity.name;
+      } else if (match.isNewProduct) {
+        // FIXED: 2 — flag new product so we surface a "do you want to add it?" prompt
+        parsed.isNewProduct = true;
       }
     }
 
@@ -252,8 +150,17 @@ ${learnedRules}${corrections}${recentContext}
       await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${text}, ${text}, ${action}, ${usedModel})`;
     } catch {}
 
-    if (geminiError) warnings.push(`Gemini: ${geminiError} (used ${usedModel})`);
-    return NextResponse.json({ action, data: parsed, warnings, transcript: text });
+    // DONE: Step 4 — geminiError removed; Groq is the only model
+
+    // FIXED: 2 — surface "add new product?" suggestion to the UI
+    const responseBody = { action, data: parsed, warnings, transcript: text };
+    if (parsed.isNewProduct === true) {
+      warnings.push('المنتج غير موجود في القاعدة — هل تريد إضافته؟');
+      responseBody.suggestAddProduct = true;
+      responseBody.suggestedProductName = parsed.item;
+    }
+
+    return NextResponse.json(responseBody);
   } catch (error) {
     console.error('Voice extract error:', error);
     return NextResponse.json({ error: 'خطأ في استخراج البيانات' }, { status: 500 });
