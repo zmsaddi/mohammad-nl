@@ -62,25 +62,16 @@ export default function VoiceButton({ onResult, onError }) {
   const processAudio = async (blob) => {
     setState('processing');
     try {
-      // Step 1: Transcribe
+      // Single endpoint: audio → transcribe + extract in parallel
       const formData = new FormData();
       formData.append('audio', blob, 'recording.webm');
-      const transcribeRes = await fetch('/api/voice/transcribe', { method: 'POST', body: formData });
-      if (!transcribeRes.ok) { const e = await transcribeRes.json(); throw new Error(e.error); }
-      const { raw, normalized } = await transcribeRes.json();
+      const res = await fetch('/api/voice/process', { method: 'POST', body: formData });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const result = await res.json();
 
-      if (!normalized || normalized.length < 3) { onError?.('لم أسمع شيء واضح - حاول مرة أخرى'); setState('idle'); return; }
+      if (!result.transcript && !result.normalized) { onError?.('لم أسمع شيء واضح - حاول مرة أخرى'); setState('idle'); return; }
 
-      // Step 2: Extract data
-      const extractRes = await fetch('/api/voice/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: normalized }),
-      });
-      if (!extractRes.ok) { const e = await extractRes.json(); throw new Error(e.error); }
-      const result = await extractRes.json();
-
-      onResult?.({ ...result, transcript: raw, normalized });
+      onResult?.(result);
     } catch (err) {
       onError?.(err.message || 'خطأ في المعالجة');
     } finally {
