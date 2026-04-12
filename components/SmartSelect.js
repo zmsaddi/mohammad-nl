@@ -3,13 +3,19 @@
 import { useState, useRef, useEffect } from 'react';
 
 export default function SmartSelect({ value, onChange, options, placeholder, allowNew, newLabel, renderOption, required, id }) {
+  // Derive search directly from `value` rather than mirroring it via setState in an
+  // effect (which causes cascading re-renders in React 19). Local edits update via
+  // the `key` reset trick: when the parent value changes, React unmounts/remounts.
   const [search, setSearch] = useState(value || '');
+  const [lastValue, setLastValue] = useState(value || '');
+  if (value !== lastValue) {
+    setLastValue(value || '');
+    setSearch(value || '');
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
-
-  useEffect(() => { setSearch(value || ''); }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -89,7 +95,7 @@ export default function SmartSelect({ value, onChange, options, placeholder, all
               className={`smart-select-option smart-select-new ${highlighted === filtered.length ? 'highlighted' : ''}`}
               onClick={() => { onChange(search); setIsOpen(false); }}
             >
-              <span style={{ color: '#3b82f6' }}>+ {newLabel || 'إضافة'} "{search}"</span>
+              <span style={{ color: '#3b82f6' }}>+ {newLabel || 'إضافة'} «{search}»</span>
             </div>
           )}
         </div>

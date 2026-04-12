@@ -19,27 +19,35 @@ export default function VoiceConfirm({ result, onConfirm, onCancel }) {
 }
 
 function EditableForm({ action: initialAction, data, warnings, transcript, onConfirm, onCancel }) {
-  const [form, setForm] = useState({});
+  // Derive form/action from props synchronously instead of mirroring them through
+  // setState in useEffect (which would trigger cascading renders in React 19).
+  const [lastKey, setLastKey] = useState({ data, initialAction });
+  const [form, setForm] = useState(() => (data ? { ...data } : {}));
   const [action, setAction] = useState(initialAction);
+  if (lastKey.data !== data || lastKey.initialAction !== initialAction) {
+    setLastKey({ data, initialAction });
+    setForm(data ? { ...data } : {});
+    setAction(initialAction);
+  }
   const [saving, setSaving] = useState(false);
   const [dbData, setDbData] = useState({ products: [], clients: [], suppliers: [] });
 
   useEffect(() => {
-    if (data) setForm({ ...data });
-    setAction(initialAction);
-    // Fetch DB data for smart dropdowns
+    let cancelled = false;
     Promise.all([
       fetch('/api/products').then((r) => r.json()).catch(() => []),
       fetch('/api/clients').then((r) => r.json()).catch(() => []),
       fetch('/api/suppliers').then((r) => r.json()).catch(() => []),
     ]).then(([products, clients, suppliers]) => {
+      if (cancelled) return;
       setDbData({
         products: Array.isArray(products) ? products : [],
         clients: Array.isArray(clients) ? clients : [],
         suppliers: Array.isArray(suppliers) ? suppliers : [],
       });
     });
-  }, [data, initialAction]);
+    return () => { cancelled = true; };
+  }, []);
 
   const actionLabels = { register_sale: 'بيع', register_purchase: 'شراء', register_expense: 'مصروف' };
   const actionColors = { register_sale: '#16a34a', register_purchase: '#1e40af', register_expense: '#f59e0b' };
@@ -146,7 +154,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
         </div>
 
         <div className="detail-modal-body">
-          {transcript && <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '12px' }}>🎙️ سمعت: "{transcript}"</p>}
+          {transcript && <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '12px' }}>🎙️ سمعت: «{transcript}»</p>}
 
           {warnings && warnings.length > 0 && (
             <div style={{ background: '#fef3c7', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px', fontSize: '0.78rem', color: '#92400e' }}>
@@ -244,7 +252,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>الدفع</label>
-                <select style={inputStyle} value={form.payment_type || 'cash'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
+                <select style={inputStyle} value={form.payment_type || 'كاش'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
                   <option value="كاش">كاش</option>
                   <option value="بنك">بنك</option>
                 </select>
@@ -272,7 +280,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>الدفع</label>
-                <select style={inputStyle} value={form.payment_type || 'cash'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
+                <select style={inputStyle} value={form.payment_type || 'كاش'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
                   <option value="كاش">كاش</option>
                   <option value="بنك">بنك</option>
                 </select>

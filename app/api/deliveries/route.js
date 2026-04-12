@@ -49,7 +49,8 @@ export async function PUT(request) {
     await updateDelivery(data);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
+    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في تحديث البيانات';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
 }
 

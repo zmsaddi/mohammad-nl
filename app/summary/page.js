@@ -46,6 +46,7 @@ function SummaryContent() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
   const handleFilter = () => {
@@ -104,7 +105,7 @@ function SummaryContent() {
       {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
         <div className="card" style={{ marginBottom: '24px', textAlign: 'center', padding: '24px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#374151' }}>إدخال صوتي</h3>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '16px' }}>اضغط مع الاستمرار وتكلم: "بعت لأحمد دراجة بسبعمية كاش"</p>
+          <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '16px' }}>اضغط مع الاستمرار وتكلم: «بعت لأحمد دراجة بسبعمية كاش»</p>
           <VoiceButton
             onResult={(r) => setVoiceResult(r)}
             onError={(e) => addToast(e, 'error')}

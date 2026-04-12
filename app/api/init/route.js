@@ -3,28 +3,47 @@ import { getToken } from 'next-auth/jwt';
 import { initDatabase, resetDatabase } from '@/lib/db';
 import { sql } from '@vercel/postgres';
 
+// GET → idempotent init only (safe). POST → mutating operations (clean / reset).
 export async function GET(request) {
-  return handleInit(request);
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  if (!token || token.role !== 'admin') {
+    return NextResponse.json({ error: 'غير مصرح - سجل دخول كمدير أولاً' }, { status: 401 });
+  }
+  try {
+    await initDatabase();
+    return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
+  } catch (error) {
+    return NextResponse.json({ error: 'خطأ في التهيئة' }, { status: 500 });
+  }
 }
 
 export async function POST(request) {
-  return handleInit(request);
-}
-
-async function handleInit(request) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   if (!token || token.role !== 'admin') {
     return NextResponse.json({ error: 'غير مصرح - سجل دخول كمدير أولاً' }, { status: 401 });
   }
 
+  let body = {};
+  try { body = await request.json(); } catch {}
+
+  // Destructive operations require an explicit confirmation phrase in the body.
+  // This blocks CSRF / accidental link clicks because no GET / form submission can set it.
+  const CONFIRM_PHRASE = 'احذف كل البيانات نهائيا';
+
   try {
-    const { searchParams } = new URL(request.url);
-    if (searchParams.get('reset') === 'true') {
+    if (body.action === 'reset') {
+      if (body.confirm !== CONFIRM_PHRASE) {
+        return NextResponse.json({ error: 'تأكيد مفقود - مطلوب confirm بالعبارة الصحيحة' }, { status: 400 });
+      }
       await resetDatabase();
       return NextResponse.json({ success: true, message: 'تم إعادة تهيئة قاعدة البيانات بالكامل' });
     }
-    if (searchParams.get('clean') === 'true') {
-      const keepLearning = searchParams.get('keepLearning') === 'true';
+
+    if (body.action === 'clean') {
+      if (body.confirm !== CONFIRM_PHRASE) {
+        return NextResponse.json({ error: 'تأكيد مفقود - مطلوب confirm بالعبارة الصحيحة' }, { status: 400 });
+      }
+      const keepLearning = body.keepLearning === true;
       await sql`DELETE FROM purchases`;
       await sql`DELETE FROM sales`;
       await sql`DELETE FROM expenses`;
@@ -43,11 +62,18 @@ async function handleInit(request) {
         await sql`DELETE FROM ai_patterns`.catch(() => {});
         await sql`DELETE FROM entity_aliases`.catch(() => {});
       }
-      return NextResponse.json({ success: true, message: keepLearning ? 'تم مسح البيانات مع الحفاظ على المستخدمين والتعلم' : 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
+      return NextResponse.json({
+        success: true,
+        message: keepLearning
+          ? 'تم مسح البيانات مع الحفاظ على المستخدمين والتعلم'
+          : 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات',
+      });
     }
+
+    // Default POST: idempotent init.
     await initDatabase();
     return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ: ' + error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في تنفيذ العملية' }, { status: 500 });
   }
 }

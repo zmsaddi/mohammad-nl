@@ -49,6 +49,7 @@ function ClientDetailContent({ params }) {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [id]);
 
   const handlePayment = async (e) => {

@@ -28,7 +28,8 @@ export async function POST(request) {
     const id = await addPurchase(data);
     return NextResponse.json({ success: true, id });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في إضافة البيانات: ' + error.message }, { status: 500 });
+    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في إضافة البيانات';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
 }
 
@@ -40,7 +41,7 @@ export async function PUT(request) {
     await updatePurchase(data);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
 

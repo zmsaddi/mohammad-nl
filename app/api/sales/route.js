@@ -39,50 +39,63 @@ export async function POST(request) {
     const { saleId, deliveryId, refCode } = await addSale(data);
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'خطأ في إضافة البيانات' }, { status: 500 });
+    // Surface validation messages we throw ourselves; hide raw DB internals.
+    const safe = isSafeError(error) ? error.message : 'خطأ في إضافة البيانات';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
+}
+
+// Validation errors thrown by lib/db.js are user-facing Arabic strings — safe to return.
+function isSafeError(error) {
+  if (!error || !error.message) return false;
+  // Heuristic: messages starting with Arabic chars are our own validation; pg errors are English.
+  return /^[\u0600-\u06FF]/.test(error.message);
 }
 
 export async function PUT(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  if (!['admin', 'manager', 'seller'].includes(token.role)) {
+    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  }
   try {
     const data = await request.json();
-    // Seller can only edit their own محجوز orders
-    if (token.role === 'seller') {
-      const { sql: sqlQ } = await import('@vercel/postgres');
-      const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${data.id}`;
-      if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
-      if (rows[0].created_by !== token.username) return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
-      if (rows[0].status !== 'محجوز') return NextResponse.json({ error: 'لا يمكن تعديل طلب بعد التوصيل' }, { status: 403 });
-    } else if (token.role !== 'admin') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+    const { sql: sqlQ } = await import('@vercel/postgres');
+    const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${data.id}`;
+    if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
+    // Only reserved orders can be edited - confirmed sales would corrupt the invoice & bonus ledger
+    if (rows[0].status !== 'محجوز') {
+      return NextResponse.json({ error: 'لا يمكن تعديل طلب بعد التوصيل أو الإلغاء' }, { status: 403 });
+    }
+    if (token.role === 'seller' && rows[0].created_by !== token.username) {
+      return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
     }
     await updateSale(data);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
 
 export async function DELETE(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  // Seller can cancel their own محجوز orders
-  if (token.role === 'seller') {
+  if (!['admin', 'manager', 'seller'].includes(token.role)) {
+    return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
+  }
+  try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const { sql: sqlQ } = await import('@vercel/postgres');
     const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${id}`;
     if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
-    if (rows[0].created_by !== token.username) return NextResponse.json({ error: 'لا يمكنك إلغاء طلب غيرك' }, { status: 403 });
-    if (rows[0].status !== 'محجوز') return NextResponse.json({ error: 'لا يمكن إلغاء طلب بعد التوصيل' }, { status: 403 });
-  } else if (token.role !== 'admin') {
-    return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
-  }
-  try {
-    const { searchParams } = new URL(request.url);
-    await deleteSale(searchParams.get('id'));
+    if (rows[0].status !== 'محجوز') {
+      return NextResponse.json({ error: 'لا يمكن إلغاء طلب بعد التوصيل' }, { status: 403 });
+    }
+    if (token.role === 'seller' && rows[0].created_by !== token.username) {
+      return NextResponse.json({ error: 'لا يمكنك إلغاء طلب غيرك' }, { status: 403 });
+    }
+    await deleteSale(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });

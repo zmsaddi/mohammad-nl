@@ -4,7 +4,14 @@ import Providers from '@/components/Providers';
 export const metadata = {
   title: 'Vitesse Eco - إدارة الدراجات الكهربائية',
   description: 'نظام إدارة متكامل للدراجات الكهربائية والإكسسوارات وقطع الغيار',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
+};
+
+// Next.js 16 requires viewport to be its own export.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

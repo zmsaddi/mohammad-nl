@@ -17,7 +17,7 @@ export async function GET(request) {
     }
     return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
 
@@ -32,6 +32,7 @@ export async function PUT(request) {
     }
     return NextResponse.json({ error: 'عملية غير معروفة' }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في تنفيذ العملية';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
 }

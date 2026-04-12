@@ -31,6 +31,7 @@ function SettlementsContent() {
     finally { setLoading(false); }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
   // Calculate unsettled bonuses per user

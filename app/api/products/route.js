@@ -21,10 +21,18 @@ export async function GET(request) {
 export async function POST(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
     const data = await request.json();
     data.createdBy = token.username;
+    // Sellers can only upsert a name shell — they cannot set prices or stock
+    if (token.role === 'seller') {
+      data.buyPrice = 0;
+      data.sellPrice = 0;
+      data.stock = 0;
+      data.category = '';
+      data.unit = '';
+    }
     const result = await addProduct(data);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
@@ -42,7 +50,7 @@ export async function PUT(request) {
     await sql`UPDATE products SET sell_price = ${data.sell_price || 0} WHERE id = ${data.id}`;
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
 
@@ -55,6 +63,7 @@ export async function DELETE(request) {
     await deleteProduct(searchParams.get('id'));
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
+    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في حذف البيانات';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
 }
