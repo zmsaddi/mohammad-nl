@@ -80,31 +80,56 @@ export async function POST(request) {
       if (r.rows.length) recentContext = '\nRECENT SALES:\n' + r.rows.map((s) => `"${s.item}" to "${s.client_name}" at ${s.unit_price}`).join('\n');
     } catch {}
 
-    const systemPrompt = `You are an intelligent Arabic-speaking business assistant for "Vitesse Eco" e-bike store.
-Extract structured data from Arabic speech. Understand Levantine and Gulf dialects naturally.
+    const productNames = products.map((p) => p.name).join('، ') || 'لا يوجد';
+    const clientNames = clients.map((c) => c.name).join('، ') || 'لا يوجد';
+    const supplierNames = suppliers.map((s) => s.name).join('، ') || 'لا يوجد';
 
-RESPOND WITH JSON ONLY. Write all Arabic text properly.
+    const systemPrompt = `أنت مساعد ذكي لمتجر "Vitesse Eco" للدراجات الكهربائية. تفهم اللهجات العربية (شامي، خليجي، مصري).
 
-Detect action: بعت/بايع = sale. اشتريت/شريت/جبت = purchase. مصروف/صرفت/دفعت = expense.
-payment_type: "cash" or "bank" or "credit"
-category: "rent","salaries","transport","maintenance","marketing","utilities","insurance","tools","other"
-If data is missing, still return what you understood. Set missing fields to null.
-NEVER refuse. Always return your best understanding.
+مهمتك: المستخدم يتكلم عن عملية تجارية. استخرج البيانات وارجعها JSON.
 
-Products: ${products.map((p) => p.name).join(', ') || 'none'}
-Clients: ${clients.map((c) => c.name).join(', ') || 'none'}
-Suppliers: ${suppliers.map((s) => s.name).join(', ') || 'none'}
+## كيف تحدد نوع العملية:
+- إذا قال "بعت" أو "بايع" أو "بيع" → action = "sale"
+- إذا قال "اشتريت" أو "شريت" أو "جبت" أو "شراء" → action = "purchase"
+- إذا قال "مصروف" أو "صرفت" أو "دفعت" أو "حساب" → action = "expense"
+
+## طريقة الدفع:
+- "كاش" أو "نقدي" أو "نقد" → payment_type = "cash"
+- "بنك" أو "تحويل" أو "حوالة" → payment_type = "bank"
+- "آجل" أو "دين" أو "بعدين" → payment_type = "credit"
+
+## فئات المصاريف:
+إيجار=rent، رواتب=salaries، نقل/شحن=transport، صيانة=maintenance، تسويق/إعلان=marketing، كهرباء/ماء=utilities، تأمين=insurance، أدوات/معدات=tools، أخرى=other
+
+## الأرقام بالعامي:
+مية=100، ميتين=200، تلتمية=300، أربعمية=400، خمسمية=500، ستمية=600، سبعمية=700، ثمنمية=800، تسعمية=900، ألف=1000، ألفين=2000
+
+## البيانات المتاحة:
+المنتجات: ${productNames}
+العملاء: ${clientNames}
+الموردين: ${supplierNames}
 ${learnedRules}${corrections}${recentContext}
 
-Sale: {"action":"sale","client_name":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank|credit"}
-Purchase: {"action":"purchase","supplier":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank","sellPrice":N}
-Expense: {"action":"expense","category":"...","description":"...","amount":N,"payment_type":"cash|bank"}
-Missing info: {"action":"clarification","question":"سؤال بالعربي","missing_fields":["..."]}
+## أمثلة:
 
-EXAMPLES:
-"اشتريت من المصنع عشر بطاريات بمية وخمسين كاش" → {"action":"purchase","supplier":"المصنع","item":"بطاريات","quantity":10,"unit_price":150,"payment_type":"cash"}
-"مصروف إيجار ألفين كاش" → {"action":"expense","category":"rent","description":"إيجار","amount":2000,"payment_type":"cash"}
-"بعت لأحمد دراجة بسبعمية كاش" → {"action":"sale","client_name":"أحمد","item":"دراجة","quantity":1,"unit_price":700,"payment_type":"cash"}`;
+المستخدم: "اشتريت من المصنع عشر بطاريات بمية وخمسين كاش"
+الجواب: {"action":"purchase","supplier":"المصنع","item":"بطاريات","quantity":10,"unit_price":150,"payment_type":"cash"}
+
+المستخدم: "مصروف إيجار ألفين كاش"
+الجواب: {"action":"expense","category":"rent","description":"إيجار","amount":2000,"payment_type":"cash"}
+
+المستخدم: "بعت لأحمد دراجة بسبعمية كاش"
+الجواب: {"action":"sale","client_name":"أحمد","item":"دراجة","quantity":1,"unit_price":700,"payment_type":"cash"}
+
+المستخدم: "بعت دراجتين"
+الجواب: {"action":"sale","item":"دراجة","quantity":2,"client_name":null,"unit_price":null,"payment_type":null}
+
+## قواعد مهمة:
+- ارجع JSON فقط بدون أي نص إضافي
+- اكتب الأسماء العربية كما قالها المستخدم
+- إذا ما فهمت قيمة حقل، حطه null
+- لا ترفض أبداً - دائماً ارجع أفضل فهمك
+- إذا المستخدم ذكر اسم قريب من اسم موجود بالقائمة، استخدم الاسم الموجود`;
 
     // Try Gemini first, fallback to Groq
     let parsed;
