@@ -45,9 +45,19 @@ export async function POST(request) {
 
 export async function PUT(request) {
   const token = await checkAuth(request);
-  if (!token || token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   try {
     const data = await request.json();
+    // Seller can only edit their own محجوز orders
+    if (token.role === 'seller') {
+      const { sql: sqlQ } = await import('@vercel/postgres');
+      const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${data.id}`;
+      if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
+      if (rows[0].created_by !== token.username) return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
+      if (rows[0].status !== 'محجوز') return NextResponse.json({ error: 'لا يمكن تعديل طلب بعد التوصيل' }, { status: 403 });
+    } else if (token.role !== 'admin') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+    }
     await updateSale(data);
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -58,7 +68,18 @@ export async function PUT(request) {
 export async function DELETE(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (token.role !== 'admin') return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
+  // Seller can cancel their own محجوز orders
+  if (token.role === 'seller') {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const { sql: sqlQ } = await import('@vercel/postgres');
+    const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${id}`;
+    if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
+    if (rows[0].created_by !== token.username) return NextResponse.json({ error: 'لا يمكنك إلغاء طلب غيرك' }, { status: 403 });
+    if (rows[0].status !== 'محجوز') return NextResponse.json({ error: 'لا يمكن إلغاء طلب بعد التوصيل' }, { status: 403 });
+  } else if (token.role !== 'admin') {
+    return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     await deleteSale(searchParams.get('id'));
