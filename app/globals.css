@@ -390,19 +390,9 @@ body {
   font-weight: 600;
 }
 
-.status-cash {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
 .status-credit {
   background: #fef3c7;
   color: #d97706;
-}
-
-.status-debt {
-  background: #fee2e2;
-  color: #dc2626;
 }
 
 /* Filters */
