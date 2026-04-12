@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import Groq from 'groq-sdk';
-import { getProducts, getClients, getSuppliers } from '@/lib/db';
+import { getProducts, getClients, getSuppliers, getAIPatterns, getRecentCorrections } from '@/lib/db';
 import { sql } from '@vercel/postgres';
 import { fuzzyMatchName } from '@/lib/voice-normalizer';
 import { EXPENSE_CATEGORIES } from '@/lib/utils';
@@ -33,13 +33,41 @@ export async function POST(request) {
     const { text } = await request.json();
     if (!text) return NextResponse.json({ error: 'لم يتم إرسال نص' }, { status: 400 });
 
-    const [products, clients, suppliers] = await Promise.all([
-      getProducts(), getClients(), getSuppliers(),
+    const [products, clients, suppliers, patterns, recentCorrections] = await Promise.all([
+      getProducts(), getClients(), getSuppliers(), getAIPatterns(15), getRecentCorrections(5),
     ]);
 
     const productList = products.map((p) => p.name).join(', ');
     const clientList = clients.map((c) => c.name).join(', ');
     const supplierList = suppliers.map((s) => s.name).join(', ');
+
+    // Build learned knowledge from user corrections
+    let learnedRules = '';
+    if (patterns.length > 0) {
+      learnedRules = '\nLEARNED CORRECTIONS (IMPORTANT - apply these rules):\n';
+      for (const p of patterns) {
+        learnedRules += `- When you hear "${p.spoken_text}" for ${p.field_name}, the correct value is "${p.correct_value}" (confirmed ${p.frequency} times)\n`;
+      }
+    }
+
+    // Build context from recent corrections
+    let correctionExamples = '';
+    if (recentCorrections.length > 0) {
+      correctionExamples = '\nRECENT USER CORRECTIONS (learn from these):\n';
+      for (const c of recentCorrections) {
+        correctionExamples += `- User said "${c.transcript}". AI extracted ${c.field_name}="${c.ai_output}" but user corrected to "${c.user_correction}"\n`;
+      }
+    }
+
+    // Get recent transactions for context
+    const { rows: recentSales } = await sql`SELECT client_name, item, unit_price FROM sales ORDER BY id DESC LIMIT 3`.catch(() => ({ rows: [] }));
+    let recentContext = '';
+    if (recentSales.length > 0) {
+      recentContext = '\nRECENT TRANSACTIONS (for context):\n';
+      for (const s of recentSales) {
+        recentContext += `- Sold "${s.item}" to "${s.client_name}" at ${s.unit_price}\n`;
+      }
+    }
 
     const systemPrompt = `You extract business data from Arabic speech for an e-bike store. The user speaks Arabic (Levantine/Gulf dialects). You MUST understand dialect variations.
 
@@ -56,6 +84,7 @@ RULES:
 Available Products: ${productList || 'none yet - user may add new ones'}
 Known Clients: ${clientList || 'none yet - user may add new ones'}
 Known Suppliers: ${supplierList || 'none yet - user may add new ones'}
+${learnedRules}${correctionExamples}${recentContext}
 
 JSON format for sale:
 {"action":"sale","client_name":"...","item":"...","quantity":N,"unit_price":N,"payment_type":"cash|bank|credit"}

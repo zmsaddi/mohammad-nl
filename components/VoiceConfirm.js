@@ -31,7 +31,21 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
   const actionColors = { register_sale: '#16a34a', register_purchase: '#1e40af', register_expense: '#f59e0b' };
   const color = actionColors[action] || '#1e40af';
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // LEARN: Send corrections to AI learning endpoint
+    try {
+      await fetch('/api/voice/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: transcript || '',
+          aiData: data || {},
+          userData: form,
+          actionType: action,
+        }),
+      });
+    } catch {} // Don't block save if learning fails
+
     const submitData = { ...form, date: getTodayDate() };
     // Clean up internal flags
     delete submitData.isNewClient;
