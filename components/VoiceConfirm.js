@@ -141,8 +141,25 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>العميل {!dbData.clients.some((c) => c.name === form.client_name) && form.client_name && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
-                <input style={inputStyle} list="vc-clients" value={form.client_name || ''} onChange={(e) => setForm({ ...form, client_name: e.target.value })} autoComplete="off" />
-                <datalist id="vc-clients">{dbData.clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+                <input style={inputStyle} list="vc-clients" value={form.client_name || ''} onChange={(e) => {
+                  const client = dbData.clients.find((c) => c.name === e.target.value);
+                  setForm({ ...form, client_name: e.target.value, client_phone: client?.phone || form.client_phone || '', client_email: client?.email || form.client_email || '', client_address: client?.address || form.client_address || '' });
+                }} autoComplete="off" />
+                <datalist id="vc-clients">{dbData.clients.map((c) => <option key={c.id} value={c.name} label={c.phone || ''} />)}</datalist>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: '#64748b' }}>هاتف العميل</label>
+                  <input style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }} type="tel" value={form.client_phone || ''} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} placeholder="+31..." />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: '#64748b' }}>إيميل العميل</label>
+                  <input style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }} type="email" value={form.client_email || ''} onChange={(e) => setForm({ ...form, client_email: e.target.value })} placeholder="email@..." />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>عنوان التوصيل</label>
+                <input style={inputStyle} value={form.client_address || ''} onChange={(e) => setForm({ ...form, client_address: e.target.value })} placeholder="العنوان الكامل" />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المنتج {!dbData.products.some((p) => p.name === form.item) && form.item && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
@@ -155,7 +172,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
                   <input style={inputStyle} type="number" min="0" value={form.quantity || ''} onChange={(e) => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.78rem', color: '#64748b' }}>سعر الوحدة</label>
+                  <label style={{ fontSize: '0.78rem', color: '#64748b' }}>سعر البيع</label>
                   <input style={inputStyle} type="number" min="0" value={form.unit_price || ''} onChange={(e) => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
@@ -163,12 +180,16 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
                 الإجمالي: {formatNumber((form.quantity || 0) * (form.unit_price || 0))}
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>الدفع</label>
-                <select style={inputStyle} value={form.payment_type || 'cash'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
-                  <option value="كاش">كاش</option>
-                  <option value="بنك">بنك</option>
-                  <option value="آجل">آجل</option>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>طريقة الدفع</label>
+                <select style={inputStyle} value={form.payment_type || 'كاش'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
+                  <option value="كاش">كاش (عند التوصيل)</option>
+                  <option value="بنك">بنك (تحويل)</option>
+                  <option value="آجل">آجل (دين)</option>
                 </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>ملاحظات</label>
+                <input style={inputStyle} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
               </div>
             </div>
           )}

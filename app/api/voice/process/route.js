@@ -120,10 +120,11 @@ export async function POST(request) {
 - "اشتريت"/"شريت"/"جبت"/"شراء" → action = "purchase"
 - "مصروف"/"صرفت"/"دفعت" → action = "expense"
 
-## الدفع:
-- "كاش"/"نقدي"/"نقد" → payment_type = "cash"
-- "بنك"/"تحويل" → payment_type = "bank"
-- "آجل"/"دين" → payment_type = "credit"
+## الدفع (مهم جداً):
+- "كاش"/"نقدي"/"نقد"/"عند التوصيل"/"عند الاستلام"/"على الدليفري"/"دفع عند التوصيل"/"COD" → payment_type = "cash" (الدفع عند التوصيل = كاش)
+- "بنك"/"تحويل"/"حوالة"/"تحويل بنكي" → payment_type = "bank"
+- "آجل"/"دين"/"بعدين"/"على الحساب"/"بالدين" → payment_type = "credit"
+ملاحظة: "الدفع عند التوصيل" و "الدفع عند الاستلام" = cash وليس credit!
 
 ## فئات المصاريف:
 إيجار=rent، رواتب=salaries، نقل=transport، صيانة=maintenance، تسويق=marketing، كهرباء=utilities، تأمين=insurance، أدوات=tools، أخرى=other
