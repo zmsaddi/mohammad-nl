@@ -9,10 +9,12 @@ export async function POST(request) {
   try {
     const { transcript, aiData, userData, actionType } = await request.json();
 
-    // Compare AI output vs user edits - save each difference as a correction
+    // Only learn from fields that AI actually extracted (not user-added fields like phone/email)
+    const learnableFields = ['client_name', 'item', 'supplier', 'quantity', 'unit_price', 'payment_type', 'category', 'description', 'amount'];
     const corrections = [];
-    for (const [key, userValue] of Object.entries(userData)) {
+    for (const key of learnableFields) {
       const aiValue = aiData[key];
+      const userValue = userData[key];
       if (aiValue !== undefined && aiValue !== null && String(aiValue) !== String(userValue) && userValue) {
         corrections.push({
           username: token.username,

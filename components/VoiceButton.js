@@ -23,11 +23,14 @@ export default function VoiceButton({ onResult, onError }) {
       chunks.current = [];
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
+      const recStartTime = Date.now();
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((t) => t.stop()); // Always cleanup stream
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        const duration = Date.now() - recStartTime;
+        if (duration < 800) { setState('idle'); onError?.('اضغط لفترة أطول - أقل شيء ثانية'); return; }
         const blob = new Blob(chunks.current, { type: 'audio/webm' });
-        if (blob.size < 1000) { setState('idle'); onError?.('التسجيل قصير جداً'); return; }
+        if (blob.size < 500) { setState('idle'); onError?.('لم أسمع شيء - حاول مرة أخرى'); return; }
         await processAudio(blob);
       };
 

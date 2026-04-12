@@ -59,8 +59,19 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
       });
     } catch {} // Don't block save if learning fails
 
+    // Step 1: Auto-create entities FIRST (before main save)
+    const creates = [];
+    if (action === 'register_sale') {
+      if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }) }).catch(() => {}));
+      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {}));
+    } else if (action === 'register_purchase') {
+      if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }) }).catch(() => {}));
+      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {}));
+    }
+    if (creates.length) await Promise.all(creates);
+
+    // Step 2: Build submit data
     const submitData = { ...form, date: getTodayDate() };
-    // Clean up internal flags
     delete submitData.isNewClient;
     delete submitData.isNewSupplier;
     delete submitData.action;
@@ -70,37 +81,21 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
       endpoint = '/api/sales';
       submitData.clientName = form.client_name;
       submitData.unitPrice = form.unit_price;
-      submitData.paymentType = form.payment_type;
+      submitData.paymentType = form.payment_type || 'كاش';
       submitData.clientPhone = form.client_phone || '';
       submitData.clientAddress = form.client_address || '';
       submitData.clientEmail = form.client_email || '';
-
-      // Auto-create client if new
-      if (form.client_name) {
-        await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name }) }).catch(() => {});
-      }
-      // Auto-create product if new
-      if (form.item) {
-        await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {});
-      }
     } else if (action === 'register_purchase') {
       endpoint = '/api/purchases';
       submitData.unitPrice = form.unit_price;
-      submitData.paymentType = form.payment_type;
+      submitData.paymentType = form.payment_type || 'كاش';
       submitData.sellPrice = form.sellPrice || '';
-
-      // Auto-create supplier if new
-      if (form.supplier) {
-        await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }) }).catch(() => {});
-      }
-      // Auto-create product if new
-      if (form.item) {
-        await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {});
-      }
     } else if (action === 'register_expense') {
       endpoint = '/api/expenses';
-      submitData.paymentType = form.payment_type;
+      submitData.paymentType = form.payment_type || 'كاش';
     }
+
+    // Step 3: Save main record
     onConfirm(endpoint, submitData);
   };
 

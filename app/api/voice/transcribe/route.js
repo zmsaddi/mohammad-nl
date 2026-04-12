@@ -67,7 +67,7 @@ export async function POST(request) {
       file: file,
       model: 'whisper-large-v3',
       language: 'ar',
-      prompt: vocab.slice(0, 500),
+      prompt: vocab.slice(0, 1500),
     });
 
     const rawText = transcription.text || '';
