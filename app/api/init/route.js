@@ -39,6 +39,7 @@ async function handleInit(request) {
       await sql`DELETE FROM voice_logs`.catch(() => {});
       await sql`DELETE FROM ai_corrections`.catch(() => {});
       await sql`DELETE FROM ai_patterns`.catch(() => {});
+      await sql`DELETE FROM entity_aliases`.catch(() => {});
       return NextResponse.json({ success: true, message: 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
     }
     await initDatabase();
