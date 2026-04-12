@@ -12,8 +12,8 @@ export async function GET(request) {
   try {
     const settings = await getSettings();
     return NextResponse.json(settings);
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في معالجة الإعدادات' }, { status: 500 });
   }
 }
 
@@ -24,7 +24,7 @@ export async function PUT(request) {
     const data = await request.json();
     await updateSettings(data);
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في معالجة الإعدادات' }, { status: 500 });
   }
 }

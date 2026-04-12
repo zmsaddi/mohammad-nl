@@ -79,6 +79,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Voice transcribe error:', error);
-    return NextResponse.json({ error: 'خطأ في التحويل: ' + (error?.message || error?.error?.message || 'غير معروف') }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في التحويل الصوتي' }, { status: 500 });
   }
 }

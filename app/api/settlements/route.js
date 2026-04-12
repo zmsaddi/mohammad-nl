@@ -14,8 +14,8 @@ export async function GET(request) {
   try {
     const rows = await getSettlements();
     return NextResponse.json(rows);
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
 
@@ -29,6 +29,8 @@ export async function POST(request) {
     const id = await addSettlement({ ...data, settledBy: token.username });
     return NextResponse.json({ success: true, id });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Arabic messages from db.js are safe user-facing validations; hide everything else
+    const safe = /^[\u0600-\u06FF]/.test(error?.message || '') ? error.message : 'خطأ في تسجيل التسوية';
+    return NextResponse.json({ error: safe }, { status: 400 });
   }
 }

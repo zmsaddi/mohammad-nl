@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getClients, addClient, updateClient, deleteClient } from '@/lib/db';
+import { invalidateCache } from '@/lib/entity-resolver';
 
 async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -17,7 +18,7 @@ export async function GET(request) {
     const withDebt = searchParams.get('withDebt') === 'true';
     const rows = await getClients(withDebt);
     return NextResponse.json(rows);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -30,8 +31,9 @@ export async function POST(request) {
     const data = await request.json();
     data.createdBy = token.username;
     const result = await addClient(data);
+    invalidateCache(); // client list changed — rebuild entity-resolver index
     return NextResponse.json({ success: true, ...result });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -43,8 +45,9 @@ export async function PUT(request) {
   try {
     const data = await request.json();
     await updateClient(data);
+    invalidateCache();
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -56,8 +59,9 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     await deleteClient(searchParams.get('id'));
+    invalidateCache();
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

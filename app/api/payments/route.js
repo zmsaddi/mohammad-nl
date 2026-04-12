@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getPayments, addPayment } from '@/lib/db';
 import { sql } from '@vercel/postgres';
+import { PaymentSchema, zodArabicError } from '@/lib/schemas';
 
 async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -15,7 +16,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const rows = await getPayments(searchParams.get('client'));
     return NextResponse.json(rows);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -25,11 +26,13 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    data.createdBy = token.username;
-    const id = await addPayment(data);
+    const body = await request.json();
+    const parsed = PaymentSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const id = await addPayment({ ...parsed.data, createdBy: token.username });
     return NextResponse.json({ success: true, id });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -42,7 +45,7 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await sql`DELETE FROM payments WHERE id = ${searchParams.get('id')}`;
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

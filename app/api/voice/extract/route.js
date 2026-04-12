@@ -256,6 +256,6 @@ ${learnedRules}${corrections}${recentContext}
     return NextResponse.json({ action, data: parsed, warnings, transcript: text });
   } catch (error) {
     console.error('Voice extract error:', error);
-    return NextResponse.json({ error: error.message || 'خطأ' }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في استخراج البيانات' }, { status: 500 });
   }
 }

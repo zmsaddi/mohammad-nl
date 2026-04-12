@@ -12,6 +12,21 @@ import { EXPENSE_CATEGORIES } from '@/lib/utils';
 const geminiClient = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
+// Per-user sliding-window rate limiter (module-level — persists across warm invocations).
+// For cross-instance limits in a scaled deployment, replace with @vercel/kv.
+const voiceRateLimit = new Map();
+const RATE_WINDOW_MS = 60_000; // 1 minute window
+const RATE_MAX = 10;            // 10 voice calls per minute per user
+
+function checkRateLimit(username) {
+  const now = Date.now();
+  const stamps = (voiceRateLimit.get(username) || []).filter(t => now - t < RATE_WINDOW_MS);
+  if (stamps.length >= RATE_MAX) return false;
+  stamps.push(now);
+  voiceRateLimit.set(username, stamps);
+  return true;
+}
+
 const CATEGORY_MAP = { rent: 'إيجار', salaries: 'رواتب', transport: 'نقل وشحن', maintenance: 'صيانة وإصلاح', marketing: 'تسويق وإعلان', utilities: 'كهرباء وماء', insurance: 'تأمين', tools: 'أدوات ومعدات', other: 'أخرى', 'إيجار': 'إيجار', 'رواتب': 'رواتب' };
 const PAYMENT_MAP = { cash: 'كاش', bank: 'بنك', credit: 'آجل', 'كاش': 'كاش', 'بنك': 'بنك', 'آجل': 'آجل' };
 
@@ -20,10 +35,20 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (!['admin', 'manager', 'seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
 
+  if (!checkRateLimit(token.username)) {
+    return NextResponse.json({ error: 'تجاوزت الحد المسموح (10 طلبات/دقيقة) — انتظر قليلاً ثم أعد المحاولة' }, { status: 429 });
+  }
+
   try {
     const formData = await request.formData();
     const audioFile = formData.get('audio');
     if (!audioFile) return NextResponse.json({ error: 'لم يتم إرسال ملف صوتي' }, { status: 400 });
+
+    // Reject oversized uploads before reading into memory (prevents OOM / cost abuse)
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+    if (audioFile.size > MAX_BYTES) {
+      return NextResponse.json({ error: 'حجم الملف كبير جداً (الحد الأقصى 10MB)' }, { status: 413 });
+    }
 
     // === PARALLEL: Whisper transcription + ALL DB queries at same time ===
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
@@ -239,9 +264,12 @@ ${learnedRules}${correctionExamples}${context}
     // Log
     try { const today = new Date().toISOString().split('T')[0]; await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel})`; } catch {}
 
-    return NextResponse.json({ action, data: parsed, warnings, transcript: raw, normalized });
+    // List fields the AI left as null so the UI can highlight them
+    const missing_fields = Object.keys(parsed).filter((k) => parsed[k] === null || parsed[k] === undefined);
+
+    return NextResponse.json({ action, data: parsed, warnings, transcript: raw, normalized, missing_fields });
   } catch (error) {
     console.error('Voice process error:', error);
-    return NextResponse.json({ error: error.message || 'خطأ' }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في معالجة الصوت' }, { status: 500 });
   }
 }

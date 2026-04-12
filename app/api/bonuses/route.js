@@ -14,7 +14,7 @@ export async function GET(request) {
     }
     const rows = await getBonuses(token.username);
     return NextResponse.json(rows);
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }

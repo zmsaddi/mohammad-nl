@@ -13,8 +13,8 @@ export async function GET(request) {
   try {
     const rows = await getUsers();
     return NextResponse.json(rows);
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
 
@@ -28,10 +28,10 @@ export async function POST(request) {
     const id = await addUser(data);
     return NextResponse.json({ success: true, id });
   } catch (error) {
-    if (error.message?.includes('unique')) {
+    if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
       return NextResponse.json({ error: 'اسم المستخدم موجود مسبقاً' }, { status: 400 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في إضافة المستخدم' }, { status: 500 });
   }
 }
 
@@ -45,8 +45,8 @@ export async function PUT(request) {
       await updateUser(data);
     }
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في تحديث المستخدم' }, { status: 500 });
   }
 }
 
@@ -56,7 +56,7 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await deleteUser(searchParams.get('id'));
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في حذف المستخدم' }, { status: 500 });
   }
 }

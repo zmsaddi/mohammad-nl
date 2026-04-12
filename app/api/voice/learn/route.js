@@ -32,7 +32,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ success: true, corrections: corrections.length });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'خطأ في حفظ التعلم' }, { status: 500 });
   }
 }
