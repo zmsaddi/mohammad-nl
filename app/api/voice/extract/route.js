@@ -110,12 +110,14 @@ EXAMPLES:
     // Try Gemini first, fallback to Groq
     let parsed;
     let usedModel = 'unknown';
+    let geminiError = '';
     if (process.env.GEMINI_API_KEY) {
       try {
         parsed = await callGemini(systemPrompt, text);
         usedModel = 'gemini';
       } catch (e) {
-        console.error('Gemini failed, falling back to Groq:', e.message);
+        geminiError = e.message || 'unknown error';
+        console.error('Gemini failed:', geminiError);
       }
     }
     if (!parsed && process.env.GROQ_API_KEY) {
@@ -193,6 +195,7 @@ EXAMPLES:
       await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${text}, ${text}, ${action}, ${usedModel})`;
     } catch {}
 
+    if (geminiError) warnings.push(`Gemini: ${geminiError} (used ${usedModel})`);
     return NextResponse.json({ action, data: parsed, warnings, transcript: text });
   } catch (error) {
     console.error('Voice extract error:', error);
