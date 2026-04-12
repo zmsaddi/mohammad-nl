@@ -24,6 +24,7 @@ async function handleInit(request) {
       return NextResponse.json({ success: true, message: 'تم إعادة تهيئة قاعدة البيانات بالكامل' });
     }
     if (searchParams.get('clean') === 'true') {
+      const keepLearning = searchParams.get('keepLearning') === 'true';
       await sql`DELETE FROM purchases`;
       await sql`DELETE FROM sales`;
       await sql`DELETE FROM expenses`;
@@ -37,10 +38,12 @@ async function handleInit(request) {
       await sql`DELETE FROM invoices`.catch(() => {});
       await sql`DELETE FROM price_history`.catch(() => {});
       await sql`DELETE FROM voice_logs`.catch(() => {});
-      await sql`DELETE FROM ai_corrections`.catch(() => {});
-      await sql`DELETE FROM ai_patterns`.catch(() => {});
-      await sql`DELETE FROM entity_aliases`.catch(() => {});
-      return NextResponse.json({ success: true, message: 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
+      if (!keepLearning) {
+        await sql`DELETE FROM ai_corrections`.catch(() => {});
+        await sql`DELETE FROM ai_patterns`.catch(() => {});
+        await sql`DELETE FROM entity_aliases`.catch(() => {});
+      }
+      return NextResponse.json({ success: true, message: keepLearning ? 'تم مسح البيانات مع الحفاظ على المستخدمين والتعلم' : 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
     }
     await initDatabase();
     return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
