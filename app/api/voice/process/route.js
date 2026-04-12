@@ -50,7 +50,8 @@ export async function POST(request) {
         } catch {}
 
         const allNames = [...new Set([...topNames, ...products.map((p) => p.name), ...clients.map((c) => c.name), ...suppliers.map((s) => s.name), ...aliasNames])].filter(Boolean);
-        const vocab = `بعت لعميل دراجة كهربائية كاش بنك آجل، اشتريت من مورد بطارية شاحن، مصروف إيجار رواتب، ${allNames.join('، ')}`;
+        // Product names are English model numbers - Whisper needs them explicitly
+        const vocab = `V20 Comfort, V20 Pro, V20 Pro Mini, V20 Pro Max, V20 LIMITED, V20 CROSS, V8 Mini, V8 Ultra, V8 Pro Max, V8 Pro, S20 Pro, S73 Mini, GT-20, GT-2000, C80 Mini, C80, H9, Q8, EB2 Pro, E007 NFC, Sur-Ron Light Bee X, ApeRyder A10 Pro, ApeRyder MD10, Apollo Thunder 300cc, بعت, اشتريت, مصروف, كاش, بنك, آجل, ${allNames.join(', ')}`;
 
         const transcription = await groqClient.audio.transcriptions.create({ file, model: 'whisper-large-v3', language: 'ar', prompt: vocab.slice(0, 1500) });
         return { raw: transcription.text || '', normalized: normalizeArabicText(transcription.text || '') };
@@ -110,6 +111,9 @@ export async function POST(request) {
     const systemPrompt = `أنت مساعد ذكي لمتجر "Vitesse Eco" للدراجات الكهربائية. تفهم اللهجات العربية (شامي، خليجي، مصري).
 
 مهمتك: استخرج البيانات من كلام المستخدم وارجعها JSON فقط.
+
+## مهم جداً - أسماء المنتجات:
+أسماء المنتجات بالإنجليزي (V20 Pro, S73 Mini, GT-2000, ApeRyder, Sur-Ron, etc). المستخدم يخلط عربي وإنجليزي. مثلاً: "بعت V20 Pro لأحمد" أو "اشتريت عشر GT-20". اكتب اسم المنتج بالإنجليزي كما هو.
 
 ## نوع العملية:
 - "بعت"/"بايع"/"بيع" → action = "sale"
