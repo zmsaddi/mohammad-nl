@@ -33,13 +33,17 @@ export default function VoiceButton({ onResult, onError }) {
 
       recorder.start();
       setState('recording');
-      setSeconds(0);
+      setSeconds(MAX_DURATION);
+      const startTime = Date.now();
       timerRef.current = setInterval(() => {
-        setSeconds((s) => {
-          if (s >= MAX_DURATION - 1) { stopRecording(); return s; }
-          return s + 1;
-        });
-      }, 1000);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = MAX_DURATION - elapsed;
+        if (remaining <= 0) {
+          stopRecording();
+        } else {
+          setSeconds(remaining);
+        }
+      }, 500);
     } catch (err) {
       onError?.('لا يمكن الوصول للميكروفون');
       setState('idle');
@@ -108,7 +112,7 @@ export default function VoiceButton({ onResult, onError }) {
       </button>
       <div style={{ fontSize: '0.8rem', color: state === 'recording' ? '#dc2626' : '#64748b', fontWeight: 600 }}>
         {state === 'idle' && 'اضغط مع الاستمرار للتسجيل'}
-        {state === 'recording' && `جاري التسجيل... ${MAX_DURATION - seconds} ثانية`}
+        {state === 'recording' && `جاري التسجيل... ${seconds} ثانية`}
         {state === 'processing' && 'جاري المعالجة...'}
       </div>
     </div>
