@@ -22,11 +22,10 @@ async function callGemini(systemPrompt, userText) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.0-flash',
+    systemInstruction: systemPrompt,
     generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
   });
-  const result = await model.generateContent([
-    { role: 'user', parts: [{ text: systemPrompt + '\n\nالمستخدم قال: ' + userText }] },
-  ]);
+  const result = await model.generateContent(userText);
   return JSON.parse(result.response.text());
 }
 
