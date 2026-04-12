@@ -123,7 +123,7 @@ function SalesContent() {
         // Ask if user wants to share via WhatsApp
         if (form.clientPhone) {
           const shareData = {
-            phone: form.clientPhone.replace(/[^0-9+]/g, '').replace(/^00/, '+').replace(/^\+/, ''),
+            phone: form.clientPhone.replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, ''),
             refCode: result.refCode || '',
             item: form.item,
             quantity: form.quantity,
@@ -411,7 +411,7 @@ function SalesContent() {
                           style={{ background: '#25d366', color: 'white', padding: '4px 8px' }}
                           onClick={() => {
                             const client = clients.find((c) => c.name === row.client_name);
-                            const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '+').replace(/^\+/, '');
+                            const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, '');
                             if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
                             const msg = encodeURIComponent(
 `*Vitesse Eco*

@@ -47,6 +47,24 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
 
   const handleSubmit = async () => {
     if (saving) return;
+
+    // Validate required fields
+    if (action === 'register_sale') {
+      if (!form.client_name) { alert('اسم العميل مطلوب'); return; }
+      if (!form.item) { alert('المنتج مطلوب'); return; }
+      if (!form.quantity || form.quantity <= 0) { alert('الكمية مطلوبة'); return; }
+      if (!form.unit_price || form.unit_price <= 0) { alert('السعر مطلوب'); return; }
+    } else if (action === 'register_purchase') {
+      if (!form.supplier) { alert('المورد مطلوب'); return; }
+      if (!form.item) { alert('المنتج مطلوب'); return; }
+      if (!form.quantity || form.quantity <= 0) { alert('الكمية مطلوبة'); return; }
+      if (!form.unit_price || form.unit_price <= 0) { alert('السعر مطلوب'); return; }
+    } else if (action === 'register_expense') {
+      if (!form.category) { alert('الفئة مطلوبة'); return; }
+      if (!form.description) { alert('الوصف مطلوب'); return; }
+      if (!form.amount || form.amount <= 0) { alert('المبلغ مطلوب'); return; }
+    }
+
     setSaving(true);
 
     // LEARN: Send corrections to AI learning endpoint
