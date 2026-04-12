@@ -21,6 +21,7 @@ export default function VoiceConfirm({ result, onConfirm, onCancel }) {
 function EditableForm({ action: initialAction, data, warnings, transcript, onConfirm, onCancel }) {
   const [form, setForm] = useState({});
   const [action, setAction] = useState(initialAction);
+  const [saving, setSaving] = useState(false);
   const [dbData, setDbData] = useState({ products: [], clients: [], suppliers: [] });
 
   useEffect(() => {
@@ -45,6 +46,9 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
   const color = actionColors[action] || '#1e40af';
 
   const handleSubmit = async () => {
+    if (saving) return;
+    setSaving(true);
+
     // LEARN: Send corrections to AI learning endpoint
     try {
       await fetch('/api/voice/learn', {
@@ -239,7 +243,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
         </div>
 
         <div className="detail-modal-footer">
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSubmit}>تأكيد وحفظ</button>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={saving}>{saving ? 'جاري الحفظ...' : 'تأكيد وحفظ'}</button>
           <button className="btn btn-outline" onClick={onCancel}>إلغاء</button>
         </div>
       </div>
