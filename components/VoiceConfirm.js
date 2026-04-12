@@ -21,10 +21,23 @@ export default function VoiceConfirm({ result, onConfirm, onCancel }) {
 function EditableForm({ action: initialAction, data, warnings, transcript, onConfirm, onCancel }) {
   const [form, setForm] = useState({});
   const [action, setAction] = useState(initialAction);
+  const [dbData, setDbData] = useState({ products: [], clients: [], suppliers: [] });
 
   useEffect(() => {
     if (data) setForm({ ...data });
     setAction(initialAction);
+    // Fetch DB data for smart dropdowns
+    Promise.all([
+      fetch('/api/products').then((r) => r.json()).catch(() => []),
+      fetch('/api/clients').then((r) => r.json()).catch(() => []),
+      fetch('/api/suppliers').then((r) => r.json()).catch(() => []),
+    ]).then(([products, clients, suppliers]) => {
+      setDbData({
+        products: Array.isArray(products) ? products : [],
+        clients: Array.isArray(clients) ? clients : [],
+        suppliers: Array.isArray(suppliers) ? suppliers : [],
+      });
+    });
   }, [data, initialAction]);
 
   const actionLabels = { register_sale: 'بيع', register_purchase: 'شراء', register_expense: 'مصروف' };
@@ -58,10 +71,32 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
       submitData.clientName = form.client_name;
       submitData.unitPrice = form.unit_price;
       submitData.paymentType = form.payment_type;
+      submitData.clientPhone = form.client_phone || '';
+      submitData.clientAddress = form.client_address || '';
+      submitData.clientEmail = form.client_email || '';
+
+      // Auto-create client if new
+      if (form.client_name) {
+        await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name }) }).catch(() => {});
+      }
+      // Auto-create product if new
+      if (form.item) {
+        await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {});
+      }
     } else if (action === 'register_purchase') {
       endpoint = '/api/purchases';
       submitData.unitPrice = form.unit_price;
       submitData.paymentType = form.payment_type;
+      submitData.sellPrice = form.sellPrice || '';
+
+      // Auto-create supplier if new
+      if (form.supplier) {
+        await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }) }).catch(() => {});
+      }
+      // Auto-create product if new
+      if (form.item) {
+        await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {});
+      }
     } else if (action === 'register_expense') {
       endpoint = '/api/expenses';
       submitData.paymentType = form.payment_type;
@@ -106,12 +141,14 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
           {action === 'register_sale' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>العميل {form.isNewClient && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
-                <input style={inputStyle} value={form.client_name || ''} onChange={(e) => setForm({ ...form, client_name: e.target.value })} />
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>العميل {!dbData.clients.some((c) => c.name === form.client_name) && form.client_name && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
+                <input style={inputStyle} list="vc-clients" value={form.client_name || ''} onChange={(e) => setForm({ ...form, client_name: e.target.value })} autoComplete="off" />
+                <datalist id="vc-clients">{dbData.clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المنتج</label>
-                <input style={inputStyle} value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} />
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المنتج {!dbData.products.some((p) => p.name === form.item) && form.item && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
+                <input style={inputStyle} list="vc-products" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
+                <datalist id="vc-products">{dbData.products.filter((p) => p.stock > 0).map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock}`} />)}</datalist>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
@@ -141,12 +178,14 @@ function EditableForm({ action: initialAction, data, warnings, transcript, onCon
           {action === 'register_purchase' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المورد {form.isNewSupplier && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
-                <input style={inputStyle} value={form.supplier || ''} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المورد {!dbData.suppliers.some((s) => s.name === form.supplier) && form.supplier && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
+                <input style={inputStyle} list="vc-suppliers" value={form.supplier || ''} onChange={(e) => setForm({ ...form, supplier: e.target.value })} autoComplete="off" />
+                <datalist id="vc-suppliers">{dbData.suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المنتج</label>
-                <input style={inputStyle} value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} />
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>المنتج {!dbData.products.some((p) => p.name === form.item) && form.item && <span style={{ color: '#f59e0b' }}>(جديد)</span>}</label>
+                <input style={inputStyle} list="vc-products2" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
+                <datalist id="vc-products2">{dbData.products.map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock || 0}`} />)}</datalist>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
