@@ -74,10 +74,34 @@ export async function POST(request) {
       ).join('\n');
     }
 
+    // Context Boosting: recent transactions + frequent clients
     let recentContext = '';
     try {
-      const r = await sql`SELECT client_name, item, unit_price FROM sales ORDER BY id DESC LIMIT 3`;
-      if (r.rows.length) recentContext = '\nRECENT SALES:\n' + r.rows.map((s) => `"${s.item}" to "${s.client_name}" at ${s.unit_price}`).join('\n');
+      // Last 5 transactions (sales + purchases)
+      const recentSales = await sql`SELECT client_name, item, unit_price, payment_type, date FROM sales ORDER BY id DESC LIMIT 5`;
+      const recentPurchases = await sql`SELECT supplier, item, unit_price, date FROM purchases ORDER BY id DESC LIMIT 3`;
+
+      // Most frequent clients (for disambiguation: "أحمد" who?)
+      const topClients = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 5`;
+
+      if (recentSales.rows.length || recentPurchases.rows.length || topClients.rows.length) {
+        recentContext = '\n\n## سياق مهم (استخدمه لفهم أفضل):';
+        if (recentSales.rows.length) {
+          recentContext += '\nآخر المبيعات:\n' + recentSales.rows.map((s) =>
+            `- بعنا "${s.item}" لـ "${s.client_name}" بسعر ${s.unit_price} (${s.payment_type}) بتاريخ ${s.date}`
+          ).join('\n');
+        }
+        if (recentPurchases.rows.length) {
+          recentContext += '\nآخر المشتريات:\n' + recentPurchases.rows.map((p) =>
+            `- اشترينا "${p.item}" من "${p.supplier}" بسعر ${p.unit_price}`
+          ).join('\n');
+        }
+        if (topClients.rows.length) {
+          recentContext += '\nأكثر العملاء تكراراً:\n' + topClients.rows.map((c) =>
+            `- "${c.client_name}" (${c.cnt} عمليات)`
+          ).join('\n');
+        }
+      }
     } catch {}
 
     const productNames = products.map((p) => p.name).join('، ') || 'لا يوجد';
@@ -175,9 +199,18 @@ ${learnedRules}${corrections}${recentContext}
 
     const warnings = [];
 
+    // Build context for entity resolution (recent names for disambiguation)
+    const entityContext = { recentClients: [], recentSuppliers: [] };
+    try {
+      const rc = await sql`SELECT DISTINCT client_name FROM sales ORDER BY id DESC LIMIT 10`;
+      entityContext.recentClients = rc.rows.map((r) => r.client_name);
+      const rs = await sql`SELECT DISTINCT supplier FROM purchases ORDER BY id DESC LIMIT 5`;
+      entityContext.recentSuppliers = rs.rows.map((r) => r.supplier);
+    } catch {}
+
     // === ENTITY RESOLUTION ===
     if (action === 'register_sale' && parsed.client_name) {
-      const match = await resolveEntity(parsed.client_name, 'client', clients);
+      const match = await resolveEntity(parsed.client_name, 'client', clients, entityContext);
       if (match.status === 'matched') {
         if (parsed.client_name !== match.entity.name) warnings.push(`العميل: "${parsed.client_name}" → "${match.entity.name}" (${match.method})`);
         parsed.client_name = match.entity.name;
@@ -191,7 +224,7 @@ ${learnedRules}${corrections}${recentContext}
     }
 
     if ((action === 'register_sale' || action === 'register_purchase') && parsed.item) {
-      const match = await resolveEntity(parsed.item, 'product', products);
+      const match = await resolveEntity(parsed.item, 'product', products, entityContext);
       if (match.status === 'matched') {
         if (parsed.item !== match.entity.name) warnings.push(`المنتج: "${parsed.item}" → "${match.entity.name}" (${match.method})`);
         parsed.item = match.entity.name;
@@ -199,7 +232,7 @@ ${learnedRules}${corrections}${recentContext}
     }
 
     if (action === 'register_purchase' && parsed.supplier) {
-      const match = await resolveEntity(parsed.supplier, 'supplier', suppliers);
+      const match = await resolveEntity(parsed.supplier, 'supplier', suppliers, entityContext);
       if (match.status === 'matched') {
         if (parsed.supplier !== match.entity.name) warnings.push(`المورد: "${parsed.supplier}" → "${match.entity.name}" (${match.method})`);
         parsed.supplier = match.entity.name;

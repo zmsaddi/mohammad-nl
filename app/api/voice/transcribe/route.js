@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import Groq from 'groq-sdk';
 import { getProducts, getClients, getSuppliers } from '@/lib/db';
+import { sql } from '@vercel/postgres';
 import { normalizeArabicText } from '@/lib/voice-normalizer';
 
 export async function POST(request) {
@@ -22,17 +23,38 @@ export async function POST(request) {
       return NextResponse.json({ error: 'لم يتم إرسال ملف صوتي' }, { status: 400 });
     }
 
-    // Build vocabulary prompt from DB
+    // Build smart vocabulary: frequency-sorted + sentence format for better Whisper accuracy
     const [products, clients, suppliers] = await Promise.all([
       getProducts(), getClients(), getSuppliers(),
     ]);
-    // Build context prompt - full sentences help Whisper understand word boundaries
-    const names = [
-      ...products.map((p) => p.name),
-      ...clients.map((c) => c.name),
-      ...suppliers.map((s) => s.name),
-    ].filter(Boolean).join('، ');
-    const vocab = `بعت، اشتريت، مصروف، كاش، بنك، آجل، دراجة كهربائية، بطارية، شاحن، إيجار، رواتب، ${names}`;
+
+    // Get frequently used names from recent sales (most frequent first)
+    let topNames = [];
+    try {
+      const { rows: topClients } = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 20`;
+      const { rows: topItems } = await sql`SELECT item, COUNT(*) as cnt FROM sales GROUP BY item ORDER BY cnt DESC LIMIT 10`;
+      topNames = [...topClients.map((c) => c.client_name), ...topItems.map((i) => i.item)];
+    } catch {}
+
+    // Get learned aliases (user-corrected names)
+    let aliasNames = [];
+    try {
+      const { rows: aliases } = await sql`SELECT alias FROM entity_aliases ORDER BY frequency DESC LIMIT 15`;
+      aliasNames = aliases.map((a) => a.alias);
+    } catch {}
+
+    // Build vocab: action words + frequent names first + all names + aliases
+    const allNames = [
+      ...new Set([
+        ...topNames,
+        ...products.map((p) => p.name),
+        ...clients.map((c) => c.name),
+        ...suppliers.map((s) => s.name),
+        ...aliasNames,
+      ])
+    ].filter(Boolean);
+
+    const vocab = `بعت لعميل دراجة كهربائية كاش بنك آجل، اشتريت من مورد بطارية شاحن، مصروف إيجار رواتب، ${allNames.join('، ')}`;
 
     // Convert to proper File for Groq
     const arrayBuffer = await audioFile.arrayBuffer();
