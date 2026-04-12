@@ -50,8 +50,8 @@ export async function POST(request) {
         } catch {}
 
         const allNames = [...new Set([...topNames, ...products.map((p) => p.name), ...clients.map((c) => c.name), ...suppliers.map((s) => s.name), ...aliasNames])].filter(Boolean);
-        // Product names are English model numbers - Whisper needs them explicitly
-        const vocab = `V20 Comfort, V20 Pro, V20 Pro Mini, V20 Pro Max, V20 LIMITED, V20 CROSS, V8 Mini, V8 Ultra, V8 Pro Max, V8 Pro, S20 Pro, S73 Mini, GT-20, GT-2000, C80 Mini, C80, H9, Q8, EB2 Pro, E007 NFC, Sur-Ron Light Bee X, ApeRyder A10 Pro, ApeRyder MD10, Apollo Thunder 300cc, بعت, اشتريت, مصروف, كاش, بنك, آجل, ${allNames.join(', ')}`;
+        // Mix Arabic action words + all entity names (may include English model numbers)
+        const vocab = `بعت, اشتريت, مصروف, كاش, بنك, آجل, ${allNames.join(', ')}`;
 
         const transcription = await groqClient.audio.transcriptions.create({ file, model: 'whisper-large-v3', language: 'ar', prompt: vocab.slice(0, 1500) });
         return { raw: transcription.text || '', normalized: normalizeArabicText(transcription.text || '') };
