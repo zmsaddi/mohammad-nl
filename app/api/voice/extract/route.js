@@ -33,9 +33,12 @@ export async function POST(request) {
     const { text } = await request.json();
     if (!text) return NextResponse.json({ error: 'لم يتم إرسال نص' }, { status: 400 });
 
-    const [products, clients, suppliers, patterns, recentCorrections] = await Promise.all([
-      getProducts(), getClients(), getSuppliers(), getAIPatterns(15), getRecentCorrections(5),
+    const [products, clients, suppliers] = await Promise.all([
+      getProducts(), getClients(), getSuppliers(),
     ]);
+    let patterns = [], recentCorrections = [];
+    try { patterns = await getAIPatterns(15); } catch {}
+    try { recentCorrections = await getRecentCorrections(5); } catch {}
 
     const productList = products.map((p) => p.name).join(', ');
     const clientList = clients.map((c) => c.name).join(', ');
@@ -60,7 +63,8 @@ export async function POST(request) {
     }
 
     // Get recent transactions for context
-    const { rows: recentSales } = await sql`SELECT client_name, item, unit_price FROM sales ORDER BY id DESC LIMIT 3`.catch(() => ({ rows: [] }));
+    let recentSales = [];
+    try { const r = await sql`SELECT client_name, item, unit_price FROM sales ORDER BY id DESC LIMIT 3`; recentSales = r.rows; } catch {}
     let recentContext = '';
     if (recentSales.length > 0) {
       recentContext = '\nRECENT TRANSACTIONS (for context):\n';
