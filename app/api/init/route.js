@@ -25,20 +25,25 @@ async function handleInit(request) {
     }
     if (searchParams.get('clean') === 'true') {
       const keepLearning = searchParams.get('keepLearning') === 'true';
-      const report = {};
-      const tables = ['purchases','sales','expenses','deliveries','payments','products','suppliers','clients','bonuses','settlements','invoices','price_history','voice_logs'];
-      if (!keepLearning) tables.push('ai_corrections','ai_patterns','entity_aliases');
-      for (const t of tables) {
-        try {
-          const before = await sql.query(`SELECT COUNT(*)::int AS c FROM ${t}`);
-          const del = await sql.query(`DELETE FROM ${t}`);
-          const after = await sql.query(`SELECT COUNT(*)::int AS c FROM ${t}`);
-          report[t] = { before: before.rows[0].c, deleted: del.rowCount, after: after.rows[0].c };
-        } catch (e) {
-          report[t] = { error: e.message };
-        }
+      await sql`DELETE FROM purchases`;
+      await sql`DELETE FROM sales`;
+      await sql`DELETE FROM expenses`;
+      await sql`DELETE FROM deliveries`;
+      await sql`DELETE FROM payments`;
+      await sql`DELETE FROM products`;
+      await sql`DELETE FROM suppliers`;
+      await sql`DELETE FROM clients`;
+      await sql`DELETE FROM bonuses`;
+      await sql`DELETE FROM settlements`;
+      await sql`DELETE FROM invoices`.catch(() => {});
+      await sql`DELETE FROM price_history`.catch(() => {});
+      await sql`DELETE FROM voice_logs`.catch(() => {});
+      if (!keepLearning) {
+        await sql`DELETE FROM ai_corrections`.catch(() => {});
+        await sql`DELETE FROM ai_patterns`.catch(() => {});
+        await sql`DELETE FROM entity_aliases`.catch(() => {});
       }
-      return NextResponse.json({ success: true, keepLearning, report });
+      return NextResponse.json({ success: true, message: keepLearning ? 'تم مسح البيانات مع الحفاظ على المستخدمين والتعلم' : 'تم مسح البيانات مع الحفاظ على المستخدمين والإعدادات' });
     }
     await initDatabase();
     return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
