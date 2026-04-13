@@ -305,6 +305,43 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
 // won the stable sort). Removed; Persian پي → P added as the only reliable
 // spoken-Arabic P disambiguator.
 // ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// BUG-01a: single-pass cleanup loop. Three-or-more-letter product codes were
+// only collapsing the first pair ("B M W" → "BM W", trailing W dropped).
+// BUG-01b: cleanup-before-number-normalization ordering. Cleanup used to run
+// inside transliterateArabicToLatin, before normalizeArabicNumbers — so
+// "في عشرين برو" became "V عشرين Pro" → "V 20 Pro" (never merged to V20).
+// ────────────────────────────────────────────────────────────────────────────
+describe('BUG-01a/b: multi-letter cleanup + post-number merge', () => {
+  it('"بي ام دبليو" → "BMW" (three-letter code collapses fully)', () => {
+    expect(normalizeArabicText('بي ام دبليو')).toContain('BMW');
+  });
+
+  it('"بي تي إكس 30" → "BTX30" (three letters followed by number)', () => {
+    expect(normalizeArabicText('بي تي إكس 30')).toContain('BTX30');
+  });
+
+  it('"جي تي 20" → contains "GT20" (two letters + number, still works)', () => {
+    expect(normalizeArabicText('جي تي 20')).toContain('GT20');
+  });
+
+  it('"جي تي" → "GT" (two letters, no number)', () => {
+    expect(normalizeArabicText('جي تي')).toContain('GT');
+  });
+
+  it('"في عشرين برو" → "V20 Pro" (letter + Arabic number word + product)', () => {
+    expect(normalizeArabicText('في عشرين برو')).toContain('V20 Pro');
+  });
+
+  it('"في 20 برو" → "V20 Pro" (letter + digit + product still works)', () => {
+    expect(normalizeArabicText('في 20 برو')).toContain('V20 Pro');
+  });
+
+  it('"إس 20 برو" → "S20 Pro" (existing positive path, still green)', () => {
+    expect(normalizeArabicText('إس 20 برو')).toContain('S20 Pro');
+  });
+});
+
 describe('BUG-01: بي → B, پي → P (collision resolved)', () => {
   it('"بي 20" → "B20" (Arabic ب is always B, never P)', () => {
     expect(normalizeArabicText('بي 20')).toContain('B20');

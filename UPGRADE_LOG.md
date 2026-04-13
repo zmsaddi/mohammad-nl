@@ -694,3 +694,96 @@ Five new BUG-01 cases added to `tests/voice-normalizer.test.js`:
 All previous tests remain green (47 BUG-01c + 7 BUG-01d + 9 BUG-01g +
 28 regression suite + 5 BUG-01 + 1 alif + 2 compound = 97 + 2 alif and
 related). No new bug class emerged.
+
+---
+
+## BUG-01a + BUG-01b — Multi-letter cleanup loop + post-number merge ordering
+
+**Severity:** Functional
+**Scope:** `lib/voice-normalizer.js` — cleanup pass extracted from
+`transliterateArabicToLatin` into a new `mergeLetterNumberTokens()`
+helper called from `normalizeArabicText` after number normalization.
+**Commit:** COMMIT 5 of the BUG-01 series. Two bugs fixed together
+because they share the same cleanup code path.
+
+### BUG-01a — single-pass cleanup
+
+The previous implementation ran `([A-Z])\s+([A-Z])(?=\s|$|\d)` exactly
+once. For three-letter codes like `B M W`, JavaScript's global replace
+does not re-scan overlapping matches: the first pass consumed `B M`
+and produced `BM W`, but the trailing ` W` was never re-evaluated
+against the new `BM`-adjacent token. Three-or-more-letter product codes
+(BMW, BTX, RTX, GTX) never collapsed fully.
+
+### BUG-01b — cleanup runs before number normalization
+
+The cleanup lived inside `transliterateArabicToLatin()`, which runs
+**before** `normalizeArabicNumbers()` in the pipeline. So:
+
+1. `في عشرين برو` → translit → `V عشرين Pro` (cleanup can't merge —
+   no digit exists yet)
+2. `normalizeArabicNumbers` → `V 20 Pro`
+3. …but the cleanup pass already finished. Final output `V 20 Pro`,
+   not `V20 Pro`.
+
+### Fix
+
+Extracted a dedicated `mergeLetterNumberTokens(text)` helper that
+loops until a fixed point:
+
+```js
+function mergeLetterNumberTokens(text) {
+  let result = text;
+  let prev;
+  do {
+    prev = result;
+    result = result.replace(/([A-Z])\s+([A-Z])(?=\s|$|\d)/g, '$1$2');
+    result = result.replace(/([A-Z])\s+(\d)/g, '$1$2');
+  } while (result !== prev);
+  return result;
+}
+```
+
+Called from `normalizeArabicText()` **after** both `transliterateArabicToLatin`
+and `normalizeArabicNumbers`, so it sees the fully-resolved letters and
+digits in one pass.
+
+Addresses both bugs:
+- BUG-01a: the `do { } while (result !== prev)` loop retries until
+  nothing changes. `B M W` → `BM W` → `BMW`.
+- BUG-01b: running after `normalizeArabicNumbers` means digits produced
+  from Arabic number words are visible to the merge step.
+  `V عشرين Pro` → `V 20 Pro` → `V20 Pro`.
+
+### Tests
+
+7 new BUG-01a/b cases:
+
+| # | Input | Expected | Result |
+|---|---|---|---|
+| 1 | `بي ام دبليو` | `BMW` (three-letter) | ✓ |
+| 2 | `بي تي إكس 30` | `BTX30` | ✓ |
+| 3 | `جي تي 20` | `GT20` (two-letter regression) | ✓ |
+| 4 | `جي تي` | `GT` (no number, regression) | ✓ |
+| 5 | `في عشرين برو` | `V20 Pro` (BUG-01b core) | ✓ |
+| 6 | `في 20 برو` | `V20 Pro` (digit variant) | ✓ |
+| 7 | `إس 20 برو` | `S20 Pro` (existing positive path) | ✓ |
+
+```
+ Test Files  1 passed (1)
+      Tests  104 passed (104)
+```
+
+### Discovered during smoke-testing — Bug I candidate
+
+Input `أر 20` (alif-with-hamza-above) produces `أر 20`, not `R20`. The
+`ARABIC_TO_LATIN` table has `آر` (alif-madda) and `ار` (bare alif) as
+the R spellings, but not `أر`. This is a **dictionary coverage gap**
+for alif-variant spellings. Not a code bug, not introduced by any
+BUG-01 commit — the hamza-above variant was simply never added to the
+dictionary.
+
+This is a structurally different class from the bugs we've fixed:
+those were all regex / ordering / collision issues in the code. This
+is a data issue in the vocabulary table. Tracked as **Bug I** for the
+audit document.
