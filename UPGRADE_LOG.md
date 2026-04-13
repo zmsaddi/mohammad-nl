@@ -822,3 +822,94 @@ checkpoint. The stop protocol exists to catch regressions and in-path
 surprises, not to punish careful observation. A new bug discovered
 *inside the code path being changed* — or one that causes a test to
 fail — still triggers an immediate stop.
+
+---
+
+## BUG-02 — Silent catches in API routes
+
+**Severity:** Functional (observability)
+**Scope:** `app/api/**/*.js`
+**Commit:** One commit covering 19 files + vitest config + test.
+
+### Problem
+
+Most API route handlers used `} catch {` with no variable, swallowing
+the error entirely before returning a 500 with an Arabic user-facing
+message. When a route broke in production, the only signal was the
+Arabic error string in the UI — there was no way to tell *why* from
+server logs. Some voice-pipeline routes used variants like
+`catch (error) {}` with an Arabic-safe extraction but without any
+`console.error`. Fire-and-forget `.catch(() => {})` in `init/route.js`
+and Promise.all `.catch(() => [])` in `voice/process/route.js` also
+swallowed silently.
+
+### Fix
+
+Mechanical rewrite across 19 files in `app/api`:
+
+1. Every `} catch {` before a `return NextResponse.json(...)` rewritten
+   to `} catch (err) { console.error('[<route>] <METHOD>:', err); return ... }`.
+2. Every `} catch (error) {` / `catch (err)` that had a variable but
+   no log gets a `console.error('[<route>] <METHOD>:', error)` added
+   as the first statement inside the catch, preserving existing
+   Arabic-safe error-message extraction logic.
+3. Every inner best-effort `try { ... } catch {}` (no return, e.g.
+   context lookups in `voice/transcribe`, `voice/extract`,
+   `voice/process`) got a named catch variable and a
+   `console.error('[<route>] <action>:', err)` inside the block.
+4. Fire-and-forget `.catch(() => {})` and `.catch(() => [])` in
+   `init/route.js` and `voice/process/route.js` rewritten to log the
+   error before returning the fallback value.
+
+Arabic user-facing strings untouched. No new try/catch added where
+none existed. No refactoring beyond the catch blocks themselves.
+
+### Files modified (19)
+
+- `clients`, `deliveries`, `expenses`, `settings`, `invoices`,
+  `payments`, `users`, `summary`, `products`, `bonuses`,
+  `settlements`, `suppliers`, `sales`, `purchases` (standard CRUD)
+- `voice/transcribe`, `voice/process`, `voice/extract`, `voice/learn`
+  (voice pipeline)
+- `init` (schema/ops endpoint)
+
+`invoices/[id]/pdf/route.js` was **already logging** via a slightly
+different format (`console.error('[Invoice PDF]', error.message)`) and
+was left untouched per the "don't refactor working code" rule.
+
+### Out of scope (per BUG-02 file-scope rule)
+
+- `lib/db.js` has ~50 `.catch(() => {})` attached to DDL statements
+  (`ALTER TABLE ... IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
+  `INSERT ... ON CONFLICT DO NOTHING`). These are **intentional
+  idempotency patterns** that absorb "already exists" errors on
+  repeated init calls. Not silent bugs. Would flag as a separate task
+  if ever needed.
+- `lib/entity-resolver.js` has one `.catch(() => {})` on a fire-and-
+  forget frequency-bump `UPDATE`. Out of `app/api` scope.
+
+### Test
+
+Representative forced-error test: `tests/api-error-logging.test.js`.
+Mocks `@/lib/db` so `getBonuses` throws, mocks `next-auth/jwt` so the
+token check passes, calls the `GET` handler, asserts:
+
+- Response status is 500
+- Response body is the Arabic error message (`خطأ في جلب البيانات`)
+- `console.error` was called exactly with `'[bonuses] GET:'` as the
+  first arg and the thrown Error as the second
+
+Requires `vitest.config.js` with the `@/*` → project-root alias so the
+route's `import { getBonuses } from '@/lib/db'` resolves under Vitest
+(the Next.js runtime handles this via `jsconfig.json`, Vitest does
+not). New file, minimal content (8 lines).
+
+### Final test counts
+
+```
+ Test Files  2 passed (2)
+      Tests  105 passed (105)
+```
+
+- 104 voice-normalizer tests (BUG-01 series, unchanged)
+- 1 BUG-02 forced-error logging test

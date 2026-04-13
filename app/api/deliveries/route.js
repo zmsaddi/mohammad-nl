@@ -26,7 +26,8 @@ export async function GET(request) {
     }
     const rows = await getDeliveries(statusFilter);
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[deliveries] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -40,7 +41,8 @@ export async function POST(request) {
     data.createdBy = token.username; // audit trail
     const id = await addDelivery(data);
     return NextResponse.json({ success: true, id });
-  } catch {
+  } catch (err) {
+    console.error('[deliveries] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -91,6 +93,7 @@ export async function PUT(request) {
     await updateDelivery(parsed.data);
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('[deliveries] PUT:', error);
     const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في تحديث البيانات';
     return NextResponse.json({ error: safe }, { status: 400 });
   }
@@ -104,7 +107,8 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await deleteDelivery(searchParams.get('id'));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[deliveries] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

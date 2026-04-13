@@ -31,7 +31,8 @@ export async function GET(request) {
         totalBonusPaid:   myBonuses.filter((b) => b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0),
         totalBonusOwed:   myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0),
       });
-    } catch {
+    } catch (err) {
+      console.error('[summary] GET:', err);
       return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
     }
   }
@@ -41,7 +42,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const data = await getSummaryData(searchParams.get('from'), searchParams.get('to'));
     return NextResponse.json(data);
-  } catch {
+  } catch (err) {
+    console.error('[summary] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }

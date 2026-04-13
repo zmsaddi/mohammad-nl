@@ -13,7 +13,8 @@ export async function GET(request) {
   try {
     const rows = await getUsers();
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[users] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -28,6 +29,7 @@ export async function POST(request) {
     const id = await addUser(data);
     return NextResponse.json({ success: true, id });
   } catch (error) {
+    console.error('[users] POST:', error);
     if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
       return NextResponse.json({ error: 'اسم المستخدم موجود مسبقاً' }, { status: 400 });
     }
@@ -45,7 +47,8 @@ export async function PUT(request) {
       await updateUser(data);
     }
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[users] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث المستخدم' }, { status: 500 });
   }
 }
@@ -56,7 +59,8 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await deleteUser(searchParams.get('id'));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[users] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف المستخدم' }, { status: 500 });
   }
 }

@@ -65,9 +65,10 @@ export async function POST(request) {
         // Whisper truncates long prompts, so the order matters: action verbs and
         // payment terms first (these are critical), then variants/colors, then
         // model names, then learned aliases, then frequent entities, then full lists.
-        const topEntities = await getTopEntities(token.username).catch(() => ({
-          products: [], clients: [], suppliers: [], aliases: [],
-        }));
+        const topEntities = await getTopEntities(token.username).catch((err) => {
+          console.error('[voice/process] getTopEntities:', err);
+          return { products: [], clients: [], suppliers: [], aliases: [] };
+        });
 
         const PRIORITY_TERMS = [
           // 1. Action verbs — critical
@@ -117,8 +118,8 @@ export async function POST(request) {
         const [products, clients, suppliers, patterns, corrections] = await Promise.all([
           getProducts(), getClients(), getSuppliers(),
           // DONE: Step 3 — pass username so per-user patterns are returned first
-          getAIPatterns(20, token.username).catch(() => []),
-          getRecentCorrections(5).catch(() => []),
+          getAIPatterns(20, token.username).catch((err) => { console.error('[voice/process] getAIPatterns:', err); return []; }),
+          getRecentCorrections(5).catch((err) => { console.error('[voice/process] getRecentCorrections:', err); return []; }),
         ]);
 
         // Context queries - all parallel
@@ -136,7 +137,9 @@ export async function POST(request) {
           topClients = tc.rows;
           recentClientNames = rcn.rows.map((r) => r.client_name);
           recentSupplierNames = rsn.rows.map((r) => r.supplier);
-        } catch {}
+        } catch (err) {
+          console.error('[voice/process] context lookup:', err);
+        }
 
         return { products, clients, suppliers, patterns, corrections, recentSales, recentPurchases, topClients, recentClientNames, recentSupplierNames };
       })(),
@@ -299,11 +302,18 @@ export async function POST(request) {
             await addAlias('supplier', sup[0].id, parsed.supplier, normalizeForMatching(parsed.supplier), 'confirmed_action');
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error('[voice/process] alias learning:', err);
+      }
     })();
 
     // Log
-    try { const today = new Date().toISOString().split('T')[0]; await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel})`; } catch {}
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel})`;
+    } catch (err) {
+      console.error('[voice/process] voice_logs insert:', err);
+    }
 
     // DONE: Fix 2 — REQUIRED-FIELDS list per action type. The previous
     // Object.keys(parsed) approach only caught keys that existed but were null;
@@ -344,7 +354,7 @@ export async function POST(request) {
 
     return NextResponse.json(responseBody);
   } catch (error) {
-    console.error('Voice process error:', error);
+    console.error('[voice/process] POST:', error);
     return NextResponse.json({ error: 'خطأ في معالجة الصوت' }, { status: 500 });
   }
 }

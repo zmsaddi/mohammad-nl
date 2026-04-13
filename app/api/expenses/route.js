@@ -14,7 +14,8 @@ export async function GET(request) {
   try {
     const rows = await getExpenses();
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[expenses] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -30,7 +31,8 @@ export async function POST(request) {
 
     const id = await addExpense({ ...parsed.data, createdBy: token.username });
     return NextResponse.json({ success: true, id });
-  } catch {
+  } catch (err) {
+    console.error('[expenses] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -42,7 +44,8 @@ export async function PUT(request) {
     const data = await request.json();
     await updateExpense(data);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[expenses] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -55,7 +58,8 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await deleteExpense(searchParams.get('id'));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[expenses] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

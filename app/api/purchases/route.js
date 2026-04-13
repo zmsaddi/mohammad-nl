@@ -15,7 +15,8 @@ export async function GET(request) {
   try {
     const rows = await getPurchases();
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[purchases] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -34,6 +35,7 @@ export async function POST(request) {
     invalidateCache(); // new product may have been created
     return NextResponse.json({ success: true, id });
   } catch (error) {
+    console.error('[purchases] POST:', error);
     const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في إضافة البيانات';
     return NextResponse.json({ error: safe }, { status: 400 });
   }
@@ -46,7 +48,8 @@ export async function PUT(request) {
     const data = await request.json();
     await updatePurchase(data);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[purchases] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -59,7 +62,8 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await deletePurchase(searchParams.get('id'));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[purchases] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

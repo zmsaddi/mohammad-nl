@@ -14,7 +14,8 @@ export async function GET(request) {
   try {
     const rows = await getSuppliers();
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[suppliers] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -29,7 +30,8 @@ export async function POST(request) {
     const result = await addSupplier(data);
     invalidateCache(); // supplier list changed — rebuild entity-resolver index
     return NextResponse.json({ success: true, ...result });
-  } catch {
+  } catch (err) {
+    console.error('[suppliers] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -43,7 +45,8 @@ export async function DELETE(request) {
     await deleteSupplier(searchParams.get('id'));
     invalidateCache();
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[suppliers] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

@@ -16,7 +16,8 @@ export async function GET(request) {
     let rows = await getSales(searchParams.get('client'));
     if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[sales] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -45,6 +46,7 @@ export async function POST(request) {
     invalidateCache(); // client may have been auto-created
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {
+    console.error('[sales] POST:', error);
     const safe = isSafeError(error) ? error.message : 'خطأ في إضافة البيانات';
     return NextResponse.json({ error: safe }, { status: 400 });
   }
@@ -78,7 +80,8 @@ export async function PUT(request) {
     }
     await updateSale(parsed.data);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[sales] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -103,7 +106,8 @@ export async function DELETE(request) {
     }
     await deleteSale(id);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[sales] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

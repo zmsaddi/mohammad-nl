@@ -15,7 +15,8 @@ export async function GET(request) {
     // Strip buy_price at the server — sellers must never receive cost data
     if (token.role === 'seller') rows = rows.map(({ buy_price, ...rest }) => rest);
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[products] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -38,7 +39,8 @@ export async function POST(request) {
     const result = await addProduct(data);
     invalidateCache(); // product list changed — rebuild entity-resolver index
     return NextResponse.json({ success: true, ...result });
-  } catch {
+  } catch (err) {
+    console.error('[products] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -69,7 +71,8 @@ export async function PUT(request) {
     `;
     invalidateCache();
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[products] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -84,6 +87,7 @@ export async function DELETE(request) {
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('[products] DELETE:', error);
     const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في حذف البيانات';
     return NextResponse.json({ error: safe }, { status: 400 });
   }

@@ -64,11 +64,14 @@ export async function POST(request) {
           WHERE spoken_text = ${transcript}
             AND (username = ${token.username} OR username = '')
         `;
-      } catch {}
+      } catch (err) {
+        console.error('[voice/learn] frequency bump:', err);
+      }
     }
 
     return NextResponse.json({ success: true, corrections: corrections.length });
-  } catch {
+  } catch (err) {
+    console.error('[voice/learn] POST:', err);
     return NextResponse.json({ error: 'خطأ في حفظ التعلم' }, { status: 500 });
   }
 }
