@@ -8,6 +8,17 @@ async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 }
 
+// BUG-04: coerce a DB `date` column (Date | string) to the YYYY-MM-DD shape
+// that DeliveryUpdateSchema expects. The DB driver may hand back either a
+// JS Date object, a full ISO string, or an already-trimmed YYYY-MM-DD —
+// accept all three.
+function dbDateToISO(v) {
+  if (!v) return '';
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  const s = String(v);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
 export async function GET(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
@@ -61,7 +72,25 @@ export async function PUT(request) {
       const existing = rows[0];
       if (!existing || existing.assigned_driver !== token.username) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
       if (existing.status === 'تم التوصيل' || existing.status === 'ملغي') return NextResponse.json({ error: 'لا يمكن تحديث هذا التوصيل' }, { status: 403 });
-      body = { ...existing, id: body.id, status: 'تم التوصيل', vin: body.vin || '', clientName: existing.client_name, clientPhone: existing.client_phone, driverName: existing.driver_name, assignedDriver: existing.assigned_driver };
+      // BUG-04: build the update body explicitly in camelCase. Never spread
+      // `existing` — it is a raw DB row with snake_case keys that Zod would
+      // silently strip, dropping fields like total_amount → defaulting to 0.
+      // The driver is only permitted to change `status` and `vin`; every
+      // other field must be carried forward unchanged from the existing row.
+      body = {
+        id: body.id,
+        date: dbDateToISO(existing.date),
+        clientName: existing.client_name || '',
+        clientPhone: existing.client_phone || '',
+        address: existing.address || '',
+        items: existing.items || '',
+        totalAmount: Number(existing.total_amount) || 0,
+        status: 'تم التوصيل',
+        driverName: existing.driver_name || '',
+        assignedDriver: existing.assigned_driver || '',
+        notes: existing.notes || '',
+        vin: body.vin || '',
+      };
     }
 
     const parsed = DeliveryUpdateSchema.safeParse(body);

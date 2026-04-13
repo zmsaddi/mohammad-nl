@@ -998,3 +998,96 @@ code path was already POST-based. I did not chase the GET path (it does
 not exist); the production env gate was still required and was the real
 fix. No files outside the declared scope were touched.
 
+---
+
+## BUG-04 — Driver PUT schema collision in deliveries
+
+**Severity:** High (silent data loss)
+**Scope:** `app/api/deliveries/route.js` — PUT driver branch, line ~64
+**Commit:** BUG-04
+
+### Problem
+
+In the driver PUT path, after the token/role checks, the code rebuilt the
+request body by spreading the raw database row and then bolting camelCase
+keys on top:
+
+```js
+body = { ...existing, id: body.id, status: 'تم التوصيل', vin: body.vin || '',
+         clientName: existing.client_name, clientPhone: existing.client_phone,
+         driverName: existing.driver_name, assignedDriver: existing.assigned_driver };
+```
+
+`existing` comes from `SELECT * FROM deliveries` — every column is
+**snake_case** (`client_name`, `client_phone`, `driver_name`, `assigned_driver`,
+`total_amount`, `date`). The resulting `body` object therefore carried
+**both** conventions simultaneously.
+
+`DeliveryUpdateSchema` (in `lib/schemas.js`) is a plain `z.object({...})`
+with camelCase keys. Default Zod `.object()` behavior is to **strip unknown
+keys**, so:
+
+1. `client_name`, `client_phone`, `driver_name`, `assigned_driver` were
+   silently dropped — harmless because the camelCase equivalents were
+   overwritten right after.
+2. `total_amount` was silently dropped and **never remapped** — so the
+   parsed body's `totalAmount` fell back to the schema default of `0`.
+   A driver confirming delivery would zero out the total amount of the
+   delivery record on its way to `updateDelivery()`.
+3. `date` from the DB row is a JS `Date` object, but `dateStr` in the schema
+   requires `YYYY-MM-DD`. The Zod parse could fail on legitimate rows
+   depending on the DB driver's row shape.
+
+This is the exact "silently strip the wrong one" failure mode BUG-04 calls
+out.
+
+### Decision: camelCase, built explicitly (not spread)
+
+Per the task ("Pick ONE convention… justify your choice in the log"):
+
+- **Convention picked:** camelCase. `DeliveryUpdateSchema` already defines
+  the wire format in camelCase, and every other write path in this file
+  (POST, admin/manager PUT) already speaks camelCase. Keeping the driver
+  path in the same shape as every other caller of `updateDelivery()`
+  minimizes surface area.
+- **Spread vs explicit build:** explicit build. Stripping snake_case keys
+  from `existing` with a helper (`_.omit`-style) would keep the spread
+  pattern but still pulls whatever the DB happens to return today into
+  the request body — a fragile coupling that would silently break if
+  the schema grew a new column. An explicit object listing exactly the
+  fields the driver PUT needs is both shorter and audit-safe.
+- **What the driver is actually allowed to change:** only `status`
+  (→ 'تم التوصيل') and `vin`. Every other field must come from `existing`.
+  The explicit build makes that contract obvious at the call site.
+
+### Fix
+
+Replaced the spread with an explicit object built from known-good
+conversions of the `existing` row, and added a private helper
+`dbDateToISO()` local to the file to coerce the DB `date` into the
+schema's `YYYY-MM-DD` shape.
+
+### Tests
+
+New file: `tests/bug04-deliveries-driver-put.test.js` — 2 cases:
+1. Driver confirms delivery on a row with `total_amount: 4500.5` →
+   parsed `updateDelivery` arg has no snake_case keys, `totalAmount`
+   is `4500.5` (not `0`), status/vin/clientName/assignedDriver all
+   correctly mapped.
+2. Driver confirms delivery on a row with a JS `Date` in the `date`
+   column → `dbDateToISO()` coerces it to `'2026-03-15'` and Zod
+   accepts the parse.
+
+Mocks `@/lib/db`, `next-auth/jwt`, and `@vercel/postgres` (tagged-template
+sql mock keyed by interpolated id).
+
+### Verification
+
+```
+ Test Files  4 passed (4)
+      Tests  112 passed (112)
+```
+
+Delta: +2 tests (BUG-04 suite). No pre-existing tests regressed.
+
+
