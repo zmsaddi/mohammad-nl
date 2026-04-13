@@ -1090,4 +1090,80 @@ sql mock keyed by interpolated id).
 
 Delta: +2 tests (BUG-04 suite). No pre-existing tests regressed.
 
+---
+
+## BUG-04a — VIN preservation on driver confirm (disclosed during BUG-04)
+
+**Severity:** Medium (silent data loss on admin-prefilled VINs)
+**Scope:** `app/api/deliveries/route.js` — one line inside driver PUT branch
+**Commit:** BUG-04a (separate from BUG-04 for git-bisect atomicity)
+
+### Origin
+
+Discovered during BUG-04 self-review, disclosed in the BUG-04 landing
+report rather than silently bundled into the BUG-04 commit. Isolating
+it here preserves the ability to `git revert BUG-04a` later without
+losing the BUG-04 snake_case fix, and keeps the BUG-04 commit scoped
+to exactly what its task description declared.
+
+### Root cause
+
+The original driver PUT code carried forward `vin` with
+`vin: body.vin || ''`. If a delivery row was pre-filled with a VIN at
+admission time (e.g. an admin scanned the bike frame on arrival) and
+the driver later submitted a blank VIN on confirmation, the `|| ''`
+fallback would **wipe** the admin-prefilled VIN on the way through
+`updateDelivery()`. Warranty and theft-report traceability rely on
+that VIN surviving across every mutation of the row.
+
+### Fix
+
+```js
+vin: body.vin || existing.vin || '',
+```
+
+Driver-provided VIN still wins when non-blank. Blank driver submission
+falls through to the existing row's VIN. Both-blank falls through to
+`''`, preserving the existing behavior for rows that genuinely have no
+VIN.
+
+### Test-file location decision
+
+**New file** `tests/bug04a-vin-preservation.test.js`, not appended to
+the BUG-04 test file. Rationale: a future `git revert BUG-04a` should
+remove the code change AND its tests together, in a single atomic
+operation. Appending to the BUG-04 test file would couple the two
+commits at the test-file level and defeat the whole point of splitting
+them. The new file duplicates the mock setup from the BUG-04 test file
+(about 40 lines of boilerplate) — this is the cost of bisect atomicity
+and is acceptable for a 4-test suite.
+
+### Tests
+
+4 cases in `tests/bug04a-vin-preservation.test.js`:
+1. Driver submits `vin: ''`, existing row has `vin: 'ABC123'` →
+   final `lastUpdateArg.vin === 'ABC123'` (the preservation case)
+2. Driver submits `vin: 'XYZ789'`, existing row has `vin: 'ABC123'`
+   → final `lastUpdateArg.vin === 'XYZ789'` (driver override wins)
+3. Driver submits `vin: ''`, existing row has `vin: null` →
+   final `lastUpdateArg.vin === ''` (no regression on null existing)
+4. Driver submits `vin: ''`, existing row has `vin: ''` →
+   final `lastUpdateArg.vin === ''` (no regression on empty existing)
+
+Tests 3 and 4 use `items: 'spare parts'` to avoid the BUG 3C
+"VIN-required on bike confirmation" guard, which would otherwise
+reject a blank-VIN confirmation of a bike row with 400.
+
+### Behavior-change disclosure
+
+This commit intentionally changes observable behavior: a driver who
+previously submitted a blank VIN on a row with an existing VIN would
+see the VIN wiped; now it is preserved. There is no UI path I could
+find that would rely on the wiping behavior, and preserving traceable
+serial numbers is consistent with the business rule embedded in the
+pre-existing BUG 3C VIN-required check. But it is a behavior change
+and is recorded here so that any future regression report mentioning
+"VIN not clearing" has a clean pointer back to this commit.
+
+
 

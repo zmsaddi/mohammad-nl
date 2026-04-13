@@ -22,6 +22,17 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 **Problem:** In the driver branch, `body = { ...existing, clientName: existing.client_name, ... }`. The resulting object has BOTH `client_name` (snake_case from spread) AND `clientName` (camelCase added). Zod parsing is ambiguous and may silently strip the wrong one.
 **Fix:** Pick ONE convention (camelCase matches existing `DeliveryUpdateSchema`). Either strip snake_case keys from `existing` before spreading, OR build the object explicitly without spreading. Justify your choice in the log. Add a Vitest test that asserts the parsed driver-PUT object has no snake_case keys.
 
+## TASK BUG-04a — VIN preservation on driver confirm (disclosed during BUG-04)
+**File:** `app/api/deliveries/route.js`
+**Problem:** Original driver PUT code used `vin: body.vin || ''`, which wiped any admin-prefilled VIN whenever the driver submitted a blank VIN on delivery confirmation. Behavior change was outside BUG-04's declared scope and is isolated here for bisect-ability.
+**Fix:** `vin: body.vin || existing.vin || ''`. Driver-provided VIN still wins when non-blank; blank driver submission preserves the existing row's VIN.
+**Tests:** new file `tests/bug04a-vin-preservation.test.js` — 4 cases (preserve admin VIN, driver override wins, null existing VIN no regression, empty-string existing VIN no regression).
+
+## TASK BUG-04b — Edge-case test coverage for deliveries PUT (driver path)
+**File:** `tests/bug04b-driver-put-edge-cases.test.js` (new)
+**Problem:** BUG-04 coverage was happy-path only. Gaps identified during BUG-04 self-review: null date column, missing `id`, null `total_amount`, and wrong-driver rejection not re-asserted against the rebuilt body.
+**Fix:** Add 4 unit tests exercising each gap against the existing route handler.
+
 ## TASK BUG-05 — Add date filter to seller summary
 **File:** `app/api/summary/route.js`
 **Problem:** The seller branch runs `SELECT * FROM sales WHERE created_by = ${token.username}` with NO date filter. Unbounded growth.
@@ -59,6 +70,8 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-02 — silent catch logging (commit: 04f027e, 19 files, 105 tests)
 - [ ] BUG-03 — remove `?reset=true` from production
 - [ ] BUG-04 — driver PUT schema collision
+- [ ] BUG-04a — VIN preservation on driver confirm
+- [ ] BUG-04b — edge-case test coverage for driver PUT
 - [ ] BUG-05 — seller summary date filter
 - [ ] BUG-06 — voice-normalizer test coverage (likely already done — audit first)
 - [ ] ARC-01 — JSDoc + regions in `lib/db.js`

@@ -89,7 +89,9 @@ export async function PUT(request) {
         driverName: existing.driver_name || '',
         assignedDriver: existing.assigned_driver || '',
         notes: existing.notes || '',
-        vin: body.vin || '',
+        // BUG-04a: preserve an admin-prefilled VIN when the driver
+        // submits blank. Driver override still wins when non-blank.
+        vin: body.vin || existing.vin || '',
       };
     }
 
