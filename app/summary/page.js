@@ -106,10 +106,13 @@ function SummaryContent() {
         return {
           category: cat,
           count: items.length,
-          totalStock: items.reduce((s, p) => s + (p.stock || 0), 0),
-          totalValue: items.reduce((s, p) => s + ((p.stock || 0) * (p.buy_price || 0)), 0),
-          lowCount: items.filter((p) => p.stock > 0 && p.stock <= (p.low_stock_threshold ?? 3)).length,
-          outCount: items.filter((p) => !p.stock || p.stock <= 0).length,
+          // ARC-06: NUMERIC columns arrive as strings. `!p.stock` would be
+          // true for null but FALSE for "0.00" (non-empty string is truthy),
+          // so the outCount filter uses a numeric comparison instead.
+          totalStock: items.reduce((s, p) => s + (parseFloat(p.stock) || 0), 0),
+          totalValue: items.reduce((s, p) => s + ((parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0)), 0),
+          lowCount: items.filter((p) => (parseFloat(p.stock) || 0) > 0 && (parseFloat(p.stock) || 0) <= (p.low_stock_threshold ?? 3)).length,
+          outCount: items.filter((p) => (parseFloat(p.stock) || 0) <= 0).length,
         };
       }).filter((c) => c.count > 0)
     : [];

@@ -34,11 +34,11 @@ function SettlementsContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
-  // Calculate unsettled bonuses per user
+  // Calculate unsettled bonuses per user — ARC-06: parseFloat for NUMERIC.
   const unsettledByUser = {};
   (Array.isArray(bonuses) ? bonuses : []).filter((b) => !b.settled).forEach((b) => {
     if (!unsettledByUser[b.username]) unsettledByUser[b.username] = { total: 0, count: 0, role: b.role };
-    unsettledByUser[b.username].total += b.total_bonus || 0;
+    unsettledByUser[b.username].total += parseFloat(b.total_bonus) || 0;
     unsettledByUser[b.username].count += 1;
   });
 

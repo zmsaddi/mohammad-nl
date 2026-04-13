@@ -25,10 +25,13 @@ function StockContent() {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   // DONE: Step 2 — product-specific stock status (uses per-product threshold, default 3)
+  // ARC-06: parseFloat for NUMERIC-as-string. `!p.stock` would be false for
+  // "0.00" because non-empty strings are truthy, so we compare numerically.
   const getStatus = (p) => {
     const threshold = p.low_stock_threshold ?? 3;
-    if (!p.stock || p.stock <= 0) return 'out';
-    if (p.stock <= threshold) return 'low';
+    const stockNum = parseFloat(p.stock) || 0;
+    if (stockNum <= 0) return 'out';
+    if (stockNum <= threshold) return 'low';
     return 'ok';
   };
 
@@ -77,10 +80,11 @@ function StockContent() {
   }
 
   const totalProducts = products.length;
-  const totalStock = products.reduce((s, p) => s + (p.stock || 0), 0);
+  // ARC-06: parseFloat on every NUMERIC read so reducers don't string-concat.
+  const totalStock = products.reduce((s, p) => s + (parseFloat(p.stock) || 0), 0);
   // DONE: Bug 4 — sellers receive products with buy_price stripped server-side, so total = 0 for them
   const totalValue = canSeeCosts
-    ? products.reduce((s, p) => s + ((p.stock || 0) * (p.buy_price || 0)), 0)
+    ? products.reduce((s, p) => s + ((parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0)), 0)
     : 0;
   // DONE: Step 2 — out/low counts also use the per-product threshold
   const outOfStock = products.filter((p) => getStatus(p) === 'out').length;
@@ -276,7 +280,11 @@ function StockContent() {
                             style={{ width: '80px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center', fontFamily: "'Cairo', sans-serif" }}
                             onBlur={async (e) => {
                               const val = parseFloat(e.target.value) || 0;
-                              if (val !== (p.sell_price || 0)) {
+                              // ARC-06: p.sell_price is a string under NUMERIC, so
+                              // `val !== p.sell_price` would always be true (strict
+                              // equality across types). parseFloat for the compare.
+                              const currentSell = parseFloat(p.sell_price) || 0;
+                              if (val !== currentSell) {
                                 try {
                                   const { sql } = await import('@vercel/postgres');
                                   await fetch('/api/products', {

@@ -26,14 +26,14 @@ function MyBonusContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Stats
-  const totalAll = bonuses.reduce((s, b) => s + (b.total_bonus || 0), 0);
-  const unsettled = bonuses.filter((b) => !b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0);
-  const settled = bonuses.filter((b) => b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0);
+  // Stats — ARC-06: parseFloat on every NUMERIC read so reducers coerce to number.
+  const totalAll = bonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
+  const unsettled = bonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
+  const settled = bonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
   const thisMonth = (() => {
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    return bonuses.filter((b) => b.date?.startsWith(ym)).reduce((s, b) => s + (b.total_bonus || 0), 0);
+    return bonuses.filter((b) => b.date?.startsWith(ym)).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
   })();
   const count = bonuses.length;
 

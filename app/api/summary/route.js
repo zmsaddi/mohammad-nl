@@ -69,16 +69,17 @@ export async function GET(request) {
       const confirmed = mySales.filter((s) => s.status === 'مؤكد');
       const reserved  = mySales.filter((s) => s.status === 'محجوز');
 
+      // ARC-06: parseFloat wrapping on every NUMERIC money reducer.
       return NextResponse.json({
         sellerView:       true,
         window:           { from, to, defaultSource },
         totalSales:       confirmed.length,
-        totalRevenue:     confirmed.reduce((s, r) => s + (r.total || 0), 0),
+        totalRevenue:     confirmed.reduce((s, r) => s + (parseFloat(r.total) || 0), 0),
         reservedCount:    reserved.length,
-        reservedRevenue:  reserved.reduce((s, r) => s + (r.total || 0), 0),
-        totalBonusEarned: myBonuses.reduce((s, b) => s + (b.total_bonus || 0), 0),
-        totalBonusPaid:   myBonuses.filter((b) => b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0),
-        totalBonusOwed:   myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (b.total_bonus || 0), 0),
+        reservedRevenue:  reserved.reduce((s, r) => s + (parseFloat(r.total) || 0), 0),
+        totalBonusEarned: myBonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
+        totalBonusPaid:   myBonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
+        totalBonusOwed:   myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
       });
     } catch (err) {
       console.error('[summary] GET:', err);

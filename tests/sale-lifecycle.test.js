@@ -62,6 +62,9 @@ async function setSetting(key, value) {
 }
 
 describe('TEST-01: full sale lifecycle against real DB', () => {
+  // BUG-27 / ARC-06: beforeAll does a Neon cold-start + initDatabase which
+  // now runs ~30 extra ARC-06 ALTER statements on first call. The default
+  // 10s hook timeout is too tight — bumped to 30s to absorb cold starts.
   beforeAll(async () => {
     // Ensure schema is current.
     await initDatabase();
@@ -105,7 +108,7 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
         role     = EXCLUDED.role,
         active   = true
     `;
-  });
+  }, 30000); // BUG-27: 30s timeout — default 10s was too tight after ARC-06.
 
   afterAll(async () => {
     // Wipe the business tables again so the test leaves no residue.
