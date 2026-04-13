@@ -76,7 +76,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-06 — voice-normalizer test coverage (audited, 3 gaps found, 13 tests added)
 - [x] ARC-01 — JSDoc + regions in `lib/db.js` (409 net lines, overshoot explicitly approved)
 - [x] ARC-02 — measured, deferred to ARC-04 in Sprint 2. Baseline: 1842.
-- [ ] TEST-01 — sale lifecycle E2E (needs `.env.test`)
+- [x] TEST-01 — sale lifecycle E2E (real Neon via `.env.test`, 3 tests passing)
 
 ## Sprint 2 Backlog — Discovered During Sprint 1
 

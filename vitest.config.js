@@ -1,13 +1,21 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
-// Minimal config so Vitest resolves the '@/...' path alias the Next.js
-// app uses. Added as part of BUG-02 so API route error-logging tests
-// can import handlers that reference '@/lib/db'.
+// Vitest config:
+// - `@/...` path alias so unit tests can import Next.js-style paths
+//   (added for BUG-02 route-error-logging tests).
+// - `setupFiles` loads `.env.test` + guards POSTGRES_URL for the TEST-01
+//   real-DB integration test. Mock-only tests are unaffected.
+// - Long testTimeout because TEST-01 hits a remote Neon endpoint.
 export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd()),
     },
+  },
+  test: {
+    setupFiles: ['./tests/setup.test-env.js'],
+    testTimeout: 30000,
+    sequence: { hooks: 'list' },
   },
 });
