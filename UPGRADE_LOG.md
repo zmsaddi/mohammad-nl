@@ -624,3 +624,73 @@ for a single bike. Accessories, batteries, and parts are well below
 
 **NOT in current sprint scope.** Tracked here for the
 `VOICE_NORMALIZER_AUDIT.md` to be produced after COMMIT 5.
+
+---
+
+## BUG-01 — `بي → P/B` collision
+
+**Severity:** Functional (entity-resolver fallback exists)
+**Scope:** `lib/voice-normalizer.js` — `ARABIC_TO_LATIN` table
+**Commit:** COMMIT 4 of the BUG-01 series.
+
+### Problem
+
+`ARABIC_TO_LATIN` had two entries with the same Arabic source:
+
+```js
+['بي', 'B']  // line 173
+['بي', 'P']  // line 184 — DEAD CODE
+```
+
+`SORTED_ARABIC_TO_LATIN` sorts by length descending; both are length 2,
+and JS `Array.sort` is stable (ES2019+), so the entry that comes first
+in the array wins. Result: `بي → B` always; `بي → P` never fires. This
+made every spoken `P`-prefix product code resolve to `B` (e.g.,
+`"بي 20 برو" → "B20 Pro"` instead of `"P20 Pro"`).
+
+### Linguistic reality
+
+Standard Arabic has no `/p/` phoneme. Native speakers reading Latin
+letters out loud render both `B` and `P` as `بي`. Whisper transcribes
+both spoken sounds identically. There is **no acoustic disambiguator**
+in spoken Arabic between B and P.
+
+The only reliable disambiguator is **typographic**: the Persian letter
+`پ` (U+067E), which Whisper sometimes emits when the speaker visually
+"sees" the P. So `پي → P` is the one mapping that can fire correctly.
+
+### Fix
+
+1. **Delete** the dead `['بي', 'P']` entry.
+2. **Add** `['پي', 'P']` for the Persian-character path.
+3. **Add** `پي` to `LETTER_MAPPING_SOURCES` so the BUG-01c boundary
+   logic applies.
+4. **Document** in the code that any future spoken Arabic B-vs-P
+   disambiguation will require explicit catalog hinting (a known SKU
+   prefix), not loop-level disambiguation.
+
+The entity resolver downstream is the safety net here: if a real `P`-
+prefix SKU exists in the catalog, fuzzy matching against `B20` will
+still surface it as a candidate. That's why Bug F was tier-2 in the
+COMMIT 2 reorder analysis.
+
+### Tests
+
+Five new BUG-01 cases added to `tests/voice-normalizer.test.js`:
+
+| # | Input | Expected | Result |
+|---|---|---|---|
+| 1 | `بي 20` | `B20` | ✓ |
+| 2 | `بي 20 برو` | `B20 Pro` | ✓ |
+| 3 | `پي 20` | `P20` | ✓ |
+| 4 | `پي 20 برو` | `P20 Pro` | ✓ |
+| 5 | `بي` alone | contains `B`, not `P` | ✓ |
+
+```
+ Test Files  1 passed (1)
+      Tests  97 passed (97)
+```
+
+All previous tests remain green (47 BUG-01c + 7 BUG-01d + 9 BUG-01g +
+28 regression suite + 5 BUG-01 + 1 alif + 2 compound = 97 + 2 alif and
+related). No new bug class emerged.

@@ -300,6 +300,35 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
 // Sanity tests for the existing exported helpers (kept minimal — full coverage
 // expansion is BUG-06 in the same sprint).
 // ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// BUG-01: بي → P/B collision. The duplicate ['بي', 'P'] was dead code (B
+// won the stable sort). Removed; Persian پي → P added as the only reliable
+// spoken-Arabic P disambiguator.
+// ────────────────────────────────────────────────────────────────────────────
+describe('BUG-01: بي → B, پي → P (collision resolved)', () => {
+  it('"بي 20" → "B20" (Arabic ب is always B, never P)', () => {
+    expect(normalizeArabicText('بي 20')).toContain('B20');
+  });
+
+  it('"بي 20 برو" → "B20 Pro"', () => {
+    expect(normalizeArabicText('بي 20 برو')).toContain('B20 Pro');
+  });
+
+  it('"پي 20" → "P20" (Persian پ is the only spoken-Arabic P disambiguator)', () => {
+    expect(normalizeArabicText('پي 20')).toContain('P20');
+  });
+
+  it('"پي 20 برو" → "P20 Pro"', () => {
+    expect(normalizeArabicText('پي 20 برو')).toContain('P20 Pro');
+  });
+
+  it('"بي" alone → "B", never contains "P"', () => {
+    const out = normalizeArabicText('بي');
+    expect(out).toContain('B');
+    expect(out).not.toContain('P');
+  });
+});
+
 describe('normalizeForMatching — Arabic letter unification', () => {
   it('"أ ا إ آ" → all four become "ا"', () => {
     expect(normalizeForMatching('أ ا إ آ')).toBe('ا ا ا ا');
