@@ -5,6 +5,40 @@
 
 ---
 
+## 0. System Scope — read this first
+
+Vitesse Eco is a **hybrid system** with two faces. Understanding the split is critical for anyone changing the code, especially anything that touches invoices, VAT, or the cancellation flow.
+
+### 0.1 Internal face — Arabic management UI
+
+Everything behind `/login` (sales entry, deliveries, stock, clients, summary, my-bonus, settlements, users, settings) is an **internal operations tool**. It is Arabic-first, RTL, role-gated, and exists only for the business's own staff. It is **not** a legal or accounting system — the numbers it shows (revenue, profit, bonus liability, client debt) are managerial aggregates for day-to-day decisions, not audit-grade figures.
+
+### 0.2 Customer-facing face — French legal Facture
+
+At delivery confirmation ([lib/db.js:1318-1321](lib/db.js#L1318-L1321)), the system issues a **legally-binding French invoice** ("Facture") via [lib/invoice-generator.js](lib/invoice-generator.js). This document:
+
+- Carries the French SAS's SIRET, SIREN, APE code, and TVA number
+- Shows VAT back-calculated from the TTC-entered price (20% default, configurable via `settings.vat_rate`)
+- Includes IBAN, BIC, and signature blocks
+- Is titled "Facture" in French and conforms to Code de commerce expectations for commercial documents
+
+The external accountant works **directly from these Factures** — there is no separate accounting export, and FEAT-02 (monthly CSV export) was killed in the Sprint 3 decisions because the Facture itself is the accountant's input.
+
+### 0.3 Why the split matters
+
+- **Pricing is always TTC.** Sellers enter the final customer-facing amount. The Facture back-calculates HT + TVA from that. The internal UI never asks the seller to think about VAT.
+- **"No VAT computation needed"** (a frequent clarification from the user) refers to the *internal UI*, not to the Facture. The Facture does compute VAT, and that computation is legally required.
+- **Changes to `lib/invoice-generator.js`, `settings.vat_rate`, or the invoice-generation step of `updateDelivery(confirm)` have legal implications** in France and should be reviewed accordingly. Do not "simplify" the Facture into a generic receipt without legal sign-off — the document you see at delivery time is what the customer walks away with and what the accountant books.
+- **Cancellation of a confirmed sale voids the Facture** (soft-void: `UPDATE invoices SET status='ملغي'` in `voidInvoice()`, [lib/db.js:1859](lib/db.js#L1859)). The voided Facture is still retained for audit purposes — it is not deleted from the DB.
+
+### 0.4 What this means for future work
+
+- Treat the invoice-generator as frozen unless there is a specific legal reason to modify it.
+- The FEAT-05 cancellation helper must soft-void invoices by default (`invoiceMode='soft'`), not hard-delete them — deleting a Facture that was issued to a customer is an accounting break.
+- If a new "scope" of document is added (e.g., a non-invoice delivery receipt separate from the Facture), it must live alongside the Facture, not replace it.
+
+---
+
 ## 1. Technology Stack
 
 ### Runtime & Framework
@@ -31,9 +65,10 @@
 ### AI / Voice
 | Tech | Version | Role |
 |---|---|---|
-| **groq-sdk** | 1.1.2 | Whisper-large-v3 (Arabic STT) + Llama 3.3 70B fallback LLM |
-| **@google/generative-ai** | 0.24.1 | Gemini 2.5 Flash — primary structured-extraction LLM |
+| **groq-sdk** | 1.1.2 | Whisper-large-v3 (Arabic STT) + **Llama 3.1 8B Instant** (primary structured-extraction LLM after PERF-03) |
 | **fuse.js** | 7.3.0 | Fuzzy entity search (products / clients / suppliers) |
+
+> Note: the Google Gemini dependency was removed in PERF-03 — Llama 3.1 8B Instant via Groq is now the single LLM path. `@google/generative-ai` may still appear in `package.json` history but is no longer imported anywhere in `app/` or `lib/`.
 
 ### Visualization
 | Tech | Version | Role |
@@ -73,7 +108,7 @@ d:/mohammad_nl/
 │   ├── Toast.js  ConfirmModal.js  DetailModal.js
 │
 ├── lib/                          Business + infra logic
-│   ├── db.js                     ~1166 lines — schema init + ALL DB ops
+│   ├── db.js                     ~2530 lines — schema init + ALL DB ops + bonus engine + alias system
 │   ├── auth.js                   NextAuth config (Credentials + JWT)
 │   ├── utils.js                  formatNumber, calculateClientDebt, EXPENSE_CATEGORIES
 │   ├── entity-resolver.js        Layered fuzzy matching
@@ -92,7 +127,7 @@ d:/mohammad_nl/
 ### 3.1 Login flow
 1. Browser POSTs username/password to `/api/auth/callback/credentials`.
 2. [lib/auth.js](lib/auth.js) `authorize()` queries `users WHERE username=? AND active=true`, verifies hash with bcryptjs, returns `{ id, name, role, username }`.
-3. Hardcoded fallback `admin / admin123` if DB unreachable (dev/setup safety).
+3. **No hardcoded fallback.** An earlier revision allowed `admin/admin123` to pass auth even when the DB was unreachable — that was removed because a hardcoded fallback is a permanent backdoor ([lib/auth.js:30-35](lib/auth.js#L30-L35)). The **seeded** default admin row in `initDatabase()` at [lib/db.js:439-442](lib/db.js#L439-L442) still uses `admin/admin123` as the first-login credentials; rotate immediately via `/users`.
 4. NextAuth issues a **JWT** stored in an httpOnly cookie. Session shape: `{ user: { id, name, role, username } }`.
 
 ### 3.2 Roles
@@ -249,7 +284,7 @@ Key/value: `seller_bonus_fixed` (10), `seller_bonus_percentage` (50), `driver_bo
 | `/api/settlements` | GET POST | POST flips `bonuses.settled=true` and writes `settlement_id` |
 | `/api/summary` | GET | `?from&to` — admin/manager P&L |
 | `/api/settings` | GET POST | Bonus parameters |
-| `/api/init` | GET POST | `?reset=true` / `?clean=true` / `?keepLearning=true` (admin) |
+| `/api/init` | GET POST | GET = idempotent init. POST body `{}` = same. POST `{action:'clean'\|'reset', confirm:'احذف كل البيانات نهائيا', keepLearning?:bool}` = destructive. Query-param form was removed in BUG-03. |
 | `/api/voice/process` | POST | Audio → Whisper → normalize → LLM → JSON. The only voice extraction route. |
 | `/api/voice/learn` | POST | Persists user corrections to `ai_corrections` + `entity_aliases` |
 
@@ -279,21 +314,23 @@ clients ──► sales ──► deliveries ──► invoices
            payments  (only for آجل / credit sales)
 ```
 
-### 6.2 Purchase flow — `addPurchase()` ([lib/db.js](lib/db.js#L317-L362))
+### 6.2 Purchase flow — `addPurchase()` ([lib/db.js:587](lib/db.js#L587))
 1. Insert into `purchases`.
 2. Update `products.stock += qty`.
 3. Recompute `buy_price` as weighted average:
    `(stock·old + qty·new) / (stock + qty)`.
 4. Insert audit row in `price_history`.
 
-### 6.3 Sale creation — `addSale()` ([lib/db.js](lib/db.js#L379-L438))
+### 6.3 Sale creation — `addSale()` ([lib/db.js:718](lib/db.js#L718))
 1. Snapshot `cost_price`, compute `profit`.
 2. Insert with `status = 'محجوز'`.
 3. **Reserve stock immediately** (`stock -= qty`) — prevents overselling even before delivery.
 4. Auto-create the matching `clients` row if missing.
 5. Auto-create a paired `deliveries` row with `status = 'قيد الانتظار'`, linked through `sale_id`.
 
-### 6.4 Delivery confirmation — `updateDelivery()` ([lib/db.js](lib/db.js#L635-L705))
+> **ARC-03 note — `addClient` transaction boundary.** The `addClient()` call inside `addSale()` ([lib/db.js:762](lib/db.js#L762)) runs against the **global `sql` connection**, not the transaction client (`withTx`). This means a rolled-back `addSale` still leaves behind any newly-created client row. This is **intentional**: the comment at [lib/db.js:755-760](lib/db.js#L755-L760) documents that an orphan client row is harmless (clients are identified by `(name+phone)` OR `(name+email)` partial unique indexes, so the next retry is idempotent) and that refactoring `addClient` to accept an optional transaction client was considered but deferred. If you touch this path, either preserve the boundary (keep `addClient` on global `sql`) or thread the tx client through and update this note.
+
+### 6.4 Delivery confirmation — `updateDelivery()` ([lib/db.js:1242](lib/db.js#L1242))
 On `status → تم التوصيل`:
 1. Set `sales.status = 'مؤكد'`, store VIN if provided.
 2. If `payment_type ∈ {كاش, بنك}` → `paid_amount = total, remaining = 0`.
@@ -318,6 +355,31 @@ Admin records a payout in `/settlements`; backend updates matched bonus rows to 
 ### 6.8 Dashboard P&L (`/api/summary`)
 Returns: total revenue, cost, gross profit, expenses by category, net profit, sales by client/product, delivery counts by status, total client debt — filterable by date range.
 
+### 6.9 Bonus system — behavior and quirks
+
+Both **seller** and **driver** bonuses are first-class rows in the `bonuses` table, distinguished by the `role` column (`'seller'` or `'driver'`). One `UNIQUE(delivery_id, role)` index prevents duplicate rows per confirmed delivery. Bonuses are created by `calculateBonusInTx()` ([lib/db.js:1704](lib/db.js#L1704)), called from a single site: `updateDelivery()` when a delivery transitions to `تم التوصيل`.
+
+#### Formulas
+
+- **Seller bonus:** `fixed (default 10) + max(0, actual_price − recommended_price) · quantity · percentage/100 (default 50)`. Rewards up-selling over the recommended price; the fixed portion is guaranteed.
+- **Driver bonus:** flat `fixed (default 5)` per delivery. No quantity or quality multiplier.
+
+Tuning lives in the `settings` table under `seller_bonus_fixed`, `seller_bonus_percentage`, and `driver_bonus_fixed`. Admin-editable from `/users`.
+
+#### Role guards — the "why don't I see seller bonuses?" quirk
+
+`calculateBonusInTx` has two guards that can silently skip bonus creation:
+
+1. **Seller bonus fires only if** `sale.created_by` is a user whose `role` is literally `'seller'` ([lib/db.js:1727](lib/db.js#L1727)). Admin-created or manager-created sales get **no seller bonus row** — this is deliberate so managers don't collect commission on sales they entered on behalf of a seller. If you test by logging in as `admin` and creating a sale, you will see a driver bonus but no seller bonus, and the system is working as designed.
+
+2. **Driver bonus fires only if** `deliveries.assigned_driver` is a user whose `role` is literally `'driver'` ([lib/db.js:1751](lib/db.js#L1751)). Deliveries without a real assigned driver (e.g., admin confirming a walk-in sale) get no driver bonus row.
+
+A given confirmed sale may therefore have 0, 1, or 2 bonus rows depending on who created the sale and who delivered it. Any code that assumes "every confirmed sale has both bonuses" will be wrong in production.
+
+#### Settlement and clawback
+
+Bonuses are paid out via `/settlements` (admin-only). `addSettlement()` walks the recipient's unsettled bonus rows oldest-first and flips `settled=true` + `settlement_id=X`. Once settled, the money has left the business and cannot be trivially reversed — cancelling a sale with a settled bonus throws `'لا يمكن إلغاء فاتورة مرتبطة بمكافآت مُسواة بالفعل'` in `voidInvoice()` ([lib/db.js:1832-1835](lib/db.js#L1832-L1835)). The FEAT-05 cancellation helper will extend this check to all four cancel paths.
+
 ---
 
 ## 7. Voice & AI Pipeline
@@ -327,7 +389,7 @@ Returns: total revenue, cost, gross profit, expenses by category, net profit, sa
 1. **Capture** — `VoiceButton` records WebM/Opus, max 30 s.
 2. **STT** — Groq Whisper-large-v3, `language=ar`, vocabulary prompt seeded with current product/client/supplier names.
 3. **Normalize** — [lib/voice-normalizer.js](lib/voice-normalizer.js): converts spoken Arabic numerals (`سبعمية وخمسين` → `750`), unifies Alif variants (`أ/إ/آ → ا`), strips Tatweel, transliterates spoken Latin (`في 20 برو` → `V20 Pro`).
-4. **LLM extraction** — Gemini 2.5 Flash via function-calling; falls back to Groq Llama 3.3 70B on failure. Prompt is enriched with: product list, recent transactions, learned `ai_patterns`, recent `ai_corrections`.
+4. **LLM extraction** — **Groq Llama 3.1 8B Instant** via JSON-mode (switched in PERF-03 from a dual Gemini-primary / Groq-fallback architecture — the old dual path added latency without materially improving extraction quality). Prompt is enriched with: product list, recent transactions, learned `ai_patterns`, recent `ai_corrections`.
 5. **Entity resolution** — [lib/entity-resolver.js](lib/entity-resolver.js), three layers:
    - L0: O(1) lookup in `entity_aliases` (`normalized_alias` index).
    - L1: Fuse.js fuzzy + Jaro-Winkler distance.
@@ -390,9 +452,17 @@ npm run build    # next build
 npm start        # next start
 ```
 
-Database is initialized/idempotently migrated by hitting `/api/init` (admin only). `?reset=true` wipes everything; `?clean=true` keeps users; `?keepLearning=true` preserves AI tables.
+Database is initialized/idempotently migrated by hitting `/api/init` (admin only). Destructive operations use **POST body**, not query params (BUG-03 fix):
 
-> ⚠️ Per project rule (`feedback_no_data_loss.md`): never `reset=true` against a deployment with real user data. Use `clean=true` + `keepLearning=true` when refreshing.
+- `POST {}` → idempotent init (runs `CREATE TABLE IF NOT EXISTS` + safe ALTERs)
+- `POST {"action":"reset","confirm":"احذف كل البيانات نهائيا"}` → full wipe. **Blocked in `NODE_ENV=production`** and requires `ALLOW_DB_RESET=true` in the env.
+- `POST {"action":"clean","confirm":"احذف كل البيانات نهائيا","keepLearning":true}` → wipe business data, keep users/settings. With `keepLearning:true`, also preserves `ai_corrections`, `ai_patterns`, `entity_aliases`.
+
+> ⚠️ Per project rule (`feedback_no_data_loss.md`): never run `action:'reset'` against a deployment with real user data. Use `action:'clean'` + `keepLearning:true` when refreshing a dev or test environment.
+
+### 10.1 Canonical name
+
+The project has operated under several names historically (Neon project `accounting-db`, Vercel project `mohammad_nl`, repo `zmsaddi/mohammad-nl`, seeded company `VITESSE ECO SAS`). Per ARC-05, the **canonical project name going forward is `vitesse-eco`**. New docs, branches, and scripts should use this name. The deployment URL (`mohammadnl.vercel.app`) and the Neon project name are out of scope for the docs sweep — they require infrastructure-side renames that have not been performed yet.
 
 ---
 
@@ -442,7 +512,7 @@ For non-trivial changes, this project uses **Three-Mind Architecture**: three pe
 
 | File | Purpose |
 |---|---|
-| [lib/db.js](lib/db.js) | Schema init + every DB operation (~1166 lines) |
+| [lib/db.js](lib/db.js) | Schema init + every DB operation (~2530 lines) |
 | [lib/auth.js](lib/auth.js) | NextAuth Credentials provider, JWT callbacks |
 | [lib/utils.js](lib/utils.js) | `formatNumber`, `getTodayDate`, `calculateClientDebt`, `EXPENSE_CATEGORIES`, `generateRefCode` |
 | [lib/entity-resolver.js](lib/entity-resolver.js) | 3-layer fuzzy matching |

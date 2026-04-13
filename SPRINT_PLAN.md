@@ -68,7 +68,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 ## Status
 - [x] BUG-01 — voice-normalizer bug catalog (6 bugs fixed, audit document produced, commits: 24d18e5, 9c6e4db, 8ecc6fe, 5cf2027, 02d87d7, 58320f1)
 - [x] BUG-02 — silent catch logging (commit: 04f027e, 19 files, 105 tests)
-- [ ] BUG-03 — remove `?reset=true` from production
+- [x] BUG-03 — remove `?reset=true` from production (commit: abeb430, moved reset/clean to POST body with `confirm` phrase + `ALLOW_DB_RESET` env gate)
 - [x] BUG-04 — driver PUT schema collision (commit: 236308d)
 - [x] BUG-04a — VIN preservation on driver confirm (commit: 20bba74)
 - [x] BUG-04b — edge-case test coverage for driver PUT
@@ -77,6 +77,15 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] ARC-01 — JSDoc + regions in `lib/db.js` (409 net lines, overshoot explicitly approved)
 - [x] ARC-02 — measured, deferred to ARC-04 in Sprint 2. Baseline: 1842.
 - [x] TEST-01 — sale lifecycle E2E (real Neon via `.env.test`, 3 tests passing)
+
+## Sprint 2 → Sprint 3 Transition (landed, not in Status above)
+
+These items were added to the backlog in Sprint 2 and have since shipped. The Status section at the top of this file only tracks Sprint 1's original catalog — items below landed after it was frozen.
+
+- [x] **BUG-13** — `z.coerce.number()` on user-input boundaries (commit: cc0b057). Discovered during Sprint 2 schema audit. Fixed by upgrading the relevant schemas in `lib/schemas.js` to coerce strings before number validation. The BUG-13 *lesson* ("always coerce at the boundary") is carried forward into BUG-14's schema sweep, which is deferred to pair with ARC-06 in Sprint 3b.
+- [x] **FEAT-01** — Alias generator for cold-start entity recognition (commits: 9ac4d21 + 8d5d655 + 39770b3). Adds `generateProductAliases`, `generateSupplierAliases`, `generateClientAliases`; wires them into every entity creation path; introduces `addGeneratedAlias()` with first-writer-wins semantics (vs `addAlias()` which remains newest-writer-wins for confirmed corrections). The architectural review before implementation caught an entity-stealing bug in `addAlias()` that would have bitten the generator — the separate function was designed in from day one rather than patched later. A backfill script lives at `scripts/backfill-aliases.mjs` for existing installations.
+- [x] **PERF-03** — Dead voice routes removal + LLM swap (commit: 02eb65f). Deleted `/api/voice/extract` and `/api/voice/transcribe` (zero callers). Switched `/api/voice/process` to Llama 3.1 8B Instant via Groq, dropping the Gemini dependency from the hot path.
+- [x] **ARC-01** — JSDoc + region markers on `lib/db.js` (included in Sprint 1 Status but worth reiterating: the file grew to ~2530 lines during Sprint 2/3 work, and the region markers are what keep it navigable).
 
 ## Sprint 2 Backlog — Discovered During Sprint 1
 
