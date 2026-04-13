@@ -1223,6 +1223,119 @@ cost.
 
 Delta: +4 tests (BUG-04b suite). No source code changed.
 
+---
+
+## BUG-05 — Bounded query window on seller summary
+
+**Severity:** High (unbounded growth, latent DoS on long-tenured sellers)
+**Scope:** `app/api/summary/route.js` — seller branch only
+**Commit:** BUG-05
+
+### Problem
+
+The seller branch ran `SELECT * FROM sales WHERE created_by = ${token.username}`
+and `SELECT * FROM bonuses WHERE username = ${token.username}` with **no
+date filter**. A seller employed for two years and selling 5 bikes a week
+would pull ~520 rows on every dashboard load. Left unchecked that grows
+without bound — and the aggregates are all computed in JS, not SQL, so
+the whole payload crosses the network too.
+
+### Decision: "since last settlement" default with 90-day fallback
+
+The task spec said default to "last 90 days." I considered that and went
+with a different default after inspecting the schema. Rationale:
+
+- **Seller mental model.** A seller opening the dashboard asks "what have
+  I earned since my last payout?" not "what did I do in the last 90
+  days?" The first is a product answer; the second is an engineer's
+  answer.
+- **Schema already supports it.** `settlements` has `(username, date)`
+  columns. `MAX(date) WHERE username = ?` is one aggregate over a small
+  per-user set — no new index required, well under a millisecond on any
+  reasonable dataset.
+- **Graceful fallback.** A brand-new seller with no settlements in the
+  table has no last-settlement date, so we fall through to the 90-day
+  default the spec originally asked for. Existing-seller behavior
+  improves; new-seller behavior matches the spec.
+- **Response carries the window.** The payload now includes
+  `window: { from, to, defaultSource }` where `defaultSource` is
+  `'last-settlement'`, `'ninety-day-fallback'`, or `null` (user-supplied).
+  The UI can show the seller exactly which window they are looking at
+  without guessing.
+- **Cost:** one extra DB round-trip per seller dashboard load (the
+  `MAX(date)` query). Skipped entirely when the user supplies `?from=`.
+  For admins/managers the query is not added at all — the admin path
+  delegates to the pre-existing `getSummaryData()` with raw params,
+  unchanged.
+
+### Validation
+
+`from` and `to` are validated against `/^\d{4}-\d{2}-\d{2}$/` before any
+DB work. Invalid format returns 400 immediately. No zod import needed —
+the schema is one line and the error message is route-specific.
+
+### Parameterized SQL
+
+Every DB call is a `@vercel/postgres` tagged template with the values
+interpolated via `${}` placeholders. No string concatenation, no
+`sql.unsafe`. The sales and bonuses queries both take exactly three
+params: `(username, from, to)`. The settlements MAX query takes one:
+`(username)`.
+
+### Edge cases considered
+
+- **Last-settlement date stored as a JS `Date` vs `TEXT`.** The schema
+  stores `date` as `TEXT` but some drivers still hand back a `Date`
+  object for aggregate results in some configurations. Handled with
+  `lastDate instanceof Date ? ...toISOString().slice(0,10) : String(...).slice(0,10)`.
+- **Boundary inclusion.** Both ends use `>=` and `<=`. A sale made on
+  the exact settlement date will appear in the new window (which is
+  correct — that sale's bonus was just paid, and showing it matches
+  "your last payout included these sales").
+- **Timezone.** `new Date().toISOString().slice(0,10)` is always UTC.
+  Server runs in UTC on Vercel. No DST drift. The stored `date` column
+  is already a YYYY-MM-DD string entered by the seller, so we compare
+  strings to strings.
+- **`searchParams.get('from')` returns `null` when absent.** The
+  `if (fromParam && ...)` guards treat `null` and `''` identically,
+  both triggering the default resolution.
+
+### Tests
+
+New file: `tests/bug05-summary-date-window.test.js` — 5 cases:
+
+1. **Seller with no prior settlement** → 90-day fallback window applied.
+   Asserts `window.defaultSource === 'ninety-day-fallback'`, both sales
+   and bonuses SQL calls received `[username, 90-days-ago, today]` as
+   parameter values.
+2. **Seller with prior settlement** → `from = last-settlement-date`.
+   Asserts `window.defaultSource === 'last-settlement'`, both SQL calls
+   received `[username, '2026-02-01', today]`.
+3. **User-supplied from/to overrides default** → asserts
+   `defaultSource === null` and that the settlements MAX query was
+   **never issued** (`sqlCalls.find(...FROM settlements) === undefined`).
+4. **Invalid from format (`'2026-3-1'`)** → asserts 400 status AND that
+   zero SQL calls were made (validation runs before any DB work).
+5. **Admin path unchanged** → asserts `getSummaryData` was called with
+   the raw `('2026-01-01', '2026-12-31')` params and zero seller SQL
+   calls ran.
+
+The mock captures every `sql` tagged-template call into a `sqlCalls`
+array as `{ text, values }` pairs, and routes responses by regex-matching
+the template text (`/FROM settlements/i`, `/FROM sales/i`, `/FROM bonuses/i`).
+This lets a single test inspect exactly which queries ran, in what
+order, and with what arguments.
+
+### Verification
+
+```
+ Test Files  7 passed (7)
+      Tests  125 passed (125)
+```
+
+Delta: +1 file, +5 tests (BUG-05 suite). No pre-existing tests regressed.
+
+
 
 
 

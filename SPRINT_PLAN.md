@@ -72,7 +72,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-04 — driver PUT schema collision (commit: 236308d)
 - [x] BUG-04a — VIN preservation on driver confirm (commit: 20bba74)
 - [x] BUG-04b — edge-case test coverage for driver PUT
-- [ ] BUG-05 — seller summary date filter
+- [x] BUG-05 — seller summary date filter
 - [ ] BUG-06 — voice-normalizer test coverage (likely already done — audit first)
 - [ ] ARC-01 — JSDoc + regions in `lib/db.js`
 - [ ] ARC-02 — enable `checkJs` + categorize errors
