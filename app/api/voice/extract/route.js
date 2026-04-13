@@ -50,12 +50,18 @@ export async function POST(request) {
     });
 
     // DONE: Step 3 — Groq Llama is the only extraction model (no Gemini fallback)
+    // PERF-02: switched to llama-3.1-8b-instant. The extract route does
+    // structured JSON extraction from Arabic voice input — a classification
+    // task that does not benefit from a 70B model. The 8B-instant variant
+    // is ~5x faster and ~10x cheaper per token. The /api/voice/process
+    // route still uses 70B because it does entity resolution which may
+    // benefit from larger context reasoning.
     let parsed;
-    let usedModel = 'groq-llama';
+    let usedModel = 'groq-llama-8b-instant';
     try {
       const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: text },
