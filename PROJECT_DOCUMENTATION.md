@@ -250,10 +250,12 @@ Key/value: `seller_bonus_fixed` (10), `seller_bonus_percentage` (50), `driver_bo
 | `/api/summary` | GET | `?from&to` — admin/manager P&L |
 | `/api/settings` | GET POST | Bonus parameters |
 | `/api/init` | GET POST | `?reset=true` / `?clean=true` / `?keepLearning=true` (admin) |
-| `/api/voice/process` | POST | Audio → Whisper → normalize → LLM → JSON |
-| `/api/voice/extract` | POST | Text-only LLM extraction |
-| `/api/voice/transcribe` | POST | Whisper only (legacy) |
+| `/api/voice/process` | POST | Audio → Whisper → normalize → LLM → JSON. The only voice extraction route. |
 | `/api/voice/learn` | POST | Persists user corrections to `ai_corrections` + `entity_aliases` |
+
+> Voice flow uses `/api/voice/process` exclusively. Earlier dual-route architecture
+> (`/api/voice/extract` for text-only and `/api/voice/transcribe` for legacy
+> Whisper-only) was removed in PERF-03 — both routes had zero `fetch()` callers.
 
 Every handler reads `getToken()` then enforces:
 1. Token exists.
@@ -404,8 +406,7 @@ Database is initialized/idempotently migrated by hitting `/api/init` (admin only
 | [lib/entity-resolver.js](lib/entity-resolver.js) | 3-layer fuzzy matching |
 | [lib/voice-normalizer.js](lib/voice-normalizer.js) | Arabic numerals + dialect normalization |
 | [middleware.js](middleware.js) | Page + API auth & RBAC |
-| [app/api/voice/process/route.js](app/api/voice/process/route.js) | Whisper → normalize → LLM pipeline |
-| [app/api/voice/extract/route.js](app/api/voice/extract/route.js) | LLM extraction with learning context |
+| [app/api/voice/process/route.js](app/api/voice/process/route.js) | Whisper → normalize → LLM pipeline (the only voice extraction route after PERF-03) |
 | [app/api/deliveries/route.js](app/api/deliveries/route.js) | Delivery PUT triggers invoice + bonuses |
 | [app/api/summary/route.js](app/api/summary/route.js) | Dashboard aggregates |
 | [components/VoiceButton.js](components/VoiceButton.js) | MediaRecorder UX |

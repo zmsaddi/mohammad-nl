@@ -160,12 +160,19 @@ export async function POST(request) {
     });
 
     // DONE: Step 2 — Gemini fully removed; Groq Llama is the only extraction model
+    // PERF-03: switched production route to llama-3.1-8b-instant.
+    // The 8b model is ~5x faster than 70b on extraction tasks and runs
+    // on a 5x larger daily quota (500K tokens/day vs 100K). The extract
+    // task here is structured JSON output from a compressed prompt — well
+    // within 8b capability. PERF-02 made this same change to /api/voice/extract
+    // before realizing extract was dead code; this commit applies it to
+    // the actually-used route AND deletes the dead routes.
     let parsed;
-    let usedModel = 'groq-llama';
+    let usedModel = 'groq-llama-8b-instant';
     try {
       if (!groqClient) throw new Error('GROQ_API_KEY missing');
       const completion = await groqClient.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: normalized },

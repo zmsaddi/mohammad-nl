@@ -1,7 +1,7 @@
 // BUG-13: Zod schemas now coerce string-to-number on numeric fields so
 // React <input type="number"> string values are accepted on the manual
 // form path. Voice path was already immune because it pre-coerces in
-// /api/voice/extract|process.
+// /api/voice/process.
 //
 // One case per schema for each input mode:
 //   - STRING mode   — simulates the manual form path (React raw e.target.value)
