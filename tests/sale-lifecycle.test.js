@@ -235,7 +235,17 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
   });
 
   it('Test 3 — voidInvoice reverses sale, restores stock, deletes unsettled bonuses', async () => {
-    await voidInvoice(ctx.invoiceId);
+    // FEAT-05: cancellation now requires explicit bonusActions whenever
+    // the sale has non-settled bonuses. This test exercises the "remove
+    // both" choice. The bonusActions preserve pre-FEAT-05 behavior
+    // (both bonuses deleted on void). Separate tests exist for the
+    // BONUS_CHOICE_REQUIRED sentinel and the "keep" disposition in
+    // tests/feat05-cancel-sale.test.js.
+    await voidInvoice(ctx.invoiceId, {
+      cancelledBy: 'test-admin',
+      reason: 'Lifecycle test void',
+      bonusActions: { seller: 'remove', driver: 'remove' },
+    });
 
     // Invoice voided.
     const { rows: inv } = await sql`SELECT * FROM invoices WHERE id = ${ctx.invoiceId}`;
@@ -246,6 +256,8 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     expect(sale[0].status).toBe('ملغي');
     expect(parseFloat(sale[0].paid_amount)).toBe(0);
     expect(parseFloat(sale[0].remaining)).toBe(0);
+    // FEAT-05: cancellation now also writes payment_status='cancelled'.
+    expect(sale[0].payment_status).toBe('cancelled');
 
     // Stock back to 10.
     const { rows: prods } = await sql`SELECT stock FROM products WHERE name = 'V20 Test Pro'`;
@@ -254,5 +266,16 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     // Unsettled bonuses for this sale are gone.
     const { rows: bonuses } = await sql`SELECT * FROM bonuses WHERE sale_id = ${ctx.saleId}`;
     expect(bonuses).toHaveLength(0);
+
+    // FEAT-05: a cancellations audit row was written.
+    const { rows: audit } = await sql`
+      SELECT * FROM cancellations WHERE sale_id = ${ctx.saleId} ORDER BY id DESC LIMIT 1
+    `;
+    expect(audit).toHaveLength(1);
+    expect(audit[0].cancelled_by).toBe('test-admin');
+    expect(audit[0].reason).toBe('Lifecycle test void');
+    expect(audit[0].invoice_mode).toBe('soft');
+    expect(audit[0].seller_bonus_kept).toBe(false);
+    expect(audit[0].driver_bonus_kept).toBe(false);
   });
 });

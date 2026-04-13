@@ -6,6 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
+import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 
 const DELIVERY_STATUSES = [
@@ -54,6 +55,10 @@ function DeliveriesContent() {
   const [vinInput, setVinInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
+  // FEAT-05: cancellation dialog state. When an admin clicks the status
+  // dropdown to 'ملغي' OR the delete button, we open the CancelSaleDialog
+  // and let it drive the full cancellation flow through the new endpoints.
+  const [cancelSale, setCancelSale] = useState(null); // {saleId, invoiceMode}
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -136,6 +141,17 @@ function DeliveriesContent() {
       setVinInput('');
       return;
     }
+    // FEAT-05: cancellation goes through the CancelSaleDialog (bonus
+    // keep/remove choice + audit row). The old inline PUT path no longer
+    // runs — cancelSale handles everything atomically.
+    if (newStatus === 'ملغي') {
+      if (!row.sale_id) {
+        addToast('لا يمكن إلغاء توصيل غير مرتبط ببيع', 'error');
+        return;
+      }
+      setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' });
+      return;
+    }
     await doStatusChange(row, newStatus, '');
   };
 
@@ -168,6 +184,9 @@ function DeliveriesContent() {
     }
   };
 
+  // FEAT-05: the old delete button is no longer used — admin-initiated
+  // deletion now goes through the CancelSaleDialog. This handler remains
+  // as a safety net in case some legacy UI path still sets deleteId.
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
@@ -175,6 +194,13 @@ function DeliveriesContent() {
       if (res.ok) {
         addToast('تم الحذف بنجاح');
         fetchData();
+      } else {
+        // deleteDelivery now calls cancelSale internally, which throws
+        // BONUS_CHOICE_REQUIRED when bonuses exist without bonusActions.
+        // In that case the route returns 400 with the Arabic error. Route
+        // the admin to the dialog as a fallback.
+        const data = await res.json().catch(() => ({}));
+        addToast(data?.error || 'خطأ في الحذف — استخدم خيار الإلغاء بدلاً منه', 'error');
       }
     } catch {
       addToast('خطأ في الحذف', 'error');
@@ -390,9 +416,18 @@ function DeliveriesContent() {
                       )}
                     </td>
                     <td>
-                      {isAdmin && (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                          حذف
+                      {isAdmin && row.status !== 'ملغي' && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => {
+                            if (!row.sale_id) {
+                              addToast('لا يمكن إلغاء توصيل غير مرتبط ببيع', 'error');
+                              return;
+                            }
+                            setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' });
+                          }}
+                        >
+                          إلغاء
                         </button>
                       )}
                     </td>
@@ -516,6 +551,23 @@ function DeliveriesContent() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />
+
+      {/* FEAT-05: cancellation dialog — triggered by status→ملغي or by the
+          admin delete button. Drives the full cancelSale flow via the new
+          POST /api/sales/[id]/cancel endpoint. */}
+      {cancelSale && (
+        <CancelSaleDialog
+          saleId={cancelSale.saleId}
+          invoiceMode={cancelSale.invoiceMode}
+          title="إلغاء الطلب المرتبط"
+          onSuccess={() => {
+            setCancelSale(null);
+            addToast('تم إلغاء الطلب بنجاح');
+            fetchData();
+          }}
+          onCancel={() => setCancelSale(null)}
+        />
+      )}
     </AppLayout>
   );
 }
