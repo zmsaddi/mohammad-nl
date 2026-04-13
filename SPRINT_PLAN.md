@@ -75,7 +75,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-05 — seller summary date filter
 - [x] BUG-06 — voice-normalizer test coverage (audited, 3 gaps found, 13 tests added)
 - [x] ARC-01 — JSDoc + regions in `lib/db.js` (409 net lines, overshoot explicitly approved)
-- [ ] ARC-02 — enable `checkJs` + categorize errors
+- [x] ARC-02 — measured, deferred to ARC-04 in Sprint 2. Baseline: 1842.
 - [ ] TEST-01 — sale lifecycle E2E (needs `.env.test`)
 
 ## Sprint 2 Backlog — Discovered During Sprint 1
@@ -103,6 +103,26 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
   failing loudly.
 - Tests: add a case covering the empty-delRow path and assert it throws.
 - Estimated: ~40 lines, one commit.
+
+### ARC-04 — Type debt reduction pass
+- Source: ARC-02 measurement
+- Baseline: 1842 tsc errors under `checkJs: true, noImplicitAny: false`
+- Measured pattern distribution (only 3 patterns measured, not full taxonomy):
+  - `searchParams.get()` narrowing (`string | null`): 14 errors (0.8%)
+  - `@vercel/postgres` SQL params typed `unknown`: 39 errors (2.1%)
+  - NextAuth `AuthOptions` / `SessionStrategy`: 1 error (0.05%)
+  - Residual (unmeasured): 1788 errors (97.1%)
+- **The three "dominant" patterns identified from the first 7 errors account
+  for only 2.9% of the backlog.** A mechanical sweep on just those three
+  would leave 1788 errors behind, still 9× the 200 threshold. ARC-04 needs
+  its own measurement pass against the residual before a real plan can be drawn.
+- Plan: (1) re-enable checkJs temporarily, (2) measure the residual to find
+  the actual dominant patterns, (3) sweep them, (4) re-measure, (5) repeat
+  until count is below 100, (6) re-enable checkJs permanently.
+- Estimated: unknown until residual is measured. Do NOT assume 2–4 commits —
+  the real cost is probably higher.
+- Dependency: BUG-07 (AI-layer logging) should land first so that the type
+  sweep doesn't collide with the catch-clause rewrites.
 
 ### ARC-03 — addSale transaction boundary (documentation or migration)
 - Source: ARC-01 Discovered Issue #3

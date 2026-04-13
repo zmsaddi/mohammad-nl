@@ -1566,6 +1566,97 @@ Option (a) makes the guarantee match the claim in docs. Option (b)
 makes the guarantee match the claim in code. Either is correct;
 Sprint 2 planning picks one.
 
+---
+
+## ARC-02 — Measured Baseline and Deferred
+
+**Severity:** Meta-task (type-debt measurement, no runtime change)
+**Scope:** one-time measurement against `checkJs: true` + `noImplicitAny: false`
+**Commit:** ARC-02
+
+### What happened
+
+Enabled `checkJs: true` and `noImplicitAny: false` in `jsconfig.json`
+and ran `npx tsc -p jsconfig.json --noEmit` once. The `-p` flag is
+required because `tsc` without it does not read `jsconfig.json`
+(it only auto-loads `tsconfig.json`); the first invocation without
+the flag printed the help screen and exited with code 1, masking the
+real result until I retried with the project path.
+
+Exit code was 2 (errors found, as expected — not a tool failure).
+
+### Raw count
+
+```
+Raw count: 1842 type errors
+```
+
+Over the 200 threshold set by the reviewer as the "stop and decide"
+point. Halted before full categorization per the standing
+instruction.
+
+### Pattern measurement (three patterns only — not a full taxonomy)
+
+Before the revert, I measured the three patterns I had pitched as
+"dominant" based on the first 7 errors I saw. The measurement was
+to validate (or invalidate) that guess so the Sprint 2 planner has
+real numbers instead of my extrapolation.
+
+| Pattern | Count | % of total |
+|---|---|---|
+| 1. `Argument of type 'string \| null'` (searchParams narrowing) | 14 | 0.8% |
+| 2. `Argument of type 'unknown'` (`@vercel/postgres` SQL params) | 39 | 2.1% |
+| 3. `AuthOptions` (NextAuth `session.strategy` literal) | 1 | 0.05% |
+| **Residual** | **1788** | **97.1%** |
+| Total | 1842 | 100% |
+
+### What the measurement actually tells us
+
+**My "dominant patterns" guess from the first 7 errors was wrong.**
+The three patterns together account for 54 / 1842 = **2.9%** of the
+backlog, not the 70-80% I had implied by calling them "dominant." A
+two-commit mechanical sweep on these three patterns would leave
+**1788 errors** behind, which is still 9× the 200 threshold.
+
+This is a negative finding and I want it on record as such. If the
+Sprint 2 planner had relied on my verbal extrapolation without asking
+for measurement, ARC-04 would have been scoped as "small sweep, done
+in a day" and would have blown up on contact. Cheap measurements
+beat confident extrapolation. I should have measured before pitching
+the three patterns as dominant, not after.
+
+The residual 1788 is unmeasured in this task — deliberately, per the
+"categorize top 5 + per-file top 10 only if under 200" rule. A real
+Sprint 2 task (ARC-04) will need its own measurement pass against
+the residual to build an actual reduction plan.
+
+### Decision
+
+`checkJs` enforcement **deferred to Sprint 2** as new task ARC-04.
+`jsconfig.json` reverted to its pre-ARC-02 state in this same commit.
+The 1842 number is the recorded baseline so ARC-04 can measure
+progress against it.
+
+### Reproducibility
+
+Exact commands used:
+
+```bash
+# Apply the flags
+# (edit jsconfig.json to add checkJs: true, noImplicitAny: false)
+
+# Run the check
+npx tsc -p jsconfig.json --noEmit 2> stderr.txt 1> stdout.txt
+
+# Count
+grep -c "error TS" stdout.txt                                      # → 1842
+grep "error TS" stdout.txt | grep -cF "Argument of type 'string | null'"  # → 14
+grep "error TS" stdout.txt | grep -cF "Argument of type 'unknown'"        # → 39
+grep "error TS" stdout.txt | grep -cF "AuthOptions"                       # → 1
+```
+
+TypeScript version at measurement time: 6.0.2.
+
 
 
 
