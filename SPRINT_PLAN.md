@@ -174,3 +174,24 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
      database WILL delete its business data
 - Severity: onboarding / documentation
 - Estimated: 20 minutes
+
+### BUG-14 — Add Zod schemas to currently-unvalidated POST/PUT routes
+- Source: BUG-13 audit (Sprint 2 hot-fix #2)
+- Problem: 6 write routes accept request bodies without any Zod validation:
+  - POST /api/products
+  - POST /api/clients (also PUT)
+  - POST /api/suppliers (also PUT)
+  - POST /api/users (also PUT)
+  - POST /api/settlements
+  - POST /api/deliveries
+- Risk: malformed bodies hit lib/db.js directly. Currently masked by
+  client-side discipline and Postgres bind coercion. A single misbehaving
+  caller (or a future bug like BUG-13) can blow up these routes.
+- Fix: define ProductSchema, ClientSchema, SupplierSchema, UserSchema,
+  SettlementSchema, DeliverySchema in lib/schemas.js. Wire each route's
+  POST/PUT handler to call schema.safeParse(body) before reaching db.js.
+- Use z.coerce.number() everywhere from the start (BUG-13 lesson).
+- After BUG-14 lands, remove the two defensive parseFloat lines from
+  addDelivery and addSettlement that BUG-13 added.
+- Severity: hardening / prevent-future-regressions
+- Estimated: 2-3 hours (including writing per-route tests)
