@@ -131,3 +131,65 @@ describe('BUG-10: learn route records missed-field corrections', () => {
     });
   });
 });
+
+describe('BUG-11: reinforcement bump is suppressed when user added any missing field', () => {
+  let errorSpy;
+  let warnSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    saveAICorrectionMock.mockClear();
+    sqlMock.mockClear();
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  function updateAiPatternsCalls() {
+    return sqlMock.mock.calls.filter((c) => {
+      const strings = c[0];
+      return Array.isArray(strings) && strings.join('').includes('UPDATE ai_patterns');
+    });
+  }
+
+  it('case 1: AI and user identical → reinforcement UPDATE fires', async () => {
+    await callLearn({
+      transcript: 'اشتريت V20',
+      aiData:     { item: 'V20' },
+      userData:   { item: 'V20' },
+      actionType: 'register_purchase',
+    });
+
+    expect(saveAICorrectionMock).not.toHaveBeenCalled();
+    expect(updateAiPatternsCalls()).toHaveLength(1);
+  });
+
+  it('case 2: user added sell_price the AI missed → reinforcement UPDATE does NOT fire', async () => {
+    await callLearn({
+      transcript: 'اشتريت V20 بألف سعر البيع ألف وخمسمية',
+      aiData:     { item: 'V20' },
+      userData:   { item: 'V20', sell_price: 1500 },
+      actionType: 'register_purchase',
+    });
+
+    expect(updateAiPatternsCalls()).toHaveLength(0);
+    // The correction path still fires for the missed sell_price field.
+    expect(saveAICorrectionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('case 3: user corrected a wrong value (no missed field) → correction path owns the signal, reinforcement does not fire', async () => {
+    await callLearn({
+      transcript: 'اشتريت V20 سعر البيع ألف وأربعمية',
+      aiData:     { item: 'V20', sell_price: 1400 },
+      userData:   { item: 'V20', sell_price: 1500 },
+      actionType: 'register_purchase',
+    });
+
+    expect(saveAICorrectionMock).toHaveBeenCalledTimes(1);
+    expect(updateAiPatternsCalls()).toHaveLength(0);
+  });
+});

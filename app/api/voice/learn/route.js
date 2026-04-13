@@ -65,7 +65,24 @@ export async function POST(request) {
     // If the user accepted everything the AI extracted, every matched pattern
     // gets a frequency bump. Over time the most-trusted patterns float to the
     // top of the prompt and the resolver promotes the most-used aliases.
-    if (corrections.length === 0 && transcript) {
+    //
+    // BUG-11: only reinforce when the userData contains exactly the same
+    // populated fields as aiData. If the user ADDED any field the AI missed,
+    // we are in a missed-field scenario and the correction path owns the
+    // learning signal — reinforcement must NOT fire, or the system would
+    // learn the wrong lesson (reinforcing unrelated patterns from a request
+    // that actually contained a correction).
+    const aiKeys = Object.keys(aiData || {}).filter((k) => {
+      const v = aiData[k];
+      return v !== '' && v !== null && v !== undefined;
+    });
+    const userKeys = Object.keys(userData || {}).filter((k) => {
+      const v = userData[k];
+      return v !== '' && v !== null && v !== undefined;
+    });
+    const userAddedFields = userKeys.filter((k) => !aiKeys.includes(k));
+
+    if (corrections.length === 0 && transcript && userAddedFields.length === 0) {
       try {
         await sql`
           UPDATE ai_patterns
