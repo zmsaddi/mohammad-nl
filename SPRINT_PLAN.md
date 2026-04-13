@@ -103,6 +103,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
   failing loudly.
 - Tests: add a case covering the empty-delRow path and assert it throws.
 - Estimated: ~40 lines, one commit.
+- Flagged for Sprint 2 priority-1 slot. Financial-tier. Do not defer further.
 
 ### ARC-04 — Type debt reduction pass
 - Source: ARC-02 measurement
@@ -138,3 +139,38 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - Severity: Correctness-of-documentation. The code works; the claim of atomicity
   does not fully match the code.
 - Estimated: (a) 15 minutes, (b) 2 hours + tests.
+
+### ARC-05 — Canonical naming across Vercel, Neon, and seed data
+- Source: TEST-01 pre-flight investigation, Sprint 1
+- Problem: the Neon project is "accounting-db", the Vercel project is
+  "mohammad_nl", the seeded company name in lib/db.js is "Vitesse Eco SAS",
+  the repo is "zmsaddi/mohammad-nl". Four different names for one system.
+  Cost measurable triage time during TEST-01 setup (multiple conversational
+  turns spent disambiguating which Neon project was production).
+- Decision needed from user first: pick the canonical name. Recommended:
+  "vitesse-eco" as the business brand, since that is what appears on
+  invoices and what end users see.
+- Fix (after user decision):
+  1. Rename Neon project via `neonctl projects update <id> --name vitesse-eco-prod`
+  2. Rename Vercel project via Vercel UI (Settings → General → Project Name)
+  3. Update SETUP.md and PROJECT_DOCUMENTATION.md section 10 with new names
+  4. Optionally rename the GitHub repo (user decision — has URL impact)
+- Severity: hygiene / future-risk-reduction
+- Blocker: none, do anytime in Sprint 2
+- Estimated: 30 minutes
+
+### DOC-01 — SETUP.md update for .env.test requirement
+- Source: TEST-01 honest engineering assessment, Sprint 1 closing summary
+- Problem: tests/setup.test-env.js throws if .env.test is missing. Any
+  developer running `npx vitest run` in a fresh clone sees every test fail.
+- Fix: add a "Running tests" section to SETUP.md explaining:
+  1. .env.test must exist at repo root
+  2. It must contain POSTGRES_URL pointing at a DB the developer is
+     willing to have TRUNCATEd
+  3. The simplest setup is `vercel env pull .env.test` for a developer
+     with Vercel access, or a personal Neon project for open-source
+     contributors
+  4. Warning: running the lifecycle test against any non-disposable
+     database WILL delete its business data
+- Severity: onboarding / documentation
+- Estimated: 20 minutes
