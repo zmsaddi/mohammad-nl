@@ -1657,6 +1657,158 @@ grep "error TS" stdout.txt | grep -cF "AuthOptions"                       # → 
 
 TypeScript version at measurement time: 6.0.2.
 
+---
+
+## FEAT-01 — Auto-generated aliases for cold-start entity recognition
+
+**Severity:** Feature (closes a real cold-start gap)
+**Scope:** `lib/alias-generator.js` (new), `tests/alias-generator.test.js` (new),
+`lib/db.js` (helpers + hooks + trimmed seeder), `scripts/backfill-aliases.mjs` (new),
+`PROJECT_DOCUMENTATION.md` (Three-Mind section), `SPRINT_PLAN.md` (4 follow-ups)
+**Commits:** FEAT-01 generator, FEAT-01.1 refinements, FEAT-01 integration
+
+### The cold-start gap
+
+Before this feature, freshly-added products/suppliers/clients had **zero
+aliases** in `entity_aliases`. The voice resolver could only fall back to
+fuzzy-matching the English string, which often failed for Arabic input.
+The existing `confirmed_action` learning loop only added aliases AFTER a
+user had successfully said the entity name once — there was no day-one
+coverage.
+
+### What this feature delivers
+
+A new `lib/alias-generator.js` module produces 4-5 Arabic aliases per entity
+from its English name and persists them at entity creation time. After
+deploy, a brand-new "V20 Pro" product immediately has aliases like
+`في عشرين برو`, `V20 Pro`, `V٢٠ برو`, and `v20pro` — enough for the
+resolver's Layer 0 (instant O(1) lookup) to match common spoken or typed
+input on day one.
+
+The generator handles:
+- **Numbers 0-30 individually**, plus tens 40-100, hundreds 200-1000,
+  thousands. Levantine + Gulf dialect variants where they meaningfully
+  diverge (`8 → ثمانية + تمنية`; `400 → أربعمائة + أربعمية`).
+- **Compositional numbers** like 28, 33, 47 are derived from the tens+ones
+  table entries and cross-product all dialect variants automatically.
+- **Letter-prefix model patterns** like V20, S20, GT-2000, EB30, Q30, C28,
+  D50. Multi-letter prefixes (GT, EB) are matched first; single letters
+  fall back to a per-character mapping.
+- **All-caps brand acronyms** (BMW, KTM, HP) via a 2-5 char fallback that
+  produces character-by-character transliteration. Existing LETTER_PAIRS
+  entries take priority.
+- **Product descriptor words** (Pro, Mini, Max, Ultra, Limited, Cross,
+  Pliable, Light, Inch, etc.) and **color words** in English and French
+  (Vitesse Eco's catalog uses French color suffixes like `- Noir`).
+- **Common Arabic first names** (~50 entries: Mohammed, Ahmed, Ali,
+  Khalid, Sami, Hassan, etc.) for client/supplier transliteration.
+- **Variant suffix stripping**: `"V20 Pro - Noir - NFC"` produces aliases
+  for `"V20 Pro"` only. The variant suffix is preserved in the canonical
+  entity name. Per-variant alias generation is deferred unless usage
+  warrants it.
+
+### Three sources of aliases (intentionally separate)
+
+| Source tag | Origin | Frequency | Collision policy |
+|---|---|---|---|
+| `auto_generated` | FEAT-01 generator | 1 | first-writer-wins |
+| `seed` | Hand-curated nicknames in `seedProductAliases()` | 5 | first-writer-wins (via the existing seeder's SELECT-then-INSERT) |
+| `confirmed_action` | Voice flow successful match | 1, +1 per match | newest-writer-wins (via existing `addAlias()`) |
+
+The split is load-bearing:
+- **Generator** handles MECHANICAL transliteration (the algorithmically
+  derivable cases).
+- **Hand-curated seed** (trimmed in this feature) handles DOMAIN-SPECIFIC
+  cultural labels that no algorithm can produce — `الفيشن` for V20 Pro,
+  `الطوي` for Q30 Pliable, `البيست سيلر`, `مية كيلو`, `للبنات الكبيرة`,
+  etc. ~24 entries kept; ~11 mechanical entries deleted because the
+  generator now produces them.
+- **`confirmed_action`** handles IDIOMATIC variants discovered through
+  real spoken usage. Frequency grows on each successful match, promoting
+  the most-trusted aliases via the existing Fuse `freq_boost` mechanism.
+
+### Safety: separate `addGeneratedAlias()` with first-writer-wins
+
+The architectural review (Three-Mind) caught a latent bug in the existing
+`addAlias()`: it uses **newest-writer-wins** semantics on collision,
+rewriting `entity_id` to whichever caller arrived second. This is correct
+for `confirmed_action` (the user just confirmed the new entity is right)
+but UNSAFE for `auto_generated` (we have zero evidence). If both
+`"V20 Pro"` and `"V20 Pro Black"` generate the alias `"في عشرين برو"`,
+the second insert would steal the alias from the first product.
+
+The fix: a NEW function `addGeneratedAlias()` with first-writer-wins
+collision policy. The existing `addAlias()` is left alone, preserving its
+semantics for the `confirmed_action` paths that genuinely need them. Two
+helpers, two collision policies, intentional separation. The latent bug
+in `addAlias()` itself is tracked as **BUG-19** for a future sprint.
+
+### Cache invalidation (non-negotiable)
+
+Adding aliases via the generator must invalidate the resolver's Fuse cache,
+otherwise the freshly-added entity is unrecognized for up to 5 minutes
+(the Fuse cache TTL). `generateAndPersistAliases()` calls `invalidateCache()`
+at the end of each batch. Without this fix, the user would experience
+intermittent "I just added a product and tried to say it 30 seconds later
+and it didn't recognize it" failures — exactly the kind of weird bug that
+erodes trust faster than outright failure.
+
+`invalidateCache()` takes no parameters and resets all three Fuse caches
+(products/clients/suppliers). Slightly broader than necessary but
+functionally correct, and matches the existing pattern in
+`saveAICorrection()`. Per-type invalidation is tracked as part of
+**BUG-20** for a future sprint.
+
+### Hook locations
+
+- `addProduct()` — post-INSERT, pre-return
+- `addSupplier()` — post-INSERT, pre-return
+- `addClient()` — **only** in the "Step 4 — genuinely new client" branch.
+  NOT in the contact-info-update branches that return `{ id, exists: true }`.
+  Re-generating aliases on every contact update would explode the alias
+  count for no benefit.
+
+### Backfill
+
+`scripts/backfill-aliases.mjs` walks every existing product, supplier, and
+client and runs the generator. Idempotent because `addGeneratedAlias()`
+has first-writer-wins semantics. Run manually:
+
+```bash
+node scripts/backfill-aliases.mjs
+```
+
+Reads `.env.test` first, falls back to `.env.local`. Output: per-table
+counts of `processed/skipped/aliases_created` plus a final summary.
+
+### Verification
+
+```
+ Test Files  13 passed (13)
+      Tests  206 passed (206)
+```
+
+37 generator tests across three commits (Commit 1: 28 happy-path / skip /
+edge / variant cases; FEAT-01.1: 9 cases for compositional dialect numbers
+and the all-caps acronym fallback). Plus the existing 169 from prior
+sprints. Zero regressions.
+
+### Discovered Issues promoted to Sprint 2 backlog
+
+- **FEATURE-01** — Manual entity entry forms (UI). Without these, FEAT-01
+  delivers ~80% of its value via the existing entry points (purchases
+  auto-create, voice auto-create) but the explicit "manual entry workflow"
+  needs the form.
+- **BUG-19** — `addAlias()` newest-writer-wins is a latent bug for any
+  future non-confirmed caller. Mitigated for FEAT-01 by `addGeneratedAlias()`,
+  but should be formalized.
+- **BUG-20** — Cache invalidation gap. FEAT-01 closes it for the generator
+  path, but other entity mutations (update, delete) still leave a stale
+  cache window.
+- **BUG-21** — `addSupplier()` lacks the ambiguity detection that
+  `addClient()` has. Two suppliers with the same name collide forever.
+
+
 
 
 

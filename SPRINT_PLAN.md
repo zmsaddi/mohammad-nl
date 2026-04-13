@@ -195,3 +195,62 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
   addDelivery and addSettlement that BUG-13 added.
 - Severity: hardening / prevent-future-regressions
 - Estimated: 2-3 hours (including writing per-route tests)
+
+### FEATURE-01 — Manual entity entry forms (UI)
+- Source: FEAT-01 architectural review
+- Problem: there are no admin UI forms for manually adding products,
+  suppliers, or clients. Today entities are only created as side effects
+  of POST /api/purchases or VoiceConfirm.js auto-create.
+- Impact on FEAT-01: the alias generator hooks fire for those existing
+  paths, so FEAT-01 still delivers ~80% of its value without the form.
+  But the explicit "manual entry workflow" the user described needs
+  the form to be built.
+- Fix: add three small forms — products, suppliers, clients — under the
+  admin UI. Each POSTs to the existing /api/* route, which auto-fires
+  the alias generator. Zero backend changes.
+- Severity: feature gap / UX
+- Estimated: 3-4 hours
+- Priority: Sprint 3 candidate
+
+### BUG-19 — addAlias() newest-writer-wins is unsafe for non-confirmed sources
+- Source: FEAT-01 architectural review
+- Problem: the existing addAlias() function rewrites entity_id to whichever
+  caller arrived second. This is correct for confirmed_action (user just
+  confirmed the new entity is right) but unsafe for any future caller that
+  doesn't have user evidence behind its claim. FEAT-01 mitigates this by
+  introducing addGeneratedAlias() with first-writer-wins for the generator
+  path; addAlias() is left alone.
+- Fix: formalize the policy in addAlias() with an explicit allowed-sources
+  list (only `confirmed_action` and `user` get newest-writer-wins; everything
+  else uses first-writer-wins). Or, alternatively, deprecate addAlias() in
+  favor of two named functions: addConfirmedAlias() and addLearnedAlias().
+- Severity: latent bug — fix when next non-confirmed caller is added
+- Estimated: 1 hour
+
+### BUG-20 — Resolver Fuse cache invalidation gap
+- Source: FEAT-01 architectural review
+- Problem: invalidateCache() is currently called only from saveAICorrection()
+  and (after FEAT-01) from generateAndPersistAliases(). Other entity-mutation
+  paths that should invalidate but don't:
+  - addProduct() WITHOUT the generator (e.g., when name validation fails)
+  - updateProduct() / PUT /api/products
+  - deleteProduct() / DELETE /api/products
+  - same for clients and suppliers
+- Risk: a freshly-updated or deleted entity may still appear in the resolver
+  cache for up to 5 minutes (Fuse cache TTL). Stale matches.
+- Fix: add invalidateCache() calls to every entity mutation path. Or move
+  the responsibility to a wrapper layer.
+- Severity: UX — affects accuracy of voice resolution after admin edits
+- Estimated: 1 hour
+
+### BUG-21 — addSupplier() lacks ambiguity detection
+- Source: FEAT-01 architectural review
+- Problem: addClient() has identity disambiguation via (name+phone) OR
+  (name+email) and returns { ambiguous: true } when only a name is given
+  and matches exist. addSupplier() has no equivalent — two real suppliers
+  named "Ali Trading" collide forever.
+- Fix: mirror the addClient() ambiguity flow in addSupplier(). Add phone
+  and email columns to suppliers table (currently has phone only, no email).
+  Disambiguate by (name+phone) OR (name+email).
+- Severity: data integrity
+- Estimated: 2 hours

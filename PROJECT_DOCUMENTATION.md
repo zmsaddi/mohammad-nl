@@ -396,7 +396,49 @@ Database is initialized/idempotently migrated by hitting `/api/init` (admin only
 
 ---
 
-## 11. Key File Index
+## 11. Decision-Making Process — Three-Mind Architecture
+
+For non-trivial changes, this project uses **Three-Mind Architecture**: three perspectives collaborate before code is written.
+
+1. **User** brings business context, real-world constraints, dialect knowledge, and final authority on what should be built.
+2. **Claude (chat)** brings architectural patterns, trade-off analysis, prompt design, and synthesis across the conversation.
+3. **Claude Code** brings actual code knowledge, latent bug detection, edge case awareness, and verification against the real codebase.
+
+### When to use Three-Mind
+
+- New features touching multiple files
+- Schema changes
+- Business logic involving money or persistent state
+- Refactors that span more than one module
+- Anything that would be hard to reverse
+
+### When NOT to use Three-Mind
+
+- Single-line bug fixes
+- Doc-only commits
+- Test additions
+- Dependency updates
+- Anything where designing takes longer than implementing
+
+### The workflow
+
+1. User proposes a feature or raises a concern
+2. Chat analyzes and writes an *advisory* prompt to Claude Code (architectural questions, no code)
+3. Claude Code reads the actual code, answers the questions, proposes alternatives, flags risks
+4. User and chat review the architectural report together
+5. User makes the final decision (chat presents trade-offs, doesn't decide unilaterally)
+6. Chat writes the *implementation* prompt incorporating the agreed design
+7. Claude Code executes with confidence
+
+### Examples of Three-Mind catches
+
+- **PERF-03**: Claude Code discovered `/api/voice/extract` was dead code before the optimization spec was applied to it, saving hours of fixing the wrong route.
+- **FEAT-01**: Claude Code discovered an entity-stealing bug in `addAlias()` before the auto-generator could trigger it. The fix (separate `addGeneratedAlias()` with first-writer-wins) was designed in from day one rather than discovered as an intermittent production bug.
+- **FEAT-01**: Claude Code discovered the resolver Fuse cache invalidation gap. Without `invalidateCache()` in the generator helper, freshly-added entities would be unrecognized for up to 5 minutes — an intermittent UX bug that would have been very hard to debug in production.
+
+---
+
+## 12. Key File Index
 
 | File | Purpose |
 |---|---|
@@ -415,7 +457,7 @@ Database is initialized/idempotently migrated by hitting `/api/init` (admin only
 
 ---
 
-## 12. Glossary (Arabic ⇄ English)
+## 13. Glossary (Arabic ⇄ English)
 
 | Arabic | English |
 |---|---|
