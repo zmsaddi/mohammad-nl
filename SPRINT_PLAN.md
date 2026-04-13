@@ -69,9 +69,9 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-01 — voice-normalizer bug catalog (6 bugs fixed, audit document produced, commits: 24d18e5, 9c6e4db, 8ecc6fe, 5cf2027, 02d87d7, 58320f1)
 - [x] BUG-02 — silent catch logging (commit: 04f027e, 19 files, 105 tests)
 - [ ] BUG-03 — remove `?reset=true` from production
-- [ ] BUG-04 — driver PUT schema collision
-- [ ] BUG-04a — VIN preservation on driver confirm
-- [ ] BUG-04b — edge-case test coverage for driver PUT
+- [x] BUG-04 — driver PUT schema collision (commit: 236308d)
+- [x] BUG-04a — VIN preservation on driver confirm (commit: 20bba74)
+- [x] BUG-04b — edge-case test coverage for driver PUT
 - [ ] BUG-05 — seller summary date filter
 - [ ] BUG-06 — voice-normalizer test coverage (likely already done — audit first)
 - [ ] ARC-01 — JSDoc + regions in `lib/db.js`

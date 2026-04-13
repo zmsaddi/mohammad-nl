@@ -1165,5 +1165,64 @@ pre-existing BUG 3C VIN-required check. But it is a behavior change
 and is recorded here so that any future regression report mentioning
 "VIN not clearing" has a clean pointer back to this commit.
 
+---
+
+## BUG-04b — Edge-case test coverage for deliveries PUT (driver path)
+
+**Severity:** Low (pure test coverage — no code change)
+**Scope:** `tests/bug04b-driver-put-edge-cases.test.js` (new), no source change
+**Commit:** BUG-04b
+
+### Origin
+
+During the BUG-04 self-review I listed five coverage gaps in my honest
+self-assessment. Gap 4 (VIN preservation) is now covered by BUG-04a.
+The remaining four are covered here. Isolating them in their own
+commit keeps the test history atomic: reverting BUG-04b removes its
+tests without touching route code.
+
+### Gaps covered
+
+1. **Null `date` column.** `dbDateToISO(null)` returns `''`, which
+   fails `DeliveryUpdateSchema.dateStr` (`^\d{4}-\d{2}-\d{2}$`), so
+   the route returns **400** via `zodArabicError`. Test asserts 400
+   and that `updateDelivery` is never called.
+
+2. **Missing `id` in request body.** `body.id` is `undefined`, the
+   SQL lookup returns zero rows, the existing `!existing` guard
+   fires, and the route returns **403**. Traced from the code, not
+   guessed.
+
+3. **Null `total_amount` in DB row.** `Number(null) || 0` evaluates
+   to `0` (because `Number(null) === 0` in JS). The parsed body has
+   `totalAmount: 0`, Zod accepts it (`.min(0).default(0)`), and the
+   route returns **200**. Test asserts 200 AND that the parsed
+   `totalAmount` is exactly `0`.
+
+4. **Wrong driver path re-asserted against the rebuilt body.** Tests
+   that the pre-existing `existing.assigned_driver !== token.username`
+   guard still fires **before** the new explicit body construction
+   runs, returning **403** and never calling `updateDelivery`. This
+   is a regression fence — if a future refactor moves the guard below
+   the body build, this test will catch it.
+
+### Test-file location decision
+
+New file `tests/bug04b-driver-put-edge-cases.test.js`, not appended to
+BUG-04 or BUG-04a. Same atomicity rationale: reverting BUG-04b should
+remove the edge-case coverage as a unit without disturbing either of
+the earlier commits. Duplicates the mock setup boilerplate; accepted
+cost.
+
+### Verification
+
+```
+ Test Files  6 passed (6)
+      Tests  120 passed (120)
+```
+
+Delta: +4 tests (BUG-04b suite). No source code changed.
+
+
 
 
