@@ -161,7 +161,17 @@ export async function POST(request) {
     // See lib/voice-blacklist.js for the full phrase list and rationale
     // (phrase-based, not word-based — plain "موسيقى" stays legal because
     // lib/voice-prompt-builder:208 maps it to a Bluetooth speaker alias).
-    if (isBlacklisted(normalized)) {
+    //
+    // BUG-28 F1 HOTFIX: check against the RAW Whisper output, not the
+    // normalized form. normalizeArabicText runs transliterateArabicToLatin
+    // which rewrites the Arabic preposition "في" → "V" (the letter
+    // mapping used for "في عشرين برو" → "V20 Pro"). That transform
+    // silently bypassed the blacklist on any phrase containing "في",
+    // including "اشتركوا في القناة" → "اشتركوا V القناة". The blacklist
+    // entries are stored in native Arabic, so the raw comparison is both
+    // simpler and more correct. Confirmed via the Session 2 voice
+    // diagnostic reproduction.
+    if (isBlacklisted(raw)) {
       return NextResponse.json({
         action: 'register_expense',
         data: {},

@@ -82,6 +82,28 @@ describe('BUG-28: isBlacklisted — phrase matching', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// BUG-28 F1 hotfix: isBlacklisted is invoked against the RAW Whisper
+// output in app/api/voice/process/route.js, not the normalized form.
+// normalizeArabicText's transliterateArabicToLatin step rewrites the
+// Arabic preposition "في" to the Latin letter "V" (letter-spelling
+// mapping used to turn "في عشرين برو" → "V20 Pro"). That transform
+// silently bypasses the blacklist on any phrase containing "في", the
+// most common Arabic preposition. These cases assert that the native
+// Arabic phrases — which are what the user actually says and what
+// Whisper actually outputs before normalization — match the blacklist.
+// Reproduction captured in the Session 2 voice diagnostic.
+// ─────────────────────────────────────────────────────────────────────
+describe('BUG-28 F1 hotfix: raw-form blacklist matching', () => {
+  it('matches raw "اشتركوا في القناة" (preposition في present)', () => {
+    expect(isBlacklisted('اشتركوا في القناة')).toBe(true);
+  });
+
+  it('matches raw "اشترك في القناة" (singular form)', () => {
+    expect(isBlacklisted('اشترك في القناة')).toBe(true);
+  });
+});
+
 describe('BUG-28: isSuspiciouslyLongWithoutAction — soft warning heuristic', () => {
   it('returns false for empty/null/undefined', () => {
     expect(isSuspiciouslyLongWithoutAction('')).toBe(false);
