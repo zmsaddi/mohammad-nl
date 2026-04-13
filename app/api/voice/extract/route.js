@@ -77,6 +77,20 @@ export async function POST(request) {
     if (parsed.payment_type) parsed.payment_type = PAYMENT_MAP[parsed.payment_type] || parsed.payment_type;
     if (parsed.category) parsed.category = CATEGORY_MAP[parsed.category] || parsed.category;
 
+    // DONE: Fix 3 — coerce all numeric fields to Number (or null) — see process/route.js for why
+    if (parsed.sell_price !== undefined) {
+      parsed.sell_price = parsed.sell_price ? parseFloat(parsed.sell_price) || null : null;
+    }
+    if (parsed.unit_price !== undefined) {
+      parsed.unit_price = parsed.unit_price ? parseFloat(parsed.unit_price) || null : null;
+    }
+    if (parsed.quantity !== undefined) {
+      parsed.quantity = parsed.quantity ? parseFloat(parsed.quantity) || null : null;
+    }
+    if (parsed.amount !== undefined) {
+      parsed.amount = parsed.amount ? parseFloat(parsed.amount) || null : null;
+    }
+
     // Determine action
     const ACTION_MAP = { sale: 'register_sale', purchase: 'register_purchase', expense: 'register_expense' };
     let action;
@@ -152,8 +166,34 @@ export async function POST(request) {
 
     // DONE: Step 4 — geminiError removed; Groq is the only model
 
+    // DONE: Fix 2 — REQUIRED-FIELDS list per action type (parity with /api/voice/process)
+    const REQUIRED_FIELDS = {
+      register_purchase: ['supplier', 'item', 'quantity', 'unit_price', 'sell_price', 'payment_type'],
+      register_sale:     ['client_name', 'item', 'quantity', 'unit_price', 'payment_type'],
+      register_expense:  ['category', 'description', 'amount', 'payment_type'],
+    };
+    const requiredForAction = REQUIRED_FIELDS[action] || [];
+    const missing_fields = requiredForAction.filter(
+      (k) => parsed[k] === null || parsed[k] === undefined || parsed[k] === ''
+    );
+
+    // DONE: Fix 5 — product names must be English. If the AI returned Arabic,
+    // run it through the transliterator and flag as missing if still Arabic.
+    if (parsed.item && /[\u0600-\u06FF]/.test(parsed.item)) {
+      const { normalizeArabicText } = await import('@/lib/voice-normalizer');
+      const transliterated = normalizeArabicText(parsed.item);
+      if (transliterated !== parsed.item) {
+        warnings.push(`تم تحويل اسم المنتج: "${parsed.item}" → "${transliterated}"`);
+        parsed.item = transliterated;
+      }
+      if (/[\u0600-\u06FF]/.test(parsed.item)) {
+        warnings.push(`⚠ اسم المنتج "${parsed.item}" يجب أن يكون بالإنجليزي — يرجى التصحيح`);
+        if (!missing_fields.includes('item')) missing_fields.push('item');
+      }
+    }
+
     // FIXED: 2 — surface "add new product?" suggestion to the UI
-    const responseBody = { action, data: parsed, warnings, transcript: text };
+    const responseBody = { action, data: parsed, warnings, transcript: text, missing_fields };
     if (parsed.isNewProduct === true) {
       warnings.push('المنتج غير موجود في القاعدة — هل تريد إضافته؟');
       responseBody.suggestAddProduct = true;

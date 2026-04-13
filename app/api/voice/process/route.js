@@ -3,7 +3,7 @@ import { getToken } from 'next-auth/jwt';
 // DONE: Step 3A — Gemini import + client removed; Groq is the only LLM provider now
 import Groq from 'groq-sdk';
 import { sql } from '@vercel/postgres';
-import { getProducts, getClients, getSuppliers, getAIPatterns, getRecentCorrections } from '@/lib/db';
+import { getProducts, getClients, getSuppliers, getAIPatterns, getRecentCorrections, getTopEntities } from '@/lib/db';
 import { normalizeArabicText } from '@/lib/voice-normalizer';
 import { resolveEntity } from '@/lib/entity-resolver';
 import { EXPENSE_CATEGORIES, PAYMENT_MAP, CATEGORY_MAP } from '@/lib/utils';
@@ -60,24 +60,55 @@ export async function POST(request) {
         const products = await getProducts();
         const clients = await getClients();
         const suppliers = await getSuppliers();
-        // Smart vocabulary: frequent names first
-        let topNames = [];
-        try {
-          const tc = await sql`SELECT client_name FROM sales GROUP BY client_name ORDER BY COUNT(*) DESC LIMIT 15`;
-          const ti = await sql`SELECT item FROM sales GROUP BY item ORDER BY COUNT(*) DESC LIMIT 10`;
-          topNames = [...tc.rows.map((r) => r.client_name), ...ti.rows.map((r) => r.item)];
-        } catch {}
-        let aliasNames = [];
-        try {
-          const a = await sql`SELECT alias FROM entity_aliases ORDER BY frequency DESC LIMIT 10`;
-          aliasNames = a.rows.map((r) => r.alias);
-        } catch {}
 
-        const allNames = [...new Set([...topNames, ...products.map((p) => p.name), ...clients.map((c) => c.name), ...suppliers.map((s) => s.name), ...aliasNames])].filter(Boolean);
-        // Mix Arabic action words + all entity names (may include English model numbers)
-        const vocab = `بعت, اشتريت, مصروف, كاش, بنك, آجل, ${allNames.join(', ')}`;
+        // DONE: Step 3B — smart vocabulary, priority-ordered for Whisper.
+        // Whisper truncates long prompts, so the order matters: action verbs and
+        // payment terms first (these are critical), then variants/colors, then
+        // model names, then learned aliases, then frequent entities, then full lists.
+        const topEntities = await getTopEntities(token.username).catch(() => ({
+          products: [], clients: [], suppliers: [], aliases: [],
+        }));
 
-        const transcription = await groqClient.audio.transcriptions.create({ file, model: 'whisper-large-v3', language: 'ar', prompt: vocab.slice(0, 1500) });
+        const PRIORITY_TERMS = [
+          // 1. Action verbs — critical
+          'بعت', 'شريت', 'اشتريت', 'جبت', 'سلّمت', 'مصروف', 'صرفت', 'دفعت',
+          // 2. Payment terms
+          'كاش', 'بنك', 'آجل', 'نقدي', 'تحويل', 'دين',
+          // 3. Color / variant keywords
+          'أسود', 'سوداء', 'رمادي', 'أبيض', 'أزرق', 'أحمر', 'أخضر',
+          'دوبل باتري', 'سينجل', 'NFC', 'بلوتوث',
+          // 4. Product model words
+          'برو', 'ليمتد', 'كروس', 'ماكس', 'ميني', 'الفيشن', 'الليمتد', 'الكروس', 'الطوي',
+        ];
+
+        const seen = new Set();
+        const terms = [];
+        const addTerm = (t) => {
+          if (!t || seen.has(t)) return;
+          seen.add(t);
+          terms.push(t);
+        };
+
+        PRIORITY_TERMS.forEach(addTerm);
+        topEntities.aliases.forEach(addTerm);   // learned spoken aliases
+        topEntities.products.forEach(addTerm);  // most-sold products
+        topEntities.clients.forEach(addTerm);   // user's frequent clients
+        topEntities.suppliers.forEach(addTerm); // frequent suppliers
+        products.forEach((p) => addTerm(p.name));   // full product catalog
+        clients.forEach((c) => addTerm(c.name));    // full client list
+        suppliers.forEach((s) => addTerm(s.name));  // full supplier list
+
+        // Truncate to ~1450 chars (Whisper prompt limit ≈ 224 tokens)
+        let vocab = '';
+        for (const term of terms) {
+          const candidate = vocab ? vocab + ',' + term : term;
+          if (candidate.length > 1450) break;
+          vocab = candidate;
+        }
+
+        const transcription = await groqClient.audio.transcriptions.create({
+          file, model: 'whisper-large-v3', language: 'ar', prompt: vocab,
+        });
         return { raw: transcription.text || '', normalized: normalizeArabicText(transcription.text || '') };
       })(),
 
@@ -85,7 +116,8 @@ export async function POST(request) {
       (async () => {
         const [products, clients, suppliers, patterns, corrections] = await Promise.all([
           getProducts(), getClients(), getSuppliers(),
-          getAIPatterns(15).catch(() => []),
+          // DONE: Step 3 — pass username so per-user patterns are returned first
+          getAIPatterns(20, token.username).catch(() => []),
           getRecentCorrections(5).catch(() => []),
         ]);
 
@@ -118,8 +150,10 @@ export async function POST(request) {
     const { products, clients, suppliers, patterns, corrections, recentSales, recentPurchases, topClients, recentClientNames, recentSupplierNames } = dbResult;
 
     // DONE: Step 3C — system prompt built from the shared lib/voice-prompt-builder.js
+    // username is passed so the prompt builder can split user-specific vs global patterns
     const systemPrompt = buildVoiceSystemPrompt({
       products, clients, suppliers, patterns, corrections, recentSales, topClients,
+      username: token.username,
     });
 
     // DONE: Step 2 — Gemini fully removed; Groq Llama is the only extraction model
@@ -149,6 +183,22 @@ export async function POST(request) {
     // === MAP VALUES ===
     if (parsed.payment_type) parsed.payment_type = PAYMENT_MAP[parsed.payment_type] || parsed.payment_type;
     if (parsed.category) parsed.category = CATEGORY_MAP[parsed.category] || parsed.category;
+
+    // DONE: Fix 3 — coerce all numeric fields to Number (or null) so the form
+    // always receives the right types regardless of what the LLM emitted (string,
+    // number, or "0" which we want to treat as missing).
+    if (parsed.sell_price !== undefined) {
+      parsed.sell_price = parsed.sell_price ? parseFloat(parsed.sell_price) || null : null;
+    }
+    if (parsed.unit_price !== undefined) {
+      parsed.unit_price = parsed.unit_price ? parseFloat(parsed.unit_price) || null : null;
+    }
+    if (parsed.quantity !== undefined) {
+      parsed.quantity = parsed.quantity ? parseFloat(parsed.quantity) || null : null;
+    }
+    if (parsed.amount !== undefined) {
+      parsed.amount = parsed.amount ? parseFloat(parsed.amount) || null : null;
+    }
 
     // === DETERMINE ACTION ===
     const ACTION_MAP = { sale: 'register_sale', purchase: 'register_purchase', expense: 'register_expense' };
@@ -213,11 +263,76 @@ export async function POST(request) {
 
     if (action === 'register_expense' && parsed.category && !EXPENSE_CATEGORIES.includes(parsed.category)) parsed.category = 'أخرى';
 
+    // DONE: Step 3D — background reinforcement learning from successfully resolved entities.
+    // Runs as a fire-and-forget IIFE so it never blocks the response. The aliases
+    // created here strengthen the matches the resolver just made; if the user later
+    // corrects them in VoiceConfirm, saveAICorrection will overwrite with the right
+    // values and the wrong ones will rank lower over time.
+    (async () => {
+      try {
+        if (action === 'register_sale' && parsed.client_name && !parsed.isNewClient) {
+          const { rows: cl } = await sql`SELECT id FROM clients WHERE name = ${parsed.client_name} LIMIT 1`;
+          if (cl.length) {
+            const { addAlias } = await import('@/lib/db');
+            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
+            await addAlias('client', cl[0].id, parsed.client_name, normalizeForMatching(parsed.client_name), 'confirmed_action');
+          }
+        }
+        if ((action === 'register_sale' || action === 'register_purchase') && parsed.item && !parsed.isNewProduct) {
+          const baseName = parsed.item.split(' - ')[0];
+          const { rows: prod } = await sql`
+            SELECT id FROM products
+            WHERE name = ${parsed.item} OR name LIKE ${baseName + '%'}
+            LIMIT 1
+          `;
+          if (prod.length) {
+            const { addAlias } = await import('@/lib/db');
+            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
+            await addAlias('product', prod[0].id, parsed.item, normalizeForMatching(parsed.item), 'confirmed_action');
+          }
+        }
+        if (action === 'register_purchase' && parsed.supplier && !parsed.isNewSupplier) {
+          const { rows: sup } = await sql`SELECT id FROM suppliers WHERE name = ${parsed.supplier} LIMIT 1`;
+          if (sup.length) {
+            const { addAlias } = await import('@/lib/db');
+            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
+            await addAlias('supplier', sup[0].id, parsed.supplier, normalizeForMatching(parsed.supplier), 'confirmed_action');
+          }
+        }
+      } catch {}
+    })();
+
     // Log
     try { const today = new Date().toISOString().split('T')[0]; await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel})`; } catch {}
 
-    // List fields the AI left as null so the UI can highlight them
-    const missing_fields = Object.keys(parsed).filter((k) => parsed[k] === null || parsed[k] === undefined);
+    // DONE: Fix 2 — REQUIRED-FIELDS list per action type. The previous
+    // Object.keys(parsed) approach only caught keys that existed but were null;
+    // it missed keys the AI never returned at all (e.g. sell_price for purchases).
+    const REQUIRED_FIELDS = {
+      register_purchase: ['supplier', 'item', 'quantity', 'unit_price', 'sell_price', 'payment_type'],
+      register_sale:     ['client_name', 'item', 'quantity', 'unit_price', 'payment_type'],
+      register_expense:  ['category', 'description', 'amount', 'payment_type'],
+    };
+    const requiredForAction = REQUIRED_FIELDS[action] || [];
+    const missing_fields = requiredForAction.filter(
+      (k) => parsed[k] === null || parsed[k] === undefined || parsed[k] === ''
+    );
+
+    // DONE: Fix 5 — product names must be English. If the AI returned Arabic,
+    // run it through the transliterator (which knows colors/variants/models),
+    // and if it still contains Arabic letters mark item as missing so the UI
+    // shows the orange warning border.
+    if (parsed.item && /[\u0600-\u06FF]/.test(parsed.item)) {
+      const transliterated = normalizeArabicText(parsed.item);
+      if (transliterated !== parsed.item) {
+        warnings.push(`تم تحويل اسم المنتج: "${parsed.item}" → "${transliterated}"`);
+        parsed.item = transliterated;
+      }
+      if (/[\u0600-\u06FF]/.test(parsed.item)) {
+        warnings.push(`⚠ اسم المنتج "${parsed.item}" يجب أن يكون بالإنجليزي — يرجى التصحيح`);
+        if (!missing_fields.includes('item')) missing_fields.push('item');
+      }
+    }
 
     // FIXED: 2 — surface "add new product?" suggestion to the UI
     const responseBody = { action, data: parsed, warnings, transcript: raw, normalized, missing_fields };

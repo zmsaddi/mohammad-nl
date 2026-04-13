@@ -118,7 +118,11 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
       endpoint = '/api/purchases';
       submitData.unitPrice = form.unit_price;
       submitData.paymentType = form.payment_type || 'كاش';
-      submitData.sellPrice = form.sellPrice || '';
+      // DONE: Fix 5A — AI returns snake_case sell_price; keep camelCase fallback
+      // for users who edit the field manually. Backend addPurchase reads sellPrice.
+      submitData.sellPrice = form.sell_price || form.sellPrice || null;
+      // DONE: Fix 5A — pass category through so addProduct files it correctly
+      submitData.category = form.category || '';
     } else if (action === 'register_expense') {
       endpoint = '/api/expenses';
       submitData.paymentType = form.payment_type || 'كاش';
@@ -240,10 +244,21 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 <div>
                   <label style={{ fontSize: '0.78rem', color: '#64748b' }}>هاتف العميل</label>
                   <input style={{ ...inputStyle, border: '1.5px solid #d1d5db', direction: 'ltr', textAlign: 'right' }} type="tel" value={form.client_phone || ''} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} placeholder="+31..." />
+                  {/* DONE: Fix 5C — confirm AI extracted the phone from speech */}
+                  {form.client_phone && (
+                    <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px' }}>
+                      ✓ فهم الرقم من الكلام
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ fontSize: '0.78rem', color: '#64748b' }}>إيميل العميل</label>
                   <input style={{ ...inputStyle, border: '1.5px solid #d1d5db', direction: 'ltr', textAlign: 'right' }} type="email" value={form.client_email || ''} onChange={(e) => setForm({ ...form, client_email: e.target.value })} placeholder="email@..." />
+                  {form.client_email && (
+                    <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px' }}>
+                      ✓ فهم الإيميل من الكلام
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
@@ -256,6 +271,19 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 </label>
                 <input style={fi('item')} list="vc-products" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
                 <datalist id="vc-products">{dbData.products.filter((p) => p.stock > 0).map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock}`} />)}</datalist>
+                {/* DONE: Fix 7 — Arabic product name warning (sale form) */}
+                {form.item && /[\u0600-\u06FF]/.test(form.item) && (
+                  <div style={{
+                    fontSize: '0.72rem',
+                    color: '#dc2626',
+                    background: '#fef2f2',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    marginTop: '3px',
+                  }}>
+                    ⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - Noir" وليس "في عشرين برو أسود"
+                  </div>
+                )}
                 {/* DONE: Bug 2 — surface "this product will be added" notice when AI detected a new product */}
                 {form.suggestAddProduct && form.item && (
                   <div style={{
@@ -311,6 +339,19 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 </label>
                 <input style={fi('item')} list="vc-products2" value={form.item || ''} onChange={(e) => setForm({ ...form, item: e.target.value })} autoComplete="off" />
                 <datalist id="vc-products2">{dbData.products.map((p) => <option key={p.id} value={p.name} label={`مخزون: ${p.stock || 0}`} />)}</datalist>
+                {/* DONE: Fix 7 — Arabic product name warning (purchase form) */}
+                {form.item && /[\u0600-\u06FF]/.test(form.item) && (
+                  <div style={{
+                    fontSize: '0.72rem',
+                    color: '#dc2626',
+                    background: '#fef2f2',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    marginTop: '3px',
+                  }}>
+                    ⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - Noir" وليس "في عشرين برو أسود"
+                  </div>
+                )}
                 {/* DONE: Bug 2 — same notice in PURCHASE FORM */}
                 {form.suggestAddProduct && form.item && (
                   <div style={{
@@ -332,9 +373,46 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                   <input style={fi('unit_price')} type="number" min="0" value={form.unit_price || ''} onChange={(e) => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
+              {/* DONE: Fix 5B — sell_price input with AI-detection badge + live margin display */}
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>سعر البيع الموصى</label>
-                <input style={{ ...inputStyle, border: '1.5px solid #d1d5db' }} type="number" min="0" value={form.sellPrice || ''} onChange={(e) => setForm({ ...form, sellPrice: parseFloat(e.target.value) || 0 })} placeholder="اختياري" />
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  سعر البيع الموصى للزبون
+                  {(form.sell_price || form.sellPrice) ? (
+                    <span style={{ color: '#16a34a', marginRight: '6px', fontSize: '0.72rem' }}>
+                      ✓ فهمه الذكاء الاصطناعي
+                    </span>
+                  ) : (
+                    <span style={{ color: '#f59e0b', marginRight: '6px', fontSize: '0.72rem' }}>
+                      يُنصح بإدخاله
+                    </span>
+                  )}
+                </label>
+                <input
+                  style={fi('sell_price')}
+                  type="number"
+                  min="0"
+                  value={form.sell_price ?? form.sellPrice ?? ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || null;
+                    setForm({ ...form, sell_price: val, sellPrice: val });
+                  }}
+                  placeholder="سعر بيع المنتج للعميل"
+                />
+                {form.unit_price > 0 && (form.sell_price || form.sellPrice) > 0 && (
+                  <div style={{
+                    marginTop: '4px', fontSize: '0.75rem',
+                    color: (form.sell_price || form.sellPrice) > form.unit_price ? '#16a34a' : '#dc2626',
+                    background: (form.sell_price || form.sellPrice) > form.unit_price ? '#f0fdf4' : '#fef2f2',
+                    padding: '4px 8px', borderRadius: '6px',
+                  }}>
+                    {(form.sell_price || form.sellPrice) > form.unit_price ? '💰' : '⚠️'} هامش الربح:{' '}
+                    {formatNumber(
+                      (((form.sell_price || form.sellPrice) - form.unit_price) /
+                        (form.sell_price || form.sellPrice) * 100).toFixed(1)
+                    )}%
+                    ({formatNumber((form.sell_price || form.sellPrice) - form.unit_price)} لكل وحدة)
+                  </div>
+                )}
               </div>
               {/* DONE: Step 7 — category select for the purchase form */}
               <div>
@@ -374,7 +452,15 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>الوصف</label>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  الوصف التفصيلي
+                  {/* DONE: Fix 5D — confirm AI captured the description */}
+                  {form.description && (
+                    <span style={{ color: '#16a34a', marginRight: '6px', fontSize: '0.72rem' }}>
+                      ✓ فهمه الذكاء الاصطناعي
+                    </span>
+                  )}
+                </label>
                 <input style={fi('description')} value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
               <div>
