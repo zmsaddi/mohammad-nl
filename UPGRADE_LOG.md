@@ -1335,6 +1335,112 @@ order, and with what arguments.
 
 Delta: +1 file, +5 tests (BUG-05 suite). No pre-existing tests regressed.
 
+---
+
+## BUG-06 — Voice-normalizer test coverage audit and backfill
+
+**Severity:** Low (pure coverage — no source code change)
+**Scope:** `tests/bug06-voice-normalizer-coverage.test.js` (new)
+**Commit:** BUG-06
+
+### Audit phase
+
+SPRINT_PLAN.md flagged BUG-06 as "likely already done" during the BUG-01
+series (104 voice-normalizer tests landed). Before writing any new tests
+I audited the existing suite against the BUG-06 original spec:
+
+> *"For every exported function in `lib/voice-normalizer.js`, at least 3
+> test cases covering Arabic numerals, alif normalization, tatweel
+> stripping, compound numbers, edge cases (empty / whitespace / punctuation
+> only). Target: 25+ tests."*
+
+### Mapping table: original requirement → existing coverage
+
+**Per-function coverage (exports from `lib/voice-normalizer.js`):**
+
+| Export | Existing direct test count | ≥3? | Example existing tests |
+|---|---|---|---|
+| `normalizeArabicText` | ~100 | ✅ | line 18 (substring corruption), line 64 (compound path), line 126 (آلاف), line 269 (positive paths), etc. |
+| `normalizeArabicNumbers` | 2 | ❌ | line 376 `"سبعمية وخمسين" → "750"`, line 380 `"ألفين وخمسمية" → "2500"` |
+| `normalizeForMatching` | 1 | ❌ | line 370 `"أ ا إ آ" → "ا ا ا ا"` |
+
+**Category coverage:**
+
+| Category | Existing tests | Status |
+|---|---|---|
+| Compound numbers | 28-value regression suite (line 174) + 20+ ad-hoc cases | ✅ |
+| Alif normalization (أ إ آ → ا) | line 370 (single test covering three variants) | ✅ (hamzat-wasl ٱ missing) |
+| Arabic-Indic numerals (٠-٩ → 0-9) | none | ❌ |
+| Tatweel stripping (ـ) | none | ❌ |
+| Edge cases (empty / whitespace / punctuation) | none | ❌ |
+
+### Verdict: do not skip
+
+Per the task spec and the user's standing instruction ("if any gap exists —
+even a single category — do NOT skip"), three uncovered categories and
+two under-tested exports triggered a backfill instead of a skip. New
+tests land in a separate file for bisect atomicity.
+
+### Backfill: 13 new tests in `tests/bug06-voice-normalizer-coverage.test.js`
+
+| # | Category addressed | Test | Function under test |
+|---|---|---|---|
+| 1 | Per-function (3rd for `normalizeArabicNumbers`) | `"عشرين" → "20"` | `normalizeArabicNumbers` |
+| 2 | Per-function (2nd for `normalizeForMatching`) + tatweel | `"مرحـــبا" → "مرحبا"` | `normalizeForMatching` |
+| 3 | Per-function (3rd for `normalizeForMatching`) + Arabic-Indic numerals | `"٠١٢٣٤٥٦٧٨٩" → "0123456789"` | `normalizeForMatching` |
+| 4 | Alif (fourth variant ٱ hamzat-wasl, previously uncovered) | `"ٱلرحمن" → "الرحمن"` | `normalizeForMatching` |
+| 5 | Arabic-Indic numerals via main entry point | `"بعت ب٥٠ يورو"` contains `"50"` | `normalizeArabicText` |
+| 6 | Arabic-Indic numerals, full 0-9 sweep | `"٠١٢٣٤٥٦٧٨٩"` contains `"0123456789"` | `normalizeArabicText` |
+| 7 | Tatweel on main entry point | `"مرحـــبا يا صـــديقي"` → output contains no ـ | `normalizeArabicText` |
+| 8 | Edge: empty | `""` → `""`, no throw | `normalizeArabicText` |
+| 9 | Edge: whitespace-only | `"   "` → `""` (trimmed) | `normalizeArabicText` |
+| 10 | Edge: punctuation-only | `"!!!؟؟"` → string, no throw | `normalizeArabicText` |
+| 11 | Edge: empty | `""` → `""` | `normalizeForMatching` |
+| 12 | Edge: whitespace-only | `"   "` → `""` | `normalizeForMatching` |
+| 13 | Edge: empty + no throw | `""` → `""` | `normalizeArabicNumbers` |
+
+### Post-backfill coverage
+
+| Export | Direct tests after BUG-06 | ≥3? |
+|---|---|---|
+| `normalizeArabicText` | ~105 | ✅ |
+| `normalizeArabicNumbers` | 3 (2 existing + test 1) | ✅ |
+| `normalizeForMatching` | 6 (1 existing + tests 2, 3, 4, 11, 12) | ✅ |
+
+| Category | Status after BUG-06 |
+|---|---|
+| Compound numbers | ✅ (unchanged) |
+| Alif normalization | ✅ (now includes ٱ variant) |
+| Arabic-Indic numerals | ✅ (tests 3, 5, 6) |
+| Tatweel stripping | ✅ (tests 2, 7) |
+| Edge cases | ✅ (tests 8, 9, 10, 11, 12, 13) |
+
+### Verification
+
+```
+ Test Files  8 passed (8)
+      Tests  138 passed (138)
+```
+
+Delta: +1 file, +13 tests (BUG-06 suite). No source code changed. No
+pre-existing tests regressed. Voice-normalizer total: 104 → 117 tests.
+
+---
+
+## Known Limitations
+
+### BUG-05 — seller window timezone edge case
+- Server computes default window boundaries in UTC via `toISOString().slice(0,10)`.
+- Sellers in non-UTC zones will see an off-by-one day boundary for the first
+  few hours after local midnight.
+- Impact: minimal — a sale made on the boundary day may be included/excluded
+  one day earlier or later than the seller's wall-clock expectation.
+- Fix requires passing client timezone from the browser → server. Deferred
+  as out-of-scope for Sprint 1 bugfix phase.
+- Revisit if: a seller reports their "since last settlement" numbers look off
+  by one day's worth of activity.
+
+
 
 
 

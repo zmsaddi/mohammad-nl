@@ -73,7 +73,7 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-04a — VIN preservation on driver confirm (commit: 20bba74)
 - [x] BUG-04b — edge-case test coverage for driver PUT
 - [x] BUG-05 — seller summary date filter
-- [ ] BUG-06 — voice-normalizer test coverage (likely already done — audit first)
+- [x] BUG-06 — voice-normalizer test coverage (audited, 3 gaps found, 13 tests added)
 - [ ] ARC-01 — JSDoc + regions in `lib/db.js`
 - [ ] ARC-02 — enable `checkJs` + categorize errors
 - [ ] TEST-01 — sale lifecycle E2E (needs `.env.test`)
