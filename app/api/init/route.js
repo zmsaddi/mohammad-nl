@@ -33,6 +33,13 @@ export async function POST(request) {
 
   try {
     if (body.action === 'reset') {
+      // BUG-03: reset is a defense-in-depth kill switch. Requires BOTH
+      // a non-production runtime AND an explicit opt-in env flag. The
+      // confirm phrase below still gates accidental clicks in dev.
+      if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_RESET !== 'true') {
+        console.error('[init] POST reset blocked: NODE_ENV=', process.env.NODE_ENV, 'ALLOW_DB_RESET=', process.env.ALLOW_DB_RESET);
+        return NextResponse.json({ error: 'إعادة التهيئة معطلة في بيئة الإنتاج' }, { status: 403 });
+      }
       if (body.confirm !== CONFIRM_PHRASE) {
         return NextResponse.json({ error: 'تأكيد مفقود - مطلوب confirm بالعبارة الصحيحة' }, { status: 400 });
       }

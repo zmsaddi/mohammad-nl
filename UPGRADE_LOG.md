@@ -913,3 +913,88 @@ not). New file, minimal content (8 lines).
 
 - 104 voice-normalizer tests (BUG-01 series, unchanged)
 - 1 BUG-02 forced-error logging test
+
+---
+
+## BUG-03 — Remove `?reset=true` foot-gun from production
+
+**Severity:** Critical (data loss)
+**Scope:** `app/api/init/route.js`, `.env.example`, new test file
+**Commit:** BUG-03
+
+### Problem as specified
+
+> A single admin click on `/api/init?reset=true` wipes the database.
+
+### State of the code when BUG-03 started
+
+The literal `?reset=true` GET path **already did not exist**. Prior hardening
+had moved destructive operations to `POST` with a body-level discriminator
+(`action: 'reset'`) plus a confirm phrase (`CONFIRM_PHRASE`) that must match
+byte-for-byte. This blocked CSRF / accidental link clicks but **did not block
+a malicious or confused admin** — anyone with the admin token and knowledge
+of the confirm phrase could still wipe the database, *including in production*.
+
+The BUG-03 spec asked for an environment-level kill switch on top of the
+existing confirm phrase. That is exactly what this commit adds — it does not
+weaken the confirm phrase, it layers on top of it.
+
+### Fix
+
+Added a hard gate at the top of the `action === 'reset'` branch:
+
+```js
+if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_RESET !== 'true') {
+  console.error('[init] POST reset blocked: NODE_ENV=', ..., 'ALLOW_DB_RESET=', ...);
+  return NextResponse.json({ error: 'إعادة التهيئة معطلة في بيئة الإنتاج' }, { status: 403 });
+}
+```
+
+Both conditions must pass for reset to proceed:
+1. `NODE_ENV !== 'production'` — production is never resettable
+2. `ALLOW_DB_RESET === 'true'` — opt-in even in dev
+
+The existing confirm phrase check remains as a third layer below the gate.
+The blocked-path branch `console.error`s the env state so Vercel logs record
+any attempted reset in production.
+
+The `clean` branch is intentionally **not** gated — per the task spec
+("Do NOT remove `?clean=true` or `?keepLearning=true`"). `clean` still
+deletes business rows but leaves schema + users intact, and it still
+requires the confirm phrase.
+
+### .env.example
+
+Added `ALLOW_DB_RESET=false` with a danger comment explaining the gate.
+Production deployments must leave it unset or `false`.
+
+### Tests
+
+New file: `tests/bug03-init-reset-gate.test.js` — 5 cases:
+1. `NODE_ENV=production` + `ALLOW_DB_RESET=true` → **403**, `resetDatabase` not called
+2. `NODE_ENV=development` + `ALLOW_DB_RESET` unset → **403**
+3. `NODE_ENV=development` + `ALLOW_DB_RESET='false'` → **403**
+4. `NODE_ENV=development` + `ALLOW_DB_RESET='true'` + correct confirm → **200**, `resetDatabase` called once
+5. `NODE_ENV=development` + `ALLOW_DB_RESET='true'` + wrong confirm → **400** (confirm phrase still enforced)
+
+Mocks `@/lib/db`, `next-auth/jwt`, and `@vercel/postgres` so no real DB or
+auth is touched. Restores original `NODE_ENV` / `ALLOW_DB_RESET` between
+tests so later suites are unaffected.
+
+### Verification
+
+```
+ Test Files  3 passed (3)
+      Tests  110 passed (110)
+```
+
+Delta: +5 tests (BUG-03 gate suite). Voice-normalizer (104) and BUG-02
+forced-error (1) unchanged.
+
+### Note on spec drift
+
+The spec described the bug as "`?reset=true` GET query param". The actual
+code path was already POST-based. I did not chase the GET path (it does
+not exist); the production env gate was still required and was the real
+fix. No files outside the declared scope were touched.
+
