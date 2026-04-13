@@ -3,6 +3,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 const MAX_DURATION = 30;
+// BUG-28: minimum recording duration. Bumped from 800ms to 1500ms because
+// 800ms silent clips were reaching Whisper and producing hallucinated
+// purchases. 1500ms still feels instant for a real utterance.
+const MIN_DURATION_MS = 1500;
+// BUG-28: silence threshold for the Web Audio RMS detector. Values are in
+// the [0,1] range after normalizing the 8-bit PCM samples around 128.
+// 0.02 is roughly 2% of full scale — catches a truly silent room while
+// still passing a whispered utterance. Tune if real speech gets rejected.
+const SILENCE_RMS_THRESHOLD = 0.02;
 
 export default function VoiceButton({ onResult, onError }) {
   const [state, setState] = useState('idle'); // idle, recording, processing
@@ -12,17 +21,32 @@ export default function VoiceButton({ onResult, onError }) {
   const chunks = useRef([]);
   const timerRef = useRef(null);
   const startTimeRef = useRef(0);
+  // BUG-28: Web Audio API refs for the RMS silence detector. These live
+  // alongside MediaRecorder's pipeline — both consume the same MediaStream
+  // but are otherwise independent.
+  const audioCtxRef = useRef(null);
+  const rmsIntervalRef = useRef(null);
+  const maxRmsRef = useRef(0);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (rmsIntervalRef.current) clearInterval(rmsIntervalRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+      }
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (rmsIntervalRef.current) { clearInterval(rmsIntervalRef.current); rmsIntervalRef.current = null; }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
     mediaRecorder.current = null;
   }, []);
@@ -50,20 +74,73 @@ export default function VoiceButton({ onResult, onError }) {
       chunks.current = [];
       startTimeRef.current = Date.now();
 
+      // BUG-28: Web Audio RMS silence detector. Runs in parallel with the
+      // MediaRecorder — AudioContext consumes the same MediaStream via a
+      // source node. We poll AnalyserNode at 10Hz, compute RMS around the
+      // 128 midpoint (8-bit PCM silence value), and track the max seen.
+      // If max stays below SILENCE_RMS_THRESHOLD the recording is silent.
+      maxRmsRef.current = 0;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          // Defensive resume: some browsers suspend the context until a
+          // user gesture. handleClick IS a user gesture so we're OK, but
+          // belt-and-suspenders for flaky mobile cases.
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
+          audioCtxRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          const rmsBuf = new Uint8Array(analyser.frequencyBinCount);
+          rmsIntervalRef.current = setInterval(() => {
+            analyser.getByteTimeDomainData(rmsBuf);
+            let sumSquares = 0;
+            for (let i = 0; i < rmsBuf.length; i++) {
+              const v = (rmsBuf[i] - 128) / 128;
+              sumSquares += v * v;
+            }
+            const rms = Math.sqrt(sumSquares / rmsBuf.length);
+            if (rms > maxRmsRef.current) maxRmsRef.current = rms;
+          }, 100);
+        }
+      } catch {
+        // If Web Audio is unavailable we fall back to byte-size + duration
+        // gates only. Silence detection is an enhancement, not a hard
+        // dependency — never let it break the recording path.
+      }
+
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
 
       recorder.onstop = async () => {
+        // Snapshot the RMS value BEFORE cleanup (which tears down the
+        // audio context and nulls the ref).
+        const maxRmsAtStop = maxRmsRef.current;
+        const audioCtxWasAvailable = audioCtxRef.current !== null;
         cleanup();
         const duration = Date.now() - startTimeRef.current;
-        if (duration < 800) {
+        // BUG-28: 800ms → 1500ms. Shorter clips were the single biggest
+        // hallucination vector — reflex taps on the button.
+        if (duration < MIN_DURATION_MS) {
           setState('idle');
-          onError?.('التسجيل قصير جداً - تكلم لثانية على الأقل');
+          onError?.('التسجيل قصير جداً. الرجاء التحدث لمدة ثانية ونصف على الأقل');
           return;
         }
         const blob = new Blob(chunks.current, { type: 'audio/webm' });
         if (blob.size < 500) {
           setState('idle');
-          onError?.('لم أسمع شيء - حاول مرة أخرى');
+          onError?.('التسجيل فارغ. حاول مرة أخرى');
+          return;
+        }
+        // BUG-28: silence check. Only meaningful if the AudioContext was
+        // actually available during recording (graceful no-op if browser
+        // didn't support Web Audio).
+        if (audioCtxWasAvailable && maxRmsAtStop < SILENCE_RMS_THRESHOLD) {
+          setState('idle');
+          onError?.('لم أسمع شيئاً. تأكد من أن الميكروفون يعمل');
           return;
         }
         await processAudio(blob);

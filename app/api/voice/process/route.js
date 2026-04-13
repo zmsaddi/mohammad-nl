@@ -9,6 +9,9 @@ import { resolveEntity } from '@/lib/entity-resolver';
 import { EXPENSE_CATEGORIES, PAYMENT_MAP, CATEGORY_MAP } from '@/lib/utils';
 // DONE: Step 3B — single source of truth for the voice extraction prompt
 import { buildVoiceSystemPrompt } from '@/lib/voice-prompt-builder';
+// BUG-28: phrase blacklist + soft-warning heuristic for hallucination defense.
+// Checks run between Whisper transcription and LLM extraction.
+import { isBlacklisted, isSuspiciouslyLongWithoutAction } from '@/lib/voice-blacklist';
 
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
@@ -149,6 +152,31 @@ export async function POST(request) {
     if (!normalized || normalized.length < 3) {
       return NextResponse.json({ action: 'register_expense', data: {}, warnings: ['لم أسمع شيء واضح'], transcript: raw });
     }
+
+    // BUG-28: hard-reject Whisper hallucinations BEFORE hitting the LLM.
+    // When a user records silence Whisper tends to output YouTube boilerplate
+    // ("اشتركوا في القناة") or bracketed non-speech markers ("[موسيقى]").
+    // These phrases have no commerce interpretation and would otherwise be
+    // fed to Llama, which fabricates plausible-looking sales/purchases.
+    // See lib/voice-blacklist.js for the full phrase list and rationale
+    // (phrase-based, not word-based — plain "موسيقى" stays legal because
+    // lib/voice-prompt-builder:208 maps it to a Bluetooth speaker alias).
+    if (isBlacklisted(normalized)) {
+      return NextResponse.json({
+        action: 'register_expense',
+        data: {},
+        warnings: ['لم أفهم الكلام بوضوح. الرجاء المحاولة مجدداً'],
+        transcript: raw,
+      });
+    }
+
+    // BUG-28: soft-warning for long transcriptions with zero action verbs.
+    // Does NOT reject — the LLM may still extract something useful — but
+    // pushes a warning onto the final response so the confirm dialog shows
+    // "review carefully" language. Catches Arabic-word hallucinations that
+    // the phrase blacklist misses (e.g. the user says nothing, Whisper
+    // fabricates a full paragraph about the weather).
+    const suspiciousLength = isSuspiciouslyLongWithoutAction(normalized);
 
     const { products, clients, suppliers, patterns, corrections, recentSales, recentPurchases, topClients, recentClientNames, recentSupplierNames } = dbResult;
 
@@ -349,6 +377,13 @@ export async function POST(request) {
         warnings.push(`⚠ اسم المنتج "${parsed.item}" يجب أن يكون بالإنجليزي — يرجى التصحيح`);
         if (!missing_fields.includes('item')) missing_fields.push('item');
       }
+    }
+
+    // BUG-28: append soft-hallucination warning if the transcription was
+    // long but had no action verbs. Done here (not at detection time) so
+    // the warning lands next to the LLM's own warnings in the same array.
+    if (suspiciousLength) {
+      warnings.push('لم أتعرف على عملية محددة في هذا الكلام — راجع الحقول بعناية');
     }
 
     // FIXED: 2 — surface "add new product?" suggestion to the UI
