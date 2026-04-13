@@ -16,7 +16,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const rows = await getPayments(searchParams.get('client'));
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[payments] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -50,7 +51,8 @@ export async function POST(request) {
 
     const id = await addPayment({ ...parsed.data, createdBy: token.username });
     return NextResponse.json({ success: true, id });
-  } catch {
+  } catch (err) {
+    console.error('[payments] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -63,7 +65,8 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     await sql`DELETE FROM payments WHERE id = ${searchParams.get('id')}`;
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[payments] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

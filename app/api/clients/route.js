@@ -18,7 +18,8 @@ export async function GET(request) {
     const withDebt = searchParams.get('withDebt') === 'true';
     const rows = await getClients(withDebt);
     return NextResponse.json(rows);
-  } catch {
+  } catch (err) {
+    console.error('[clients] GET:', err);
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
   }
 }
@@ -33,7 +34,8 @@ export async function POST(request) {
     const result = await addClient(data);
     invalidateCache(); // client list changed — rebuild entity-resolver index
     return NextResponse.json({ success: true, ...result });
-  } catch {
+  } catch (err) {
+    console.error('[clients] POST:', err);
     return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
   }
 }
@@ -47,7 +49,8 @@ export async function PUT(request) {
     await updateClient(data);
     invalidateCache();
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[clients] PUT:', err);
     return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
   }
 }
@@ -61,7 +64,8 @@ export async function DELETE(request) {
     await deleteClient(searchParams.get('id'));
     invalidateCache();
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[clients] DELETE:', err);
     return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
   }
 }

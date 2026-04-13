@@ -34,14 +34,18 @@ export async function POST(request) {
       const { rows: topClients } = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 20`;
       const { rows: topItems } = await sql`SELECT item, COUNT(*) as cnt FROM sales GROUP BY item ORDER BY cnt DESC LIMIT 10`;
       topNames = [...topClients.map((c) => c.client_name), ...topItems.map((i) => i.item)];
-    } catch {}
+    } catch (err) {
+      console.error('[voice/transcribe] topNames lookup:', err);
+    }
 
     // Get learned aliases (user-corrected names)
     let aliasNames = [];
     try {
       const { rows: aliases } = await sql`SELECT alias FROM entity_aliases ORDER BY frequency DESC LIMIT 15`;
       aliasNames = aliases.map((a) => a.alias);
-    } catch {}
+    } catch (err) {
+      console.error('[voice/transcribe] aliasNames lookup:', err);
+    }
 
     // Build vocab: action words + frequent names first + all names + aliases
     const allNames = [

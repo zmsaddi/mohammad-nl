@@ -24,8 +24,8 @@ export async function POST(request) {
       getProducts(), getClients(), getSuppliers(),
     ]);
     let patterns = [], recentCorrections = [];
-    try { patterns = await getAIPatterns(15); } catch {}
-    try { recentCorrections = await getRecentCorrections(5); } catch {}
+    try { patterns = await getAIPatterns(15); } catch (err) { console.error('[voice/extract] getAIPatterns:', err); }
+    try { recentCorrections = await getRecentCorrections(5); } catch (err) { console.error('[voice/extract] getRecentCorrections:', err); }
 
     // Pre-fetch context arrays the prompt builder needs (recent sales + top clients).
     let recentSales = [], topClients = [];
@@ -34,7 +34,9 @@ export async function POST(request) {
       const tc = await sql`SELECT client_name, COUNT(*) as cnt FROM sales GROUP BY client_name ORDER BY cnt DESC LIMIT 5`;
       recentSales = rs.rows;
       topClients = tc.rows;
-    } catch {}
+    } catch (err) {
+      console.error('[voice/extract] recentSales/topClients lookup:', err);
+    }
 
     // DONE: Step 4C — system prompt now built from the shared lib/voice-prompt-builder.js
     const systemPrompt = buildVoiceSystemPrompt({
@@ -113,7 +115,9 @@ export async function POST(request) {
       entityContext.recentClients = rc.rows.map((r) => r.client_name);
       const rs = await sql`SELECT DISTINCT supplier FROM purchases ORDER BY id DESC LIMIT 5`;
       entityContext.recentSuppliers = rs.rows.map((r) => r.supplier);
-    } catch {}
+    } catch (err) {
+      console.error('[voice/extract] entityContext lookup:', err);
+    }
 
     // === ENTITY RESOLUTION ===
     if (action === 'register_sale' && parsed.client_name) {
@@ -162,7 +166,9 @@ export async function POST(request) {
     try {
       const today = new Date().toISOString().split('T')[0];
       await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${text}, ${text}, ${action}, ${usedModel})`;
-    } catch {}
+    } catch (err) {
+      console.error('[voice/extract] voice_logs insert:', err);
+    }
 
     // DONE: Step 4 — geminiError removed; Groq is the only model
 
