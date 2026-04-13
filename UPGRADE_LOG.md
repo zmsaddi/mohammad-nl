@@ -1429,6 +1429,10 @@ pre-existing tests regressed. Voice-normalizer total: 104 → 117 tests.
 
 ## Known Limitations
 
+Items in this list are deliberate deferrals, not unknown bugs. Each entry
+states the impact, the reason for deferral, and the condition that should
+trigger revisit.
+
 ### BUG-05 — seller window timezone edge case
 - Server computes default window boundaries in UTC via `toISOString().slice(0,10)`.
 - Sellers in non-UTC zones will see an off-by-one day boundary for the first
@@ -1439,6 +1443,129 @@ pre-existing tests regressed. Voice-normalizer total: 104 → 117 tests.
   as out-of-scope for Sprint 1 bugfix phase.
 - Revisit if: a seller reports their "since last settlement" numbers look off
   by one day's worth of activity.
+
+---
+
+## ARC-01 — JSDoc + region markers on lib/db.js
+
+**Severity:** Low (pure documentation — no logic change)
+**Scope:** `lib/db.js`
+**Commit:** ARC-01
+
+### Work landed
+
+- **19 region markers** (`// #region NAME` / `// #endregion` pairs)
+  replacing the existing `// ==================== NAME ====================`
+  section comments. Final `// #endregion` added at EOF. Section names were
+  taken verbatim from the existing comments — no groupings invented.
+- **54 JSDoc headers**, one above every `export async function`. Every
+  header has `@param` for every parameter (read from the function body,
+  not guessed) and `@returns` with the concrete resolved shape. Complex
+  write functions (`addSale`, `updateDelivery`, `updateSale`,
+  `getSummaryData`, `saveAICorrection`, `addSettlement`, `voidInvoice`,
+  `addClient`) get multi-line object type annotations listing every
+  field the caller is expected to pass.
+- Zero logic changes, zero renames, zero moves, zero function-body edits.
+- File grew from 2011 → 2401 lines.
+
+### Line-count overshoot (explicitly approved)
+
+Pre-task estimate was ~290 lines. Actual came in at **+428/−19 = 409
+net**, exceeding the sprint's 400-line threshold by 9 lines. The
+overshoot was driven by JSDoc verbosity on the complex functions —
+I had budgeted 5 lines per header and several came in at 8–11 lines
+because their `@param` object shapes required multi-line annotations.
+
+Overshoot explicitly approved by the reviewer because ARC-01 was
+declared a bulk documentation pass in SPRINT_PLAN.md, and the
+400-line threshold is designed to catch hidden scope creep, not
+pre-declared bulk work. This is a single-use exception — the rule
+still applies for every other task.
+
+### Verification
+
+```
+ Test Files  8 passed (8)
+      Tests  138 passed (138)
+```
+
+`npm run build` also passes (every route compiles under the new
+annotations).
+
+---
+
+## Discovered Issues
+
+Items found while reading `lib/db.js` function bodies during ARC-01.
+Per the task rule, none were fixed here — they are recorded for
+Sprint 2 prioritization. Full task specs are in SPRINT_PLAN.md under
+"Sprint 2 Backlog".
+
+### ARC-01 DI-1 — AI-layer silent catches mask observability (→ BUG-07)
+
+`findAlias`, `addAlias`, `getAllAliases`, `getTopEntities`,
+`autoLearnFromHistory`, `getAIPatterns`, `getRecentCorrections`, and
+`saveAICorrection` all catch-and-return-empty with NO logging. This
+is intentional (the AI layer must never break the voice flow), but
+it means any DB outage silently degrades these functions to "return
+empty lists" with no trace in Vercel logs. A partial DB outage could
+in theory go unnoticed for hours because the user-facing symptom is
+"AI suggestions are worse today," not "errors are firing."
+
+BUG-02 applied this exact treatment to every `app/api/**/*.js` route
+(log then return error). The AI-layer DB functions want the same
+pattern: log with `console.error('[funcName]', err)`, then return
+the fallback. Estimated ~100 lines, one commit.
+
+### ARC-01 DI-2 — calculateBonusInTx driver fallback is financial-tier (→ BUG-08)
+
+`lib/db.js:1475`:
+```js
+const confirmedDriver = delRow[0]?.assigned_driver || driverUsername;
+```
+
+When the deliveries row lookup comes back empty, the code falls back
+to the caller-passed `driverUsername`. The narrow failure window is
+this: if an upstream call passes a stale or wrong driver username AND
+the delivery row is missing at this point, the bonus row would be
+credited to whoever the caller named — without any validation against
+the delivery's actual `assigned_driver`.
+
+The empty-`delRow` state should not happen in practice (the function
+is called immediately after a delivery confirmation that locked the
+row), so the probability is low. But the consequence is financial —
+a bonus paid to the wrong user. The safe fix is to throw on empty
+`delRow` rather than fall back. An empty delivery row at this point
+is already a broken state and silently proceeding is worse than
+failing loudly.
+
+Flagged as **financial-tier severity** for Sprint 2 prioritization
+so the planner knows this is not just a nit. Estimated ~40 lines
+including a test for the empty-delRow path.
+
+### ARC-01 DI-3 — addSale transaction boundary (→ ARC-03)
+
+`addSale` is declared as a transactional operation via `withTx`, but
+`addClient()` is called inside the tx callback using the global `sql`
+connection, not the tx `client`. The comment at `lib/db.js:690`
+acknowledges this and argues that `addClient` is idempotent on
+`(name, phone)` / `(name, email)` so a rollback leaves at most an
+orphan client row, which is harmless on retry.
+
+The reasoning is sound — the code works. But the "atomic sale
+creation" claim is not strictly true: if the sale rollback races
+with a client insert, you can end up with a client row that has no
+corresponding sale. The right resolution is either:
+
+- **(a) Document as accepted trade-off** in PROJECT_DOCUMENTATION.md
+  under a "Transaction Boundaries" section. ~15 min, 0 LoC change.
+- **(b) Refactor** `addClient` to accept an optional tx client
+  parameter and thread it through from `addSale`. ~2h + tests.
+
+Option (a) makes the guarantee match the claim in docs. Option (b)
+makes the guarantee match the claim in code. Either is correct;
+Sprint 2 planning picks one.
+
 
 
 

@@ -74,6 +74,47 @@ Out of scope this sprint: Privacy Policy, GDPR endpoints, VAT snapshot, UNIQUE c
 - [x] BUG-04b — edge-case test coverage for driver PUT
 - [x] BUG-05 — seller summary date filter
 - [x] BUG-06 — voice-normalizer test coverage (audited, 3 gaps found, 13 tests added)
-- [ ] ARC-01 — JSDoc + regions in `lib/db.js`
+- [x] ARC-01 — JSDoc + regions in `lib/db.js` (409 net lines, overshoot explicitly approved)
 - [ ] ARC-02 — enable `checkJs` + categorize errors
 - [ ] TEST-01 — sale lifecycle E2E (needs `.env.test`)
+
+## Sprint 2 Backlog — Discovered During Sprint 1
+
+### BUG-07 — AI-layer silent catches in lib/db.js
+- Source: ARC-01 Discovered Issue #1
+- Problem: findAlias, addAlias, getAllAliases, getTopEntities, autoLearnFromHistory,
+  getAIPatterns, getRecentCorrections, saveAICorrection all catch-and-return-empty
+  with no logging. Masks DB outages from observability.
+- Scope: apply BUG-02-style console.error to these 8 functions without changing
+  the catch-and-fallback semantics — log then return fallback.
+- Severity: Observability (not financial, not functional — but blocks diagnosis
+  of a larger outage if one occurs).
+- Estimated: <100 lines, one commit.
+
+### BUG-08 — calculateBonusInTx driver source-of-truth fallback
+- Source: ARC-01 Discovered Issue #2
+- Problem: lib/db.js:1475 `const confirmedDriver = delRow[0]?.assigned_driver || driverUsername`
+  falls back to caller-passed driverUsername when delivery row is empty.
+  A bonus could in principle be paid to the wrong user if delRow lookup
+  returns nothing but the caller passed a stale username.
+- Severity: Financial (narrow window, low probability, but direct money impact).
+- Fix approach: if delRow is empty, throw — do not fall back. An empty delRow
+  at this point is already a broken state and silently proceeding is worse than
+  failing loudly.
+- Tests: add a case covering the empty-delRow path and assert it throws.
+- Estimated: ~40 lines, one commit.
+
+### ARC-03 — addSale transaction boundary (documentation or migration)
+- Source: ARC-01 Discovered Issue #3
+- Problem: addSale() calls addClient() outside its own withTx client, so sale
+  creation is not truly atomic with client creation. The existing code comment
+  at lib/db.js:690 acknowledges this and argues idempotency on (name, phone) /
+  (name, email) makes the orphan case harmless.
+- Decision needed: either (a) document this publicly as an accepted design
+  trade-off in PROJECT_DOCUMENTATION.md under a "Transaction Boundaries" section,
+  or (b) refactor addClient to accept an optional tx client parameter and pass
+  it through from addSale. Option (a) is 0 lines of code. Option (b) is ~30
+  lines and makes the guarantee real.
+- Severity: Correctness-of-documentation. The code works; the claim of atomicity
+  does not fully match the code.
+- Estimated: (a) 15 minutes, (b) 2 hours + tests.
