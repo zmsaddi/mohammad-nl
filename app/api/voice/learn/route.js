@@ -36,11 +36,20 @@ export async function POST(request) {
         console.warn(`[voice/learn] Arabic product name submitted: "${userValue}" — should be English`);
       }
 
-      if (aiValue !== undefined && aiValue !== null && String(aiValue) !== String(userValue) && userValue) {
+      // BUG-10: record corrections even when the AI never emitted the field.
+      // Previously the filter required `aiValue !== undefined`, which silently
+      // discarded every "user added a field the LLM missed" correction —
+      // making fields the LLM consistently omits unlearnable. The new filter
+      // records any case where the user provided a value. Missed-field
+      // scenarios are tagged with ai_output='(missing)' so the prompt
+      // builder can surface them as few-shot correction examples.
+      const aiMissing = aiValue === undefined || aiValue === null || aiValue === '';
+      const userProvided = userValue !== undefined && userValue !== null && userValue !== '';
+      if (userProvided && (aiMissing || String(aiValue) !== String(userValue))) {
         corrections.push({
           username: token.username,
           transcript: transcript || '',
-          aiValue: String(aiValue),
+          aiValue: aiMissing ? '(missing)' : String(aiValue),
           userValue: String(userValue),
           actionType: actionType || '',
           fieldName: key,
