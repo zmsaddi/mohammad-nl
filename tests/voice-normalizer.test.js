@@ -1,4 +1,5 @@
 // BUG-01c: substring corruption fix.
+// BUG-01d: Arabic-safe boundaries on standalone number passes.
 // Tests for lib/voice-normalizer.js — strictly normalizer-scope.
 // Run with:  npx vitest run tests/voice-normalizer.test.js
 import { describe, it, expect } from 'vitest';
@@ -11,34 +12,37 @@ import { normalizeArabicText, normalizeArabicNumbers, normalizeForMatching } fro
 // must survive the transliteration pass intact.
 // ────────────────────────────────────────────────────────────────────────────
 describe('BUG-01c: substring corruption prevention', () => {
-  it('"بعت بخمسين يورو" must contain خمسين uncorrupted (no خمCن)', () => {
+  // After BUG-01d the Arabic number words also normalize to digits, so the
+  // post-fix expectation is "no corruption pattern present" — either the
+  // word survives intact, or it cleanly becomes a digit. Either is correct.
+  it('"بعت بخمسين يورو" must NOT contain خمCن corruption', () => {
     const out = normalizeArabicText('بعت بخمسين يورو');
-    expect(out).toContain('خمسين');
     expect(out).not.toContain('خمCن');
+    expect(out).toContain('50'); // BUG-01d normalizes "بخمسين" → "ب50"
   });
 
-  it('"ألفين وخمسمية" must contain ألفين uncorrupted (no ألVن)', () => {
+  it('"ألفين وخمسمية" must NOT contain ألVن corruption', () => {
     const out = normalizeArabicText('ألفين وخمسمية');
-    // The compound regex DOES normalize this to "2500" (which is correct),
-    // so we assert the corruption pattern is absent rather than the raw word
     expect(out).not.toContain('ألVن');
+    expect(out).toContain('2500'); // compound path
   });
 
-  it('"تلاتين دراجة" must contain تلاتين uncorrupted (no تلاTن)', () => {
+  it('"تلاتين دراجة" must NOT contain تلاTن corruption', () => {
     const out = normalizeArabicText('تلاتين دراجة');
-    expect(out).toContain('تلاتين');
     expect(out).not.toContain('تلاTن');
+    expect(out).toContain('30'); // BUG-01d normalizes "تلاتين" → "30"
   });
 
-  it('"ستين يورو" must contain ستين uncorrupted', () => {
+  it('"ستين يورو" must NOT contain ست corruption (no سي matched as C)', () => {
     const out = normalizeArabicText('ستين يورو');
-    expect(out).toContain('ستين');
+    expect(out).not.toMatch(/[a-zA-Z]ت/); // mixed-token form
+    expect(out).toContain('60'); // BUG-01d normalizes "ستين" → "60"
   });
 
-  it('"سبعين" alone must remain سبعين (the سي substring must NOT corrupt it)', () => {
+  it('"سبعين" alone must NOT contain سي → C corruption', () => {
     const out = normalizeArabicText('سبعين');
-    expect(out).toContain('سبعين');
     expect(out).not.toContain('C');
+    expect(out).toContain('70'); // BUG-01d normalizes "سبعين" → "70"
   });
 
   it('"يورو" must NOT become Uرو (the يو substring must NOT corrupt it)', () => {
@@ -61,14 +65,118 @@ describe('BUG-01c: full-pipeline normalization', () => {
     expect(normalizeArabicText('ألفين وخمسمية')).toContain('2500');
   });
 
-  it.skip('"بعت بخمسين يورو" → contains "50" (BLOCKED by Bug D — standalone \\b)', () => {
-    // Bug D: normalizeArabicNumbers uses /\bword\b/ which never matches inside
-    // Arabic text because JS \b is defined against [A-Za-z0-9_]. Standalone
-    // Arabic numbers ("خمسين", "بخمسين") are NOT normalized today; only the
-    // compound "X و Y" form works (because that regex uses \S+, not \b).
-    // Tracked under "## Discovered Issues" in UPGRADE_LOG.md.
+  // BUG-01d: previously skipped, now passing. The standalone-number pass uses
+  // arabicSafeBoundary() with proclitic support, so "بخمسين" → "ب50".
+  it('"بعت بخمسين يورو" → contains "50" (FIXED in BUG-01d)', () => {
     expect(normalizeArabicText('بعت بخمسين يورو')).toContain('50');
   });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// BUG-01d: Arabic-safe boundaries on the standalone number passes.
+// Lines 87 (normalizeArabicNumbers Phase 2) and 317 (ENGLISH_NUMBERS) used
+// `\bword\b` which never fires against Arabic. Both now use the shared
+// arabicSafeBoundary() helper with proclitic support so prepositional
+// clitics ب/ل/و/ف/ك do not block the match.
+// ────────────────────────────────────────────────────────────────────────────
+describe('BUG-01d: standalone Arabic number normalization', () => {
+  it('"بعت بخمسين يورو" → contains "50"', () => {
+    expect(normalizeArabicText('بعت بخمسين يورو')).toContain('50');
+  });
+
+  it('"ألفين وخمسمية" → contains "2500"', () => {
+    expect(normalizeArabicText('ألفين وخمسمية')).toContain('2500');
+  });
+
+  it('"ثلاثمية وعشرين" → contains "320"', () => {
+    expect(normalizeArabicText('ثلاثمية وعشرين')).toContain('320');
+  });
+
+  it('"ألف وستمية" → contains "1600"', () => {
+    expect(normalizeArabicText('ألف وستمية')).toContain('1600');
+  });
+
+  it('"سبعين" → contains "70"', () => {
+    expect(normalizeArabicText('سبعين')).toContain('70');
+  });
+
+  // ENGLISH_NUMBERS (line 317) — Arabic spellings of English digits.
+  // Same Bug D root cause, same fix.
+  it('"ون تو ثري" → contains "1", "2", "3"', () => {
+    const out = normalizeArabicText('ون تو ثري');
+    expect(out).toContain('1');
+    expect(out).toContain('2');
+    expect(out).toContain('3');
+  });
+
+  // Bug G — characterized but NOT fixed in COMMIT 2.
+  // "X آلاف" (the broken plural of ألف, meaning N×1000) is NOT in
+  // ALL_NUMBERS, and the compound regex has no multiplication semantics
+  // for "<number> آلاف". So 3000-10000 cannot be reached today; only
+  // 1000 (ألف) and 2000 (ألفين) are dictionary-resolvable. Tracked in
+  // UPGRADE_LOG.md as Bug G — needs its own commit.
+  it.skip('"تسعة آلاف وخمسمية" → contains "9500" (BLOCKED by Bug G — no X آلاف multiplication)', () => {
+    expect(normalizeArabicText('تسعة آلاف وخمسمية')).toContain('9500');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// BUG-01d compound-number regression suite.
+// 28 canonical Arabic spellings spanning 10–10000. After BUG-01d, every
+// dictionary-resolvable value should normalize to its digit. Failures here
+// surface a NEW bug class — currently the only known one is Bug G ("X آلاف"
+// multiplication) which blocks 3000–10000.
+// ────────────────────────────────────────────────────────────────────────────
+describe('BUG-01d compound-number regression suite (28 values)', () => {
+  const CASES = [
+    // Tens (UNITS + TENS dictionaries)
+    ['عشرة', '10'],
+    ['عشرين', '20'],
+    ['ثلاثين', '30'],
+    ['أربعين', '40'],
+    ['خمسين', '50'],
+    ['ستين', '60'],
+    ['سبعين', '70'],
+    ['ثمانين', '80'],
+    ['تسعين', '90'],
+    // Hundreds (HUNDREDS dictionary)
+    ['مية', '100'],
+    ['ميتين', '200'],
+    ['تلتمية', '300'],
+    ['أربعمية', '400'],
+    ['خمسمية', '500'],
+    ['ستمية', '600'],
+    ['سبعمية', '700'],
+    ['ثمانمية', '800'],
+    ['تسعمية', '900'],
+    // Thousands (LARGE dictionary + Bug G territory)
+    ['ألف', '1000'],
+    ['ألفين', '2000'],
+    ['تلاتة آلاف', '3000'],   // Bug G
+    ['أربعة آلاف', '4000'],  // Bug G
+    ['خمسة آلاف', '5000'],   // Bug G
+    ['ستة آلاف', '6000'],    // Bug G
+    ['سبعة آلاف', '7000'],   // Bug G
+    ['ثمانية آلاف', '8000'], // Bug G
+    ['تسعة آلاف', '9000'],   // Bug G
+    ['عشرة آلاف', '10000'],  // Bug G
+  ];
+
+  // Bug G class — all "X آلاف" cases. Documented in UPGRADE_LOG.md.
+  // These are run with .skip so the suite stays green; they exist on the
+  // record so the day Bug G is fixed, removing the .skip is a one-line
+  // diff that immediately validates the fix.
+  const BUG_G = new Set([
+    'تلاتة آلاف', 'أربعة آلاف', 'خمسة آلاف', 'ستة آلاف',
+    'سبعة آلاف', 'ثمانية آلاف', 'تسعة آلاف', 'عشرة آلاف',
+  ]);
+
+  for (const [arabic, expected] of CASES) {
+    const fn = BUG_G.has(arabic) ? it.skip : it;
+    fn(`"${arabic}" → contains "${expected}"`, () => {
+      expect(normalizeArabicText(arabic)).toContain(expected);
+    });
+  }
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -134,11 +242,12 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
     expect(normalizeArabicText('إس 20 برو')).toContain('S20 Pro');
   });
 
-  it('"دي خمسين" → contains "D" and "خمسين" both preserved', () => {
+  it('"دي خمسين" → contains "D" and "50" (post BUG-01d, "خمسين" normalizes)', () => {
     const out = normalizeArabicText('دي خمسين');
-    // After the fix: D is captured (دي is at word boundary), خمسين is left alone
+    // BUG-01c: D captured at word boundary, خمسين not corrupted.
+    // BUG-01d: خمسين additionally normalizes to "50".
     expect(out).toContain('D');
-    expect(out).toContain('خمسين');
+    expect(out).toContain('50');
     // And critically: NOT corrupted into "D خمCن"
     expect(out).not.toContain('خمCن');
   });
