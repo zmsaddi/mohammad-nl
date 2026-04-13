@@ -288,6 +288,39 @@ export async function POST(request) {
       }
     }
 
+    // BUG-30: soft-check sell vs buy price on voice sale extractions.
+    // User decision: amber (missing_fields) in the voice flow, not red —
+    // the LLM extracted something valid-looking, the user just needs to
+    // correct the number, and VoiceConfirm's existing amber styling on
+    // missing_fields gives the right severity. The hard submit gate lives
+    // in components/VoiceConfirm.js handleSubmit as a final safety.
+    //
+    // Uses the already-fetched `products` array (loaded in parallel with
+    // Whisper at L60) — no extra DB round-trip. Skips when the product
+    // is new (no buy_price to compare) or when unit_price is missing.
+    // Sets a flag; the `missing_fields` mutation happens below after
+    // missing_fields is initially computed (same pattern as the existing
+    // Arabic-product-name check at L406).
+    let bug30VoicePriceViolated = false;
+    if (
+      action === 'register_sale' &&
+      parsed.item &&
+      !parsed.isNewProduct &&
+      parsed.unit_price
+    ) {
+      const matchedProd = products.find((p) => p.name === parsed.item);
+      if (
+        matchedProd &&
+        matchedProd.buy_price > 0 &&
+        parseFloat(parsed.unit_price) < matchedProd.buy_price
+      ) {
+        warnings.push(
+          `سعر البيع (${parsed.unit_price}€) أقل من سعر التكلفة — يرجى التصحيح قبل الحفظ`
+        );
+        bug30VoicePriceViolated = true;
+      }
+    }
+
     if (action === 'register_purchase' && parsed.supplier) {
       const match = await resolveEntity(parsed.supplier, 'supplier', suppliers, entityContext);
       if (match.status === 'matched') {
@@ -362,6 +395,14 @@ export async function POST(request) {
     const missing_fields = requiredForAction.filter(
       (k) => parsed[k] === null || parsed[k] === undefined || parsed[k] === ''
     );
+
+    // BUG-30: amber the unit_price field when the voice-flow soft-check
+    // detected a buy_price violation. Same mechanism as the Arabic
+    // product name check below — push into missing_fields so the existing
+    // amber border styling in VoiceConfirm.js:143-146 fires.
+    if (bug30VoicePriceViolated && !missing_fields.includes('unit_price')) {
+      missing_fields.push('unit_price');
+    }
 
     // DONE: Fix 5 — product names must be English. If the AI returned Arabic,
     // run it through the transliterator (which knows colors/variants/models),

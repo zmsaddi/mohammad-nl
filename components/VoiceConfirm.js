@@ -68,11 +68,38 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
       if (!form.item) { alert('المنتج مطلوب'); return; }
       if (!form.quantity || form.quantity <= 0) { alert('الكمية مطلوبة'); return; }
       if (!form.unit_price || form.unit_price <= 0) { alert('السعر مطلوب'); return; }
+      // BUG-30: final-gate buy_price floor for the voice sale flow. The
+      // server already marks unit_price in missing_fields (amber border)
+      // when the extracted price violated the floor; this hard alert
+      // catches the case where the user manually edited the field to a
+      // still-invalid value after the voice extraction landed.
+      const prodForSale = (dbData.products || []).find((p) => p.name === form.item);
+      if (
+        prodForSale &&
+        prodForSale.buy_price > 0 &&
+        parseFloat(form.unit_price) < prodForSale.buy_price
+      ) {
+        alert('سعر البيع أقل من سعر التكلفة. يرجى التصحيح قبل الحفظ.');
+        return;
+      }
     } else if (action === 'register_purchase') {
       if (!form.supplier) { alert('المورد مطلوب'); return; }
       if (!form.item) { alert('المنتج مطلوب'); return; }
       if (!form.quantity || form.quantity <= 0) { alert('الكمية مطلوبة'); return; }
       if (!form.unit_price || form.unit_price <= 0) { alert('السعر مطلوب'); return; }
+      // BUG-30 mirror: the recommended sell_price for a purchase must be
+      // >= the buy unit_price. The L401-415 visual warning already shows
+      // the user the margin going red; this is the hard submit gate.
+      // Only fires when sell_price was actually provided (0 means
+      // "user/admin chose not to set a recommended price yet").
+      const sellPriceVal = parseFloat(form.sell_price || form.sellPrice || 0);
+      const unitPriceVal = parseFloat(form.unit_price || 0);
+      if (sellPriceVal > 0 && unitPriceVal > 0 && sellPriceVal < unitPriceVal) {
+        alert(
+          `سعر البيع الموصى (${sellPriceVal}€) أقل من سعر الشراء (${unitPriceVal}€). يرجى التصحيح.`
+        );
+        return;
+      }
     } else if (action === 'register_expense') {
       if (!form.category) { alert('الفئة مطلوبة'); return; }
       if (!form.description) { alert('الوصف مطلوب'); return; }

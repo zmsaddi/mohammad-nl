@@ -33,12 +33,43 @@ export async function POST(request) {
 
     const data = { ...parsed.data, createdBy: token.username };
 
-    // Seller cannot sell below recommended price (backend enforcement)
-    if (token.role === 'seller' && data.item) {
+    // BUG-30 + existing seller rule. Merged into one DB round-trip: fetch
+    // BOTH sell_price (existing seller-only floor) AND buy_price (new
+    // all-roles no-loss floor) in a single query, then apply the checks
+    // in order of specificity (the recommended-price error is more
+    // actionable for sellers than the vague cost floor).
+    if (data.item) {
       const { sql: sqlQ } = await import('@vercel/postgres');
-      const { rows: prod } = await sqlQ`SELECT sell_price FROM products WHERE name = ${data.item}`;
-      if (prod.length > 0 && prod[0].sell_price > 0 && data.unitPrice < prod[0].sell_price) {
-        return NextResponse.json({ error: `لا يمكن البيع بأقل من السعر الموصى (${prod[0].sell_price})` }, { status: 400 });
+      const { rows: prod } = await sqlQ`
+        SELECT sell_price, buy_price FROM products WHERE name = ${data.item}
+      `;
+      if (prod.length > 0) {
+        const { sell_price, buy_price } = prod[0];
+
+        // Existing rule: sellers only, recommended price floor
+        if (
+          token.role === 'seller' &&
+          sell_price > 0 &&
+          data.unitPrice < sell_price
+        ) {
+          return NextResponse.json(
+            { error: `لا يمكن البيع بأقل من السعر الموصى (${sell_price})` },
+            { status: 400 }
+          );
+        }
+
+        // BUG-30: all-roles buy_price floor. Never sell below cost.
+        // Role-dependent message: admin/manager see the cost, seller
+        // sees vague language (buy_price is sensitive per sales/page.js:
+        // 229-232). Skips when buy_price is 0 (unset / not purchased yet).
+        if (buy_price > 0 && data.unitPrice < buy_price) {
+          const canSeeCosts =
+            token.role === 'admin' || token.role === 'manager';
+          const errorMsg = canSeeCosts
+            ? `سعر البيع (${data.unitPrice}€) أقل من سعر التكلفة (${buy_price}€). لا يمكن البيع بخسارة.`
+            : 'سعر البيع المُدخَل غير مقبول. يرجى الالتزام بالسعر الموصى أو أعلى.';
+          return NextResponse.json({ error: errorMsg }, { status: 400 });
+        }
       }
     }
 

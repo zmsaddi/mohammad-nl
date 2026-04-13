@@ -60,6 +60,32 @@ export async function PUT(request) {
     const data = await request.json();
     if (!data.id) return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
     const { sql } = await import('@vercel/postgres');
+
+    // BUG-30 mirror: if the update payload includes a new sell_price,
+    // verify it is >= the current buy_price. Only fires when sell_price
+    // is actually being changed — editing notes/category/unit on a
+    // product with a legacy bad price state still succeeds (per user
+    // decision). buy_price is not editable via this route (see comment
+    // above), so we only need to validate sell_price against current
+    // buy_price.
+    if (data.sell_price !== undefined && data.sell_price !== null) {
+      const newSell = parseFloat(data.sell_price);
+      const { rows: current } = await sql`
+        SELECT buy_price FROM products WHERE id = ${data.id}
+      `;
+      if (current.length > 0) {
+        const curBuy = parseFloat(current[0].buy_price) || 0;
+        if (curBuy > 0 && newSell > 0 && newSell < curBuy) {
+          return NextResponse.json(
+            {
+              error: `سعر البيع الموصى (${newSell}€) لا يمكن أن يكون أقل من سعر الشراء (${curBuy}€).`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     await sql`
       UPDATE products SET
         sell_price          = COALESCE(${data.sell_price ?? null},          sell_price),

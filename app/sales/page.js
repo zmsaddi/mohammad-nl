@@ -54,6 +54,25 @@ function SalesContent() {
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
 
+  // BUG-30: reactive price-floor check. Recomputes on every render from
+  // form.item + form.unitPrice + products + role. Used to:
+  //  (a) paint the sell-price input red
+  //  (b) disable the submit button
+  //  (c) show an inline error message below the input
+  // Role-dependent message: admin/manager see the actual buy_price
+  // (they have canSeeCosts anyway), sellers see vague language because
+  // buy_price is a sensitive internal number per sales/page.js:229-232.
+  const priceFloorError = (() => {
+    if (!form.item || !form.unitPrice) return null;
+    const p = products.find((pr) => pr.name === form.item);
+    if (!p || !p.buy_price || p.buy_price <= 0) return null;
+    const up = parseFloat(form.unitPrice);
+    if (!up || up >= p.buy_price) return null;
+    return canSeeCosts
+      ? `سعر البيع (${up}€) أقل من سعر التكلفة (${p.buy_price}€). لا يمكن البيع بخسارة.`
+      : 'سعر البيع المُدخَل غير مقبول. يرجى الالتزام بالسعر الموصى أو أعلى.';
+  })();
+
   const fetchData = async () => {
     try {
       const fetches = [fetch('/api/sales'), fetch('/api/clients'), fetch('/api/products')];
@@ -82,13 +101,22 @@ function SalesContent() {
       addToast('يرجى ملء جميع الحقول المطلوبة', 'error');
       return;
     }
-    // Seller cannot sell below recommended price
+    // Seller cannot sell below recommended price (existing rule — unchanged)
     if (isSeller) {
       const prod = products.find((p) => p.name === form.item);
       if (prod?.sell_price && parseFloat(form.unitPrice) < prod.sell_price) {
         addToast(`لا يمكن البيع بأقل من السعر الموصى (${prod.sell_price})`, 'error');
         return;
       }
+    }
+    // BUG-30: all-roles buy_price floor. Fires after the seller check so a
+    // seller hitting the recommended-price error gets that (more specific)
+    // message first. For admin/manager, this is the only gate; the reactive
+    // priceFloorError above disables the submit button so this branch is a
+    // belt-and-suspenders guard for direct-submit paths.
+    if (priceFloorError) {
+      addToast(priceFloorError, 'error');
+      return;
     }
     setSubmitting(true);
     try {
@@ -249,7 +277,23 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="sale-price">سعر البيع *</label>
-              <input id="sale-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <input
+                id="sale-price"
+                type="number"
+                min="0"
+                step="any"
+                value={form.unitPrice}
+                onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
+                placeholder="0"
+                required
+                style={priceFloorError ? { border: '2px solid #dc2626', background: '#fef2f2' } : undefined}
+              />
+              {/* BUG-30: inline error when unit_price < buy_price */}
+              {priceFloorError && (
+                <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '4px' }}>
+                  ⚠ {priceFloorError}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label>الإجمالي</label>
@@ -336,7 +380,11 @@ function SalesContent() {
               <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || !!priceFloorError}
+          >
             {submitting ? 'جاري التسجيل...' : 'تسجيل عملية بيع'}
           </button>
         </form>
