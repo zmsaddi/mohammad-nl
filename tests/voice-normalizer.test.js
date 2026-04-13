@@ -109,14 +109,58 @@ describe('BUG-01d: standalone Arabic number normalization', () => {
     expect(out).toContain('3');
   });
 
-  // Bug G — characterized but NOT fixed in COMMIT 2.
-  // "X آلاف" (the broken plural of ألف, meaning N×1000) is NOT in
-  // ALL_NUMBERS, and the compound regex has no multiplication semantics
-  // for "<number> آلاف". So 3000-10000 cannot be reached today; only
-  // 1000 (ألف) and 2000 (ألفين) are dictionary-resolvable. Tracked in
-  // UPGRADE_LOG.md as Bug G — needs its own commit.
-  it.skip('"تسعة آلاف وخمسمية" → contains "9500" (BLOCKED by Bug G — no X آلاف multiplication)', () => {
+  // Bug G — FIXED in BUG-01g (COMMIT 3). Phase 0 of normalizeArabicNumbers
+  // now handles "<unit> آلاف [و <hundreds> [و <tens>]]" multiplication.
+  it('"تسعة آلاف وخمسمية" → contains "9500" (FIXED in BUG-01g)', () => {
     expect(normalizeArabicText('تسعة آلاف وخمسمية')).toContain('9500');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// BUG-01g: Arabic compound thousands "X آلاف" multiplication semantics.
+// Adds Phase 0 to normalizeArabicNumbers covering 3000-10000 (the
+// e-bike sale price range).
+// ────────────────────────────────────────────────────────────────────────────
+describe('BUG-01g: Arabic compound thousands (آلاف) multiplication', () => {
+  it('"تلاتة آلاف" → contains "3000"', () => {
+    expect(normalizeArabicText('تلاتة آلاف')).toContain('3000');
+  });
+
+  it('"أربعة آلاف وخمسمية" → contains "4500"', () => {
+    expect(normalizeArabicText('أربعة آلاف وخمسمية')).toContain('4500');
+  });
+
+  it('"خمسة آلاف وستمية وخمسين" → contains "5650"', () => {
+    expect(normalizeArabicText('خمسة آلاف وستمية وخمسين')).toContain('5650');
+  });
+
+  it('"عشرة آلاف" → contains "10000" (the ten-thousand boundary)', () => {
+    expect(normalizeArabicText('عشرة آلاف')).toContain('10000');
+  });
+
+  it('"بعت الدراجة بأربعة آلاف يورو" → contains "4000" (real-world phrasing)', () => {
+    expect(normalizeArabicText('بعت الدراجة بأربعة آلاف يورو')).toContain('4000');
+  });
+
+  it('"اشتريت بثلاثة آلاف وتسعمية" → contains "3900" (proclitic ب prefix)', () => {
+    expect(normalizeArabicText('اشتريت بثلاثة آلاف وتسعمية')).toContain('3900');
+  });
+
+  // Negative test: bare "آلاف" with no multiplier must NOT crash and must
+  // return something graceful. We choose to leave the literal Arabic word
+  // intact (no multiplication is possible without a multiplier).
+  it('"آلاف" alone → does not crash, returns "آلاف" intact', () => {
+    expect(() => normalizeArabicText('آلاف')).not.toThrow();
+    expect(normalizeArabicText('آلاف')).toContain('آلاف');
+  });
+
+  // Regression: existing 1000/2000 still work after Phase 0 was added
+  it('"ألف" still → "1000"', () => {
+    expect(normalizeArabicText('ألف')).toContain('1000');
+  });
+
+  it('"ألفين وخمسمية" still → "2500"', () => {
+    expect(normalizeArabicText('ألفين وخمسمية')).toContain('2500');
   });
 });
 
@@ -162,18 +206,9 @@ describe('BUG-01d compound-number regression suite (28 values)', () => {
     ['عشرة آلاف', '10000'],  // Bug G
   ];
 
-  // Bug G class — all "X آلاف" cases. Documented in UPGRADE_LOG.md.
-  // These are run with .skip so the suite stays green; they exist on the
-  // record so the day Bug G is fixed, removing the .skip is a one-line
-  // diff that immediately validates the fix.
-  const BUG_G = new Set([
-    'تلاتة آلاف', 'أربعة آلاف', 'خمسة آلاف', 'ستة آلاف',
-    'سبعة آلاف', 'ثمانية آلاف', 'تسعة آلاف', 'عشرة آلاف',
-  ]);
-
+  // Bug G — FIXED in BUG-01g (COMMIT 3). All 28 values are active.
   for (const [arabic, expected] of CASES) {
-    const fn = BUG_G.has(arabic) ? it.skip : it;
-    fn(`"${arabic}" → contains "${expected}"`, () => {
+    it(`"${arabic}" → contains "${expected}"`, () => {
       expect(normalizeArabicText(arabic)).toContain(expected);
     });
   }

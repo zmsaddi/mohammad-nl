@@ -466,3 +466,161 @@ Removing the entries from the `BUG_G` set is the validation step.
 e-bike priced 3000+ EUR is currently un-normalizable when spoken with
 `X آلاف`. **NOT in the current sprint scope** per the COMMIT 2 plan;
 flagging for the post-BUG-01 audit findings.
+
+> **Update after COMMIT 3:** Bug G is FIXED. Section below documents
+> the implementation. Reordered ahead of BUG-01 (collision) by user
+> decision after the COMMIT 2 checkpoint.
+
+---
+
+## BUG-01g — Arabic compound thousands (آلاف) multiplication
+
+**Severity:** Critical (financial — covers the actual e-bike price range)
+**Scope:** `lib/voice-normalizer.js` — `normalizeArabicNumbers`, new Phase 0
+**Commit:** COMMIT 3 of the BUG-01 series. Reordered ahead of BUG-01
+(collision) per the COMMIT 2 checkpoint — Bug G has no downstream
+fallback, Bug F (collision) is caught by the entity resolver.
+
+### Three candidate fix shapes — comparison
+
+| Shape | Idea | Trade-off | Verdict |
+|---|---|---|---|
+| 1 | Add `آلاف → 1000` sentinel to the LARGE dictionary | Doesn't actually multiply; needs a separate post-pass to fold the previous digit into the sentinel. Effectively shape 3 with extra steps. | **Reject** |
+| 2 | New pre-pass regex (Phase 0) before Phase 1 | Surgical, lives next to existing compound logic, decoupled from Phase 2 behavior, multiplier captured directly from raw spoken Arabic. Needs proclitic stripping. | **Pick** |
+| 3 | Phase 1.5 digit-based scan after Phase 2 | Simpler regex (digit-only), but tightly coupled to Phase 2's emission format. The BUG-01d proclitic emission (`بأربعة → ب4`) is exactly the kind of thing that would silently break a digit-based scan. | Reject |
+
+**Why Shape 2 wins:** phase decoupling. Shape 2 operates on the most
+stable input in the pipeline — the raw spoken Arabic. Shape 3 has a
+hidden dependency on the digit-emission format and would couple any
+future Phase 2 change to the multiplication logic.
+
+### Fix
+
+New Phase 0 in `normalizeArabicNumbers`, placed before the existing
+Phase 1 compound handler:
+
+```js
+const thousandsPattern = /(\S+)\s+آلاف(?:\s+و\s*(\S+)(?:\s+و\s*(\S+))?)?/g;
+result = result.replace(thousandsPattern, (match, mult, p2, p3) => {
+  let prefix = '';
+  let bareMult = mult;
+  if (/^[بلوفك]/.test(mult) && ALL_NUMBERS[mult.slice(1)] !== undefined) {
+    prefix = mult[0];
+    bareMult = mult.slice(1);
+  }
+  const m = ALL_NUMBERS[bareMult];
+  if (m === undefined || m < 3 || m > 10) return match;
+  const v2 = p2 ? ALL_NUMBERS[p2] : 0;
+  const v3 = p3 ? ALL_NUMBERS[p3] : 0;
+  if (p2 && v2 === undefined) return match;
+  if (p3 && v3 === undefined) return match;
+  return `${prefix}${m * 1000 + (v2 || 0) + (v3 || 0)}`;
+});
+```
+
+Behavior:
+
+- Multiplier restricted to dictionary units **3–10** (the only values
+  for which the broken plural `آلاف` is grammatically correct in
+  modern Arabic). Outside this range → return match unchanged, let
+  later phases handle as best they can.
+- Optional `و`-tail captures up to two terms (hundreds and tens), so
+  `خمسة آلاف وستمية وخمسين → 5650`.
+- Proclitic stripping mirrors BUG-01d: ب/ل/و/ف/ك on the multiplier is
+  detached, the bare multiplier is looked up, and the clitic is
+  re-emitted in front of the digit so `بأربعة آلاف → ب4000`.
+- If a `و`-tail term exists but isn't in the dictionary, the entire
+  match is left untouched — fail-safe rather than emit a wrong number.
+
+### Tests — BUG-01g cases (9)
+
+| # | Input | Expected | Result |
+|---|---|---|---|
+| 1 | `تلاتة آلاف` | `3000` | ✓ |
+| 2 | `أربعة آلاف وخمسمية` | `4500` | ✓ |
+| 3 | `خمسة آلاف وستمية وخمسين` | `5650` | ✓ |
+| 4 | `عشرة آلاف` | `10000` (boundary) | ✓ |
+| 5 | `بعت الدراجة بأربعة آلاف يورو` | `4000` | ✓ |
+| 6 | `اشتريت بثلاثة آلاف وتسعمية` | `3900` (proclitic) | ✓ |
+| 7 | `آلاف` standalone | no crash, returns Arabic intact | ✓ |
+| 8 | `ألف` (regression) | `1000` | ✓ |
+| 9 | `ألفين وخمسمية` (regression) | `2500` | ✓ |
+
+### Tests — 28-value compound regression suite
+
+All 8 previously-skipped Bug G entries (`تلاتة آلاف` … `عشرة آلاف`)
+**un-skipped and passing**. The suite is now 28 / 28 active green.
+
+| Class | Active | Pass |
+|---|---|---|
+| Tens (10–90) | 9 | **9 / 9** |
+| Hundreds (100–900) | 9 | **9 / 9** |
+| 1000–2000 | 2 | **2 / 2** |
+| 3000–10000 (`X آلاف`) | 8 | **8 / 8** ✓ (was 0/8) |
+| **Total** | **28** | **28 / 28** |
+
+### Final test counts
+
+```
+ Test Files  1 passed (1)
+      Tests  92 passed (92)
+```
+
+- 47 BUG-01c tests
+- 7 active BUG-01d cases (the previously-skipped Bug G test now passing)
+- 9 BUG-01g cases
+- 28 / 28 active 28-suite cases (Bug G class fully un-skipped)
+- 1 normalizeForMatching alif test
+- 2 normalizeArabicNumbers compound tests
+- (Total: 92, 0 skipped)
+
+---
+
+## Bug H — Singular `ألف` with multi-word multipliers
+
+**Status:** Characterized but NOT fixed. Pre-authorized as out-of-scope
+for COMMIT 3 by the user's instruction #2 ("if `أحد عشر ألف` is too
+rare/complex to handle cleanly in this commit, document it as Bug H and
+ship without it").
+
+In Arabic, **3–10 thousand** uses the broken plural `آلاف` (handled by
+BUG-01g). **11–10000 of higher orders** uses the **singular** `ألف`
+with a compound or multi-word multiplier:
+
+- `أحد عشر ألف` = 11000
+- `اثنا عشر ألف` = 12000
+- `خمسة عشر ألف` = 15000
+- `عشرين ألف` = 20000
+- `خمسين ألف` = 50000
+- `مية ألف` = 100000
+
+**Trace** for `خمسين ألف`:
+1. Phase 0 thousands regex looks for `\S+\s+آلاف` — input has `ألف`
+   not `آلاف`, no match.
+2. Phase 1 compound regex needs explicit `و` — none present, no match.
+3. Phase 2 standalone: `خمسين → 50`, `ألف → 1000`.
+4. Result: `"50 1000"`. Does not produce `50000`.
+
+`أحد عشر ألف` is even worse because the multiplier is two words —
+neither word individually is in the dictionary as 11.
+
+**Severity:** Financial, but **lower frequency** than Bug G in the
+Vitesse Eco context. Bike sales are typically 3000–10000 EUR, hitting
+the `آلاف` range. The `ألف` range starts at 11000 EUR which is rare
+for a single bike. Accessories, batteries, and parts are well below
+1000 EUR. So Bug H affects edge-case high-ticket sales.
+
+**Fix shape (for whoever takes this):**
+
+- Pre-pass extending the Phase 0 idea: `(<multi-word multiplier>) ألف
+  [و <rest>]`. Multiplier patterns to handle:
+  - Tens (`عشرين`, `ثلاثين` … `تسعين`) — single word, simplest case.
+  - Compound 11-19 (`أحد عشر`, `اثنا عشر`, `ثلاثة عشر` …) — two-word.
+  - Hundreds (`مية`, `ميتين`, `تلتمية` …) — single word.
+- Multiplier value × 1000 + optional `و`-tail.
+- Same proclitic stripping as BUG-01g.
+- Stay restricted to multiplier values that round to whole thousands
+  (no `أحد عشر ألف وخمسمية ونص`-style fractional madness in scope).
+
+**NOT in current sprint scope.** Tracked here for the
+`VOICE_NORMALIZER_AUDIT.md` to be produced after COMMIT 5.
