@@ -787,3 +787,38 @@ This is a structurally different class from the bugs we've fixed:
 those were all regex / ordering / collision issues in the code. This
 is a data issue in the vocabulary table. Tracked as **Bug I** for the
 audit document.
+
+---
+
+## Decision precedent — out-of-path discoveries during a green commit
+
+**Date:** 2026-04-13, during COMMIT 5 (BUG-01a + BUG-01b).
+
+**Situation:** while smoke-testing the BUG-01a/b fix, an unrelated
+issue surfaced — `أر` (alif-with-hamza-above) was not in
+`ARABIC_TO_LATIN` as an R spelling. The standing stop protocol said
+"any new Bug class appears → stop." But the finding had three
+properties that made landing the commit the correct call:
+
+1. **Out of path.** The discovery was orthogonal to the cleanup code
+   being changed in COMMIT 5. Nothing in the BUG-01a/b diff touched
+   `ARABIC_TO_LATIN` or the transliteration dictionary.
+2. **Green.** All 104 tests (including the three-letter code cases
+   that were the COMMIT 5 acceptance criteria) passed. The commit
+   met its own spec.
+3. **File-scope preserved.** The COMMIT 5 diff stayed within
+   `lib/voice-normalizer.js` and its test file. No cross-file
+   changes, no scope creep.
+
+**Decision:** land COMMIT 5, flag the finding inline in the commit
+message as Bug I, document it in `UPGRADE_LOG.md` and
+`VOICE_NORMALIZER_AUDIT.md`, then raise it at the next checkpoint.
+User confirmed this was the correct call.
+
+**Rule for future sprints:** a new bug discovered *outside the code
+path being changed* during a *green commit* does **not** trigger the
+stop protocol. Log it, land the commit, raise it at the next natural
+checkpoint. The stop protocol exists to catch regressions and in-path
+surprises, not to punish careful observation. A new bug discovered
+*inside the code path being changed* — or one that causes a test to
+fail — still triggers an immediate stop.
