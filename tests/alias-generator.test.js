@@ -261,3 +261,81 @@ describe('generateClientAliases', () => {
     expect(r.aliases.length).toBeLessThanOrEqual(4);
   });
 });
+
+// ----------------------------------------------------------------------------
+// FEAT-01.1 — Levantine compositional numbers + all-caps acronym fallback
+// ----------------------------------------------------------------------------
+
+describe('FEAT-01.1: Levantine compositional numbers', () => {
+  it('C28 produces both Gulf and Levantine forms (compositional 8+20)', () => {
+    const r = generateProductAliases('C28');
+    expect(r.skip).toBe(false);
+    // Gulf form (8 → "ثمانية")
+    expect(r.aliases).toContain('سي ثمانية وعشرين');
+    // Levantine form (8 → "تمنية")
+    expect(r.aliases).toContain('سي تمنية وعشرين');
+  });
+
+  it('V23 produces both Gulf and Levantine forms (3 has both dialect variants)', () => {
+    // Regression check: the compositional cross-product should pick up
+    // dialect variants of the ones digit, not just the tens digit.
+    const r = generateProductAliases('V23');
+    expect(r.skip).toBe(false);
+    expect(r.aliases).toContain('في ثلاثة وعشرين');
+    expect(r.aliases).toContain('في تلاتة وعشرين');
+  });
+});
+
+describe('FEAT-01.1: all-caps acronym fallback', () => {
+  it('BMW produces بي إم دبليو', () => {
+    const r = generateProductAliases('BMW');
+    expect(r.skip).toBe(false);
+    expect(r.aliases).toContain('بي إم دبليو');
+    expect(r.aliases).toContain('BMW');
+  });
+
+  it('KTM 450 produces كي تي إم in some alias', () => {
+    const r = generateProductAliases('KTM 450');
+    expect(r.skip).toBe(false);
+    // Acronym fallback fires for "KTM"; "450" falls back to Latin because
+    // it's not in NUMBER_WORDS. The composed alias is "كي تي إم 450".
+    const hasKtm = r.aliases.some(a => a.includes('كي تي إم'));
+    expect(hasKtm).toBe(true);
+  });
+
+  it('HP Laptop does not crash and includes إتش بي', () => {
+    const r = generateProductAliases('HP Laptop');
+    expect(r.skip).toBe(false);
+    const hasHp = r.aliases.some(a => a.includes('إتش بي'));
+    expect(hasHp).toBe(true);
+  });
+
+  it('GT-2000 still uses LETTER_PAIRS path (regression — LETTER_PAIRS priority)', () => {
+    const r = generateProductAliases('GT-2000');
+    expect(r.skip).toBe(false);
+    expect(r.aliases).toContain('جي تي ألفين');
+  });
+
+  it('iPhone (mixed case) does NOT trigger the acronym fallback', () => {
+    const r = generateProductAliases('iPhone');
+    expect(r.skip).toBe(false);
+    // Mixed case fails the /^[A-Z]+$/ check in transliterateAcronym.
+    // No Arabic alias is produced — iPhone falls through to Latin-only output.
+    const hasArabicLetters = r.aliases.some(a => /[\u0600-\u06FF]/.test(a));
+    expect(hasArabicLetters).toBe(false);
+  });
+
+  it('BMWXY (5 chars, all-caps) qualifies for acronym fallback', () => {
+    const r = generateProductAliases('BMWXY');
+    expect(r.skip).toBe(false);
+    expect(r.aliases).toContain('بي إم دبليو إكس واي');
+  });
+
+  it('BMWXYZ (6 chars) does NOT qualify (length boundary)', () => {
+    const r = generateProductAliases('BMWXYZ');
+    expect(r.skip).toBe(false);
+    // 6-char token exceeds the 5-char limit. Falls through to Latin-only.
+    const hasArabicAcronym = r.aliases.some(a => a.includes('بي إم دبليو'));
+    expect(hasArabicAcronym).toBe(false);
+  });
+});
