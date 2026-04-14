@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-04-14T23:56:04.099Z",
+  "base_url": "https://mohammadnl.vercel.app",
+  "duration_ms": 1284821,
+  "total_assertions": 37,
+  "passed": 37,
+  "failed": 0,
+  "pass_rate": 100,
+  "timings": {
+    "sale_create": {
+      "count": 360,
+      "p50": 1047,
+      "p95": 1102,
+      "p99": 1295,
+      "max": 1528
+    },
+    "sale_confirm": {
+      "count": 120,
+      "p50": 2202,
+      "p95": 2310,
+      "p99": 2328,
+      "max": 2431
+    },
+    "collect_fifo": {
+      "count": 100,
+      "p50": 870,
+      "p95": 1329,
+      "p99": 1461,
+      "max": 1537
+    },
+    "cancel_reserved": {
+      "count": 50,
+      "p50": 1233,
+      "p95": 1262,
+      "p99": 1590,
+      "max": 1590
+    },
+    "cancel_keep": {
+      "count": 30,
+      "p50": 1326,
+      "p95": 1374,
+      "p99": 1382,
+      "max": 1382
+    },
+    "cancel_remove": {
+      "count": 20,
+      "p50": 1512,
+      "p95": 1544,
+      "p99": 1546,
+      "max": 1546
+    },
+    "parallel_collect": {
+      "count": 10,
+      "p50": 1796,
+      "p95": 2014,
+      "p99": 2014,
+      "max": 2014
+    }
+  },
+  "failures": []
+}
