@@ -42,8 +42,8 @@ function SummaryContent() {
 
       // DONE: Step 8 — fetch products in parallel with the summary
       const [summaryRes, productsRes] = await Promise.all([
-        fetch(url),
-        fetch('/api/products'),
+        fetch(url, { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
       ]);
       const result = await summaryRes.json();
       const products = await productsRes.json();
@@ -189,7 +189,7 @@ function SummaryContent() {
         result={voiceResult}
         onConfirm={async (endpoint, submitData) => {
           try {
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData) });
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData), cache: 'no-store' });
             if (res.ok) { addToast('تم الحفظ بنجاح!'); setVoiceResult(null); fetchData(dateFrom, dateTo); }
             else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
           } catch { addToast('خطأ في الاتصال', 'error'); }

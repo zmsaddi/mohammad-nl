@@ -55,7 +55,7 @@ export default function CancelSaleDialog({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/sales/${saleId}/cancel`);
+        const res = await fetch(`/api/sales/${saleId}/cancel`, { cache: 'no-store' });
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) {
@@ -109,6 +109,7 @@ export default function CancelSaleDialog({
           bonusActions: Object.keys(bonusActions).length > 0 ? bonusActions : null,
           notes: notes.trim() || null,
         }),
+        cache: 'no-store',
       });
       const data = await res.json();
       if (!res.ok) {

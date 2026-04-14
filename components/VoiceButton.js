@@ -174,7 +174,7 @@ export default function VoiceButton({ onResult, onError }) {
     try {
       const formData = new FormData();
       formData.append('audio', blob, 'recording.webm');
-      const res = await fetch('/api/voice/process', { method: 'POST', body: formData });
+      const res = await fetch('/api/voice/process', { method: 'POST', body: formData, cache: 'no-store' });
       if (!res.ok) {
         const e = await res.json().catch(() => ({ error: 'خطأ في السيرفر' }));
         throw new Error(e.error);

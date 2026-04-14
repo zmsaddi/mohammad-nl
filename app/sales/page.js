@@ -99,8 +99,12 @@ function SalesContent() {
 
   const fetchData = async () => {
     try {
-      const fetches = [fetch('/api/sales'), fetch('/api/clients'), fetch('/api/products')];
-      if (isSeller) fetches.push(fetch('/api/settings'));
+      const fetches = [
+        fetch('/api/sales', { cache: 'no-store' }),
+        fetch('/api/clients', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
+      ];
+      if (isSeller) fetches.push(fetch('/api/settings', { cache: 'no-store' }));
       const results = await Promise.all(fetches);
       const salesData = await results[0].json();
       const clientsData = await results[1].json();
@@ -157,6 +161,7 @@ function SalesContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.clientName }),
+          cache: 'no-store',
         });
       }
 
@@ -167,6 +172,7 @@ function SalesContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.item }),
+          cache: 'no-store',
         });
       }
 
@@ -174,6 +180,7 @@ function SalesContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       if (res.ok) {
         const result = await res.json();
@@ -210,7 +217,7 @@ function SalesContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/sales?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/sales?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم الحذف بنجاح');
         fetchData();

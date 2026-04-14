@@ -42,9 +42,9 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetch('/api/products').then((r) => r.json()).catch(() => []),
-      fetch('/api/clients').then((r) => r.json()).catch(() => []),
-      fetch('/api/suppliers').then((r) => r.json()).catch(() => []),
+      fetch('/api/products', { cache: 'no-store' }).then((r) => r.json()).catch(() => []),
+      fetch('/api/clients', { cache: 'no-store' }).then((r) => r.json()).catch(() => []),
+      fetch('/api/suppliers', { cache: 'no-store' }).then((r) => r.json()).catch(() => []),
     ]).then(([products, clients, suppliers]) => {
       if (cancelled) return;
       setDbData({
@@ -113,17 +113,18 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: transcript || '', aiData: data || {}, userData: form, actionType: action }),
+        cache: 'no-store',
       });
     } catch {} // Don't block save if learning fails
 
     const creates = [];
     if (action === 'register_sale') {
-      if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }) }).catch(() => {}));
-      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }) }).catch(() => {}));
+      if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }), cache: 'no-store' }).catch(() => {}));
+      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }), cache: 'no-store' }).catch(() => {}));
     } else if (action === 'register_purchase') {
-      if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }) }).catch(() => {}));
+      if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }), cache: 'no-store' }).catch(() => {}));
       // DONE: Step 7 — pass the chosen category through so the product is filed correctly on first creation
-      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }) }).catch(() => {}));
+      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }), cache: 'no-store' }).catch(() => {}));
     }
     if (creates.length) await Promise.all(creates);
 

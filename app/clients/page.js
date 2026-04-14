@@ -30,7 +30,7 @@ function ClientsContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/clients?withDebt=true');
+      const res = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
       const data = await res.json();
       setClients(Array.isArray(data) ? data : []);
     } catch {
@@ -55,6 +55,7 @@ function ClientsContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       const result = await res.json().catch(() => ({}));
       // DONE: Bug 9 — addClient() returns { ambiguous: true, candidates, message }
@@ -82,7 +83,7 @@ function ClientsContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/clients?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/clients?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم حذف العميل بنجاح');
         fetchData();

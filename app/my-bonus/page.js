@@ -17,7 +17,7 @@ function MyBonusContent() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/bonuses');
+        const res = await fetch('/api/bonuses', { cache: 'no-store' });
         const data = await res.json();
         setBonuses(Array.isArray(data) ? data : []);
       } catch { addToast('خطأ', 'error'); }

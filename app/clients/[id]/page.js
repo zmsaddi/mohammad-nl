@@ -32,15 +32,15 @@ function ClientDetailContent({ params }) {
 
   const fetchData = async () => {
     try {
-      const clientsRes = await fetch('/api/clients?withDebt=true');
+      const clientsRes = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
       const clientsData = await clientsRes.json();
       const found = clientsData.find((c) => c.id === id);
 
       if (found) {
         setClient(found);
         const [salesRes, paymentsRes] = await Promise.all([
-          fetch(`/api/sales?client=${encodeURIComponent(found.name)}`),
-          fetch(`/api/payments?client=${encodeURIComponent(found.name)}`),
+          fetch(`/api/sales?client=${encodeURIComponent(found.name)}`, { cache: 'no-store' }),
+          fetch(`/api/payments?client=${encodeURIComponent(found.name)}`, { cache: 'no-store' }),
         ]);
         const salesData = await salesRes.json();
         const paymentsData = await paymentsRes.json();
@@ -77,6 +77,7 @@ function ClientDetailContent({ params }) {
           amount,
           paymentMethod: paymentForm.paymentMethod,
         }),
+        cache: 'no-store',
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {

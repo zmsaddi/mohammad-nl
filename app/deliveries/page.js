@@ -75,8 +75,8 @@ function DeliveriesContent() {
   const fetchData = async () => {
     try {
       const [deliveriesRes, clientsRes] = await Promise.all([
-        fetch('/api/deliveries'),
-        fetch('/api/clients'),
+        fetch('/api/deliveries', { cache: 'no-store' }),
+        fetch('/api/clients', { cache: 'no-store' }),
       ]);
       const deliveriesData = await deliveriesRes.json();
       const clientsData = await clientsRes.json();
@@ -118,6 +118,7 @@ function DeliveriesContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       if (res.ok) {
         addToast('تم إضافة التوصيلة بنجاح');
@@ -174,6 +175,7 @@ function DeliveriesContent() {
           notes: row.notes,
           vin: vin || '',
         }),
+        cache: 'no-store',
       });
       if (res.ok) {
         addToast(`تم تحديث الحالة إلى: ${newStatus}`);
@@ -190,7 +192,7 @@ function DeliveriesContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/deliveries?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/deliveries?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم الحذف بنجاح');
         fetchData();

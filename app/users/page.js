@@ -29,7 +29,10 @@ function UsersContent() {
 
   const fetchData = async () => {
     try {
-      const [usersRes, settingsRes] = await Promise.all([fetch('/api/users'), fetch('/api/settings')]);
+      const [usersRes, settingsRes] = await Promise.all([
+        fetch('/api/users', { cache: 'no-store' }),
+        fetch('/api/settings', { cache: 'no-store' }),
+      ]);
       setUsers(await usersRes.json());
       const s = await settingsRes.json();
       setSettings(s);
@@ -45,11 +48,11 @@ function UsersContent() {
     e.preventDefault();
     try {
       if (editUser) {
-        await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editUser.id, name: form.name, role: form.role, password: form.password || undefined }) });
+        await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editUser.id, name: form.name, role: form.role, password: form.password || undefined }), cache: 'no-store' });
         addToast('تم تحديث المستخدم');
       } else {
         if (!form.username || !form.password || !form.name) { addToast('جميع الحقول مطلوبة', 'error'); return; }
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form), cache: 'no-store' });
         const data = await res.json();
         if (!res.ok) { addToast(data.error, 'error'); return; }
         addToast('تم إضافة المستخدم');
@@ -60,18 +63,18 @@ function UsersContent() {
   };
 
   const handleToggle = async (id) => {
-    await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, toggleActive: true }) });
+    await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, toggleActive: true }), cache: 'no-store' });
     addToast('تم تحديث الحالة'); fetchData();
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await fetch(`/api/users?id=${deleteId}`, { method: 'DELETE' });
+    await fetch(`/api/users?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
     addToast('تم حذف المستخدم'); setDeleteId(null); fetchData();
   };
 
   const handleSaveSettings = async () => {
-    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settingsForm) });
+    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settingsForm), cache: 'no-store' });
     addToast('تم حفظ الإعدادات'); fetchData();
   };
 

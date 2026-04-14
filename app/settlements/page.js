@@ -23,7 +23,11 @@ function SettlementsContent() {
 
   const fetchData = async () => {
     try {
-      const [sRes, bRes, uRes] = await Promise.all([fetch('/api/settlements'), fetch('/api/bonuses'), fetch('/api/users')]);
+      const [sRes, bRes, uRes] = await Promise.all([
+        fetch('/api/settlements', { cache: 'no-store' }),
+        fetch('/api/bonuses', { cache: 'no-store' }),
+        fetch('/api/users', { cache: 'no-store' }),
+      ]);
       setSettlements(await sRes.json());
       setBonuses(await bRes.json());
       setUsers(await uRes.json());
@@ -46,7 +50,7 @@ function SettlementsContent() {
     e.preventDefault();
     if (!form.description || !form.amount) { addToast('الوصف والمبلغ مطلوبين', 'error'); return; }
     try {
-      const res = await fetch('/api/settlements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const res = await fetch('/api/settlements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form), cache: 'no-store' });
       if (res.ok) {
         addToast('تم تسجيل التسوية');
         setForm({ date: getTodayDate(), type: 'seller_payout', username: '', description: '', amount: '', notes: '' });

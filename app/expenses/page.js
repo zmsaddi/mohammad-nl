@@ -30,7 +30,7 @@ function ExpensesContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/expenses');
+      const res = await fetch('/api/expenses', { cache: 'no-store' });
       const data = await res.json();
       setRows(Array.isArray(data) ? data.reverse() : []);
     } catch {
@@ -55,6 +55,7 @@ function ExpensesContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       if (res.ok) {
         addToast('تم إضافة المصروف بنجاح');
@@ -73,7 +74,7 @@ function ExpensesContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/expenses?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/expenses?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم الحذف بنجاح');
         fetchData();

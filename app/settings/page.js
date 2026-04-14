@@ -31,7 +31,7 @@ function SettingsContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await fetch('/api/settings', { cache: 'no-store' });
       const data = await res.json();
       setSettings(data || {});
       setForm({
@@ -59,6 +59,7 @@ function SettingsContent() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       if (res.ok) {
         addToast('تم حفظ الإعدادات بنجاح');

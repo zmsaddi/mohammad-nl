@@ -24,7 +24,7 @@ function InvoicesContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/invoices');
+      const res = await fetch('/api/invoices', { cache: 'no-store' });
       const data = await res.json();
       setInvoices(Array.isArray(data) ? data : []);
     } catch {

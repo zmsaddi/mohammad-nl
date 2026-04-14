@@ -51,9 +51,9 @@ function PurchasesContent() {
   const fetchData = async () => {
     try {
       const [purchasesRes, productsRes, suppliersRes] = await Promise.all([
-        fetch('/api/purchases'),
-        fetch('/api/products'),
-        fetch('/api/suppliers'),
+        fetch('/api/purchases', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
+        fetch('/api/suppliers', { cache: 'no-store' }),
       ]);
       const purchasesData = await purchasesRes.json();
       const productsData = await productsRes.json();
@@ -97,6 +97,7 @@ function PurchasesContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.item, category: form.category }),
+          cache: 'no-store',
         });
       }
 
@@ -114,6 +115,7 @@ function PurchasesContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.supplier }),
+          cache: 'no-store',
         });
         const supData = await supRes.json().catch(() => ({}));
         if (supData?.ambiguous) {
@@ -127,6 +129,7 @@ function PurchasesContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        cache: 'no-store',
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
@@ -146,7 +149,7 @@ function PurchasesContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/purchases?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/purchases?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم الحذف بنجاح');
         fetchData();

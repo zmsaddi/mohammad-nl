@@ -37,7 +37,7 @@ function StockContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch('/api/products', { cache: 'no-store' });
       const data = await res.json();
       setProducts(Array.isArray(data) ? data : []);
     } catch {
@@ -53,7 +53,7 @@ function StockContent() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/products?id=${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) {
         addToast('تم حذف المنتج');
         fetchData();
@@ -297,6 +297,7 @@ function StockContent() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ id: p.id, sell_price: val }),
+                                    cache: 'no-store',
                                   });
                                   if (!res.ok) {
                                     const body = await res.json().catch(() => ({}));
@@ -340,6 +341,7 @@ function StockContent() {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ id: p.id, low_stock_threshold: safe }),
+                                    cache: 'no-store',
                                   });
                                   addToast('تم تحديث حد التنبيه');
                                   fetchData();
