@@ -103,9 +103,12 @@ or in the first day of production use.
       on 2026-04-14.** Q1-Q4 approved, documentation-only update
       (see [PROJECT_DOCUMENTATION.md § 15](../PROJECT_DOCUMENTATION.md)).
       No code changes.
-- [ ] **Session 6** — voice feature decision: Path A (ship assist-only
-      as-is), B (disable button until v1.1), or C (full rework).
-      Gated on user voice testing results.
+- [x] **Session 6** — voice feature decision: **Path A confirmed
+      on 2026-04-14.** User tested voice after the Combined
+      Hotfix and confirmed working. Ship as assist mode,
+      documented in [PROJECT_DOCUMENTATION.md § 16](../PROJECT_DOCUMENTATION.md).
+      Zero voice pipeline code changes. VoiceConfirm cleanup
+      deferred to v1.1.
 - [ ] **Session 8** — E2E manual smoke tests against production
 - [ ] **Session 9** — final documentation sweep before delivery
 - [ ] **Session 10** — `v1.0.0` tag + customer handoff

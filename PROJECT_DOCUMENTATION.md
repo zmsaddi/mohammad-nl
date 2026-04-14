@@ -735,3 +735,140 @@ logs pattern is adequate for launch.
   implement the two-document flow per the accountant's updated
   guidance. The stub currently throws `NOT_IMPLEMENTED` as a
   forcing function so it cannot silently bypass compliance.
+
+---
+
+## 16. Voice Stack (Assist Mode)
+
+**Status:** Production-ready as assist mode.
+**Decision date:** 2026-04-14
+**Path:** A (ship as-is)
+
+### Architecture
+
+The voice stack is a five-stage pipeline:
+
+1. **Whisper transcription** (`groq/whisper-large-v3`) —
+   transcribes Arabic audio to text. Returns raw transcript.
+   Rate-limited to 10 requests per 60-second rolling window per
+   user at [`app/api/voice/process/route.js`](app/api/voice/process/route.js).
+
+2. **Normalization** ([`lib/voice-normalizer.js`](lib/voice-normalizer.js))
+   — cleans common Whisper errors: letter collapsing
+   (`إس تي` → `ST`), number-word normalization (`خمسين` → `50`),
+   whitespace fixes. Does NOT transliterate names — that happens
+   at the DB boundary via `ensureLatin()`. Scope was deliberately
+   shrunk during the Session 3 surgical detox pass (no more
+   hardcoded Vitesse SKUs).
+
+3. **Extraction** ([`lib/voice-prompt-builder.js`](lib/voice-prompt-builder.js)
+   + Llama 3.1 8B Instant) — prompts Llama with anonymized
+   few-shot examples (post-surgical-detox) to extract action type
+   (sale/purchase/expense), entities (client, supplier, item),
+   and numeric fields. Returns a structured JSON object matching
+   `SaleSchema` / `PurchaseSchema` / `ExpenseSchema` from
+   [`lib/schemas.js`](lib/schemas.js).
+
+4. **Rule override** ([`lib/voice-action-classifier.js`](lib/voice-action-classifier.js))
+   — post-LLM check for explicit verbs (`بعت` → sale, `اشتريت`
+   → purchase, `دفعت` → expense) to override Llama if it
+   misclassified. Zero LLM calls, deterministic. Documented gap
+   with JS `\b` vs Arabic — uses substring alternation instead,
+   see BUG-01d cross-reference.
+
+5. **User review** ([`components/VoiceConfirm.js`](components/VoiceConfirm.js))
+   — always-shown dialog with extracted fields. User reviews and
+   corrects before save. This is the trust gate. The dialog
+   cannot be bypassed — no auto-save path exists.
+
+### Assist mode framing
+
+The voice feature is explicitly framed as "assist mode, not
+autopilot":
+
+- VoiceConfirm dialog always shows before save (cannot be
+  bypassed)
+- Every field is editable by the user
+- Subtitle reads: `🔬 وضع المساعد التجريبي — راجع كل حقل قبل
+  الحفظ` ("Experimental assist mode — review each field before
+  saving")
+- Review banner shows regardless of missing_fields state (Session
+  4 change)
+- Backdrop click-outside is disabled (Session 7b hotfix) — users
+  can't accidentally dismiss and lose voice extraction data
+- Submit button resets on error (BUG 4 hotfix) so the user can
+  correct and retry
+
+Users are expected to always review voice-extracted data before
+saving. The system does not auto-save any voice entry.
+
+### Schema robustness (BUG 1 hotfix heritage)
+
+The schema layer at [`lib/schemas.js`](lib/schemas.js) uses a
+`nullable()` preprocess wrapper on all optional fields. This
+means voice flows can send `null` for empty optional fields
+(phone, email, address, notes) and the schemas accept them
+without error. Added in the 2026-04-14 hotfix after a production
+null-field rejection.
+
+### Name normalization (BUG 5 hotfix heritage)
+
+Client and supplier names are automatically transliterated from
+Arabic to Latin at the DB boundary via `ensureLatin()` in
+[`lib/db.js`](lib/db.js). Voice can extract Arabic names freely
+— they land in the DB in Latin form for French invoice
+compliance.
+
+The transliteration uses a two-layer approach:
+1. Dictionary lookup (~30 common names) for exact matches
+2. Character-level ALA-LC fallback for unknown names
+
+Both voice-extracted and manual entries flow through this path.
+Tested with 17 unit tests in
+[`tests/latin-transformation.test.js`](tests/latin-transformation.test.js).
+
+### Known limitations
+
+- **Duplicate-key bug:** VoiceConfirm.js emits duplicate
+  camelCase + snake_case keys in the POST body (`unit_price: 600`
+  AND `unitPrice: 600`). Zod strips unknown keys by default so
+  this is harmless, but the VoiceConfirm submit handler should
+  be cleaned up in v1.1.
+- **Null vs undefined:** VoiceConfirm.js emits `null` instead
+  of `undefined` for empty optional fields. The schema
+  `nullable()` wrapper handles this, but cleaner is to stop
+  emitting nulls in the first place. Deferred to v1.1.
+- **Levantine dialect WER:** 20-30% range for Llama 3.1 8B on
+  unfamiliar product names. Users should expect to correct
+  product names in the dialog.
+- **Audio quality dependency:** voice extraction quality depends
+  on audio clarity and background noise. In a busy shop
+  environment, accuracy drops.
+- **Cold starts reset rate limit state** — rate limiter uses an
+  in-memory `Map`, not `@vercel/kv`. Acceptable for 10-20 user
+  load. Under higher load, migrate to shared state (see
+  rate-limiter comment block at
+  [`app/api/voice/process/route.js:19`](app/api/voice/process/route.js#L19)).
+
+### Rate limiting
+
+Voice endpoint (`/api/voice/process`) is rate-limited to 10
+requests per 60-second rolling window, keyed by username.
+Module-scoped `Map` persists across warm serverless invocations.
+Cold starts reset the limiter. Adequate for 10-20 user load.
+
+### v1.1 recommendations
+
+- **Rewrite VoiceConfirm.js submit handler** to emit a single
+  canonical camelCase shape with `undefined` for empty fields
+  (removes duplicate-key and null-vs-undefined workarounds)
+- **Consider Whisper large-v3-turbo** for 2-3× speedup at minor
+  accuracy cost (benchmark on real Arabic audio first)
+- **Add explicit "retry recording" button** if Whisper
+  confidence is low
+- **Consider gpt-oss-20b** with strict JSON schema for
+  higher-accuracy extraction (requires measuring real Levantine
+  WER first, not marketing numbers)
+- **E2E voice test harness** — record 30 Arabic audio samples,
+  run them through the full pipeline, assert extraction
+  correctness. Deferred to v1.1 alongside VoiceConfirm rewrite.
