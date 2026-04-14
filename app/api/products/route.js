@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getProducts, addProduct, deleteProduct } from '@/lib/db';
+import { ProductSchema, ProductUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
 
 async function checkAuth(request) {
@@ -26,9 +27,14 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    data.createdBy = token.username;
-    // Sellers can only upsert a name shell — they cannot set prices or stock
+    const body = await request.json();
+    const parsed = ProductSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const data = { ...parsed.data, createdBy: token.username };
+    // Sellers can only upsert a name shell — they cannot set prices or stock.
+    // The coercion runs AFTER Zod so the schema still validates the shape
+    // the seller sent (good signal for future debugging).
     if (token.role === 'seller') {
       data.buyPrice = 0;
       data.sellPrice = 0;
@@ -57,8 +63,10 @@ export async function PUT(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    if (!data.id) return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
+    const body = await request.json();
+    const parsed = ProductUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+    const data = parsed.data;
     const { sql } = await import('@vercel/postgres');
 
     // BUG-30 mirror: if the update payload includes a new sell_price,

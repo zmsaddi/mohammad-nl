@@ -36,6 +36,18 @@ function PurchasesContent() {
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
 
+  // BUG-31 (purchases mirror): inline sell_price < unit_price guard. The
+  // server-side check already exists in addPurchase (BUG-30), but without
+  // a reactive UI error the user only discovers the problem on submit.
+  // Mirrors the app/sales/page.js:89-98 priceFloorError pattern exactly.
+  const sellPriceError = (() => {
+    const up = parseFloat(form.unitPrice);
+    const sp = parseFloat(form.sellPrice);
+    if (!up || !sp || up <= 0 || sp <= 0) return null;
+    if (sp >= up) return null;
+    return `سعر البيع الموصى (${sp}€) لا يمكن أن يكون أقل من سعر الشراء (${up}€).`;
+  })();
+
   const fetchData = async () => {
     try {
       const [purchasesRes, productsRes, suppliersRes] = await Promise.all([
@@ -70,6 +82,12 @@ function PurchasesContent() {
       addToast('يرجى اختيار فئة المنتج', 'error');
       return;
     }
+    // BUG-31: belt-and-suspenders gate when user bypasses the disabled
+    // submit button (e.g. keyboard Enter on a touched form).
+    if (sellPriceError) {
+      addToast(sellPriceError, 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       // Auto-create product if new — DONE: Step 3E pass category through
@@ -82,14 +100,27 @@ function PurchasesContent() {
         });
       }
 
-      // Auto-create supplier if new
+      // Auto-create supplier if new.
+      // BUG-21: addSupplier now returns { ambiguous, candidates, message }
+      // when the name already exists with no phone disambiguator. Same
+      // pattern as addClient → surface the toast and abort so the user
+      // can add a phone number and retry. `return` aborts the whole
+      // purchase submit — the user must resolve the ambiguity before
+      // their purchase can land (otherwise the DB row would point at
+      // a wrong existing supplier).
       const supplierExists = suppliers.some((s) => s.name === form.supplier);
       if (!supplierExists && form.supplier) {
-        await fetch('/api/suppliers', {
+        const supRes = await fetch('/api/suppliers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: form.supplier }),
         });
+        const supData = await supRes.json().catch(() => ({}));
+        if (supData?.ambiguous) {
+          addToast(supData.message || 'يوجد مورد بنفس الاسم — أضف رقم هاتف للتمييز', 'error');
+          setSubmitting(false);
+          return;
+        }
       }
 
       const res = await fetch('/api/purchases', {
@@ -201,7 +232,26 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="pur-sell-price">سعر البيع الموصى *</label>
-              <input id="pur-sell-price" type="number" min="0" step="any" value={form.sellPrice} onChange={(e) => setForm({ ...form, sellPrice: e.target.value })} placeholder="سعر البيع للعميل" required />
+              <input
+                id="pur-sell-price"
+                type="number"
+                min="0"
+                step="any"
+                value={form.sellPrice}
+                onChange={(e) => setForm({ ...form, sellPrice: e.target.value })}
+                placeholder="سعر البيع للعميل"
+                required
+                style={{
+                  border: sellPriceError ? '2px solid #dc2626' : undefined,
+                  background: sellPriceError ? '#fef2f2' : undefined,
+                }}
+              />
+              {/* BUG-31: inline error when sell_price < unit_price (mirror BUG-30 pattern) */}
+              {sellPriceError && (
+                <div style={{ marginTop: '6px', color: '#dc2626', fontSize: '0.78rem' }}>
+                  {sellPriceError}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label htmlFor="pur-total">الإجمالي</label>
@@ -225,7 +275,7 @@ function PurchasesContent() {
               <input id="pur-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
+          <button type="submit" className="btn btn-primary" disabled={submitting || !!sellPriceError}>
             {submitting ? 'جاري الإضافة...' : 'إضافة عملية شراء'}
           </button>
         </form>

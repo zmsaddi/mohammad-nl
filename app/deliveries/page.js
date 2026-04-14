@@ -195,7 +195,7 @@ function DeliveriesContent() {
         addToast('تم الحذف بنجاح');
         fetchData();
       } else {
-        // deleteDelivery now calls cancelSale internally, which throws
+        // cancelDelivery calls cancelSale internally, which throws
         // BONUS_CHOICE_REQUIRED when bonuses exist without bonusActions.
         // In that case the route returns 400 with the Arabic error. Route
         // the admin to the dialog as a fallback.

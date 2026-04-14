@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getSettlements, addSettlement } from '@/lib/db';
+import { SettlementSchema, zodArabicError } from '@/lib/schemas';
 
 async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -26,8 +27,11 @@ export async function POST(request) {
     return NextResponse.json({ error: 'غير مصرح - المدير فقط' }, { status: 403 });
   }
   try {
-    const data = await request.json();
-    const id = await addSettlement({ ...data, settledBy: token.username });
+    const body = await request.json();
+    const parsed = SettlementSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const id = await addSettlement({ ...parsed.data, settledBy: token.username });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('[settlements] POST:', error);

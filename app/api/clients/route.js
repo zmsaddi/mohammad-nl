@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getClients, addClient, updateClient, deleteClient } from '@/lib/db';
+import { ClientSchema, ClientUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
 
 async function checkAuth(request) {
@@ -29,10 +30,15 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    data.createdBy = token.username;
+    const body = await request.json();
+    const parsed = ClientSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const data = { ...parsed.data, createdBy: token.username };
     const result = await addClient(data);
     invalidateCache(); // client list changed — rebuild entity-resolver index
+    // addClient() may return { ambiguous, candidates, message } — passed through
+    // untouched so clients/page.js can show its disambiguation dialog.
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error('[clients] POST:', err);
@@ -45,8 +51,10 @@ export async function PUT(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    await updateClient(data);
+    const body = await request.json();
+    const parsed = ClientUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+    await updateClient(parsed.data);
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {

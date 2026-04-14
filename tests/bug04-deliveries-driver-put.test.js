@@ -22,7 +22,7 @@ updateDeliveryMock.mockImplementation(async (arg) => {
 vi.mock('@/lib/db', () => ({
   updateDelivery: updateDeliveryMock,
   addDelivery: vi.fn(),
-  deleteDelivery: vi.fn(),
+  cancelDelivery: vi.fn(),
   getDeliveries: getDeliveriesMock,
 }));
 

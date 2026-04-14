@@ -13,7 +13,7 @@
 //   4. cancelSale throws SETTLED_BONUS_SELLER when seller bonus is settled
 //   5. Preview mode returns the expected shape without writes
 //   6. deleteSale entry point removes sale + delivery rows + writes audit
-//   7. deleteDelivery entry point (BUG-X1 fix) removes delivery + cancels sale
+//   7. cancelDelivery entry point (BUG-X1 fix) cancels delivery + cancels sale
 //   8. updateDelivery(cancel) entry point calls cancelSale properly
 //
 // Run with: npx vitest run tests/feat05-cancel-sale.test.js
@@ -27,7 +27,7 @@ import {
   updateDelivery,
   voidInvoice,
   deleteSale,
-  deleteDelivery,
+  cancelDelivery,
   cancelSale,
   previewCancelSale,
   commitCancelSale,
@@ -325,25 +325,25 @@ describe('FEAT-05: cancelSale helper + entry-point parity', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────
-  // Test 7: deleteDelivery — BUG-X1 fix.
+  // Test 7: cancelDelivery — BUG-X1 fix.
   //
   // Old two-line implementation dropped the delivery row outside any
   // transaction and cascade-deleted bonuses/invoices via FK while
   // leaving the sale in مؤكد with its stock decremented.
   //
-  // New behavior: deleteDelivery runs cancelSale against the linked
+  // New behavior: cancelDelivery runs cancelSale against the linked
   // sale. The delivery row is preserved with status='ملغي' (NOT
   // physically deleted) because invoices.delivery_id is NOT NULL +
   // ON DELETE CASCADE — physically dropping the delivery would
   // cascade-delete the invoice and defeat invoiceMode='soft'. See
-  // the deleteDelivery JSDoc for the full rationale.
+  // the cancelDelivery JSDoc for the full rationale.
   // ──────────────────────────────────────────────────────────────────────
-  it('deleteDelivery cancels the linked sale atomically (BUG-X1 fix)', async () => {
+  it('cancelDelivery cancels the linked sale atomically (BUG-X1 fix)', async () => {
     const { saleId, deliveryId } = await seedConfirmedSale();
 
-    await deleteDelivery(deliveryId, {
+    await cancelDelivery(deliveryId, {
       cancelledBy: 'test-admin',
-      reason: 'Delete-delivery test',
+      reason: 'Cancel-delivery test',
       bonusActions: { seller: 'remove', driver: 'remove' },
     });
 
@@ -371,7 +371,7 @@ describe('FEAT-05: cancelSale helper + entry-point parity', () => {
     // Audit row exists
     const { rows: audit } = await sql`SELECT * FROM cancellations WHERE sale_id = ${saleId}`;
     expect(audit).toHaveLength(1);
-    expect(audit[0].reason).toBe('Delete-delivery test');
+    expect(audit[0].reason).toBe('Cancel-delivery test');
   });
 
   // ──────────────────────────────────────────────────────────────────────

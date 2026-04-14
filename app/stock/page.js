@@ -285,16 +285,32 @@ function StockContent() {
                               // equality across types). parseFloat for the compare.
                               const currentSell = parseFloat(p.sell_price) || 0;
                               if (val !== currentSell) {
+                                // BUG-31: preserve server's Arabic error message.
+                                // The old catch-all `catch { addToast('خطأ') }` swallowed
+                                // the BUG-30 sell_price >= buy_price guard message
+                                // ("سعر البيع الموصى ... لا يمكن أن يكون أقل من سعر الشراء")
+                                // and showed a vague "خطأ" toast with zero context. Now
+                                // the 400 response body is surfaced verbatim so the
+                                // admin knows exactly why the update was rejected.
                                 try {
-                                  const { sql } = await import('@vercel/postgres');
-                                  await fetch('/api/products', {
+                                  const res = await fetch('/api/products', {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ id: p.id, sell_price: val }),
                                   });
+                                  if (!res.ok) {
+                                    const body = await res.json().catch(() => ({}));
+                                    addToast(body.error || 'خطأ في تحديث سعر البيع', 'error');
+                                    // Reset the input to the current DB value so the UI
+                                    // matches what the server has.
+                                    e.target.value = currentSell || '';
+                                    return;
+                                  }
                                   addToast('تم تحديث سعر البيع');
                                   fetchData();
-                                } catch { addToast('خطأ', 'error'); }
+                                } catch {
+                                  addToast('خطأ في الاتصال', 'error');
+                                }
                               }
                             }}
                           />

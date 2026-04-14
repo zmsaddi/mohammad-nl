@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getUsers, addUser, updateUser, toggleUserActive, deleteUser } from '@/lib/db';
+import { UserSchema, UserUpdateSchema, zodArabicError } from '@/lib/schemas';
 
 async function checkAdmin(request) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -22,14 +23,17 @@ export async function GET(request) {
 export async function POST(request) {
   if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    if (!data.username || !data.password || !data.name || !data.role) {
-      return NextResponse.json({ error: 'جميع الحقول مطلوبة' }, { status: 400 });
-    }
-    const id = await addUser(data);
+    const body = await request.json();
+    const parsed = UserSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const id = await addUser(parsed.data);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('[users] POST:', error);
+    // Kept after BUG-14: Zod validates shape (6-char password, role enum,
+    // required fields) but uniqueness is enforced at the DB layer. The
+    // bcryptjs hash + UNIQUE(username) catch stays in place.
     if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
       return NextResponse.json({ error: 'اسم المستخدم موجود مسبقاً' }, { status: 400 });
     }
@@ -40,7 +44,10 @@ export async function POST(request) {
 export async function PUT(request) {
   if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
+    const body = await request.json();
+    const parsed = UserUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+    const data = parsed.data;
     if (data.toggleActive) {
       await toggleUserActive(data.id);
     } else {

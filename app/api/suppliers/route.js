@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getSuppliers, addSupplier, deleteSupplier } from '@/lib/db';
+import { SupplierSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
 
 async function checkAuth(request) {
@@ -26,9 +27,15 @@ export async function POST(request) {
   // Sellers may upsert a supplier shell so the voice flow works
   if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    const result = await addSupplier(data);
+    const body = await request.json();
+    const parsed = SupplierSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const result = await addSupplier(parsed.data);
     invalidateCache(); // supplier list changed — rebuild entity-resolver index
+    // BUG-21: addSupplier may return { ambiguous, candidates, message }
+    // when the name already exists with no phone disambiguator. Passed
+    // through untouched for purchases/page.js to handle.
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error('[suppliers] POST:', err);

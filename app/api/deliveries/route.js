@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getDeliveries, addDelivery, updateDelivery, deleteDelivery } from '@/lib/db';
-import { DeliveryUpdateSchema, zodArabicError } from '@/lib/schemas';
+import { getDeliveries, addDelivery, updateDelivery, cancelDelivery } from '@/lib/db';
+import { DeliverySchema, DeliveryUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { sql } from '@vercel/postgres';
 
 async function checkAuth(request) {
@@ -48,8 +48,11 @@ export async function POST(request) {
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   if (!['admin','manager'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   try {
-    const data = await request.json();
-    data.createdBy = token.username; // audit trail
+    const body = await request.json();
+    const parsed = DeliverySchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
+    const data = { ...parsed.data, createdBy: token.username }; // audit trail
     const id = await addDelivery(data);
     return NextResponse.json({ success: true, id });
   } catch (err) {
@@ -136,7 +139,7 @@ export async function DELETE(request) {
   if (token.role !== 'admin') return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
   try {
     const { searchParams } = new URL(request.url);
-    await deleteDelivery(searchParams.get('id'));
+    await cancelDelivery(searchParams.get('id'));
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[deliveries] DELETE:', err);
