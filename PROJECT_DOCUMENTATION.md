@@ -650,3 +650,88 @@ add Sentry free tier:
 
 **Not a v1.0 requirement** — the current `console.error` + Vercel
 logs pattern is adequate for launch.
+
+---
+
+## 15. Accountant Compliance
+
+**Status:** Confirmed — all four compliance questions approved.
+**Confirmation date:** 2026-04-14
+**Channel:** Direct accountant review (user-mediated)
+
+### The four questions
+
+1. **Cash-basis accounting (Q1)**
+   Question: Is cash-basis accounting (recognizing profit only
+   upon full collection) legally acceptable in France for an SAS?
+   Answer: ✅ Approved.
+   Implication: [`getSummaryData()`](lib/db.js) dual-view P&L
+   (accrual + cash-basis) is legally valid. Profit recognition
+   waits for `remaining = 0` on each sale. See [§ 3.5 Cash-Basis
+   Accounting](#35-cash-basis-accounting) above.
+
+2. **Proportional TVA (Q2)**
+   Question: Is declaring TVA proportionally with each received
+   payment (amount ÷ 6) acceptable, or must TVA be declared in
+   full at delivery?
+   Answer: ✅ Approved.
+   Implication: Payment-time TVA calculation at
+   [`lib/db.js applyCollection()`](lib/db.js) and the payment row
+   insertion in `updateDelivery(confirm)` are correct. VAT is
+   reported as payments arrive, not at invoice issue. The
+   `totalVatCollected` aggregate in `getSummaryData()` sums
+   `payments.tva_amount` in the period.
+
+3. **Single facture, three states (Q3)**
+   Question: Is one invoice number evolving through three states
+   (EN ATTENTE → PARTIELLE → PAYÉE) acceptable, or must a
+   Facture d'acompte be issued at delivery separately from the
+   Facture définitive at full payment?
+   Answer: ✅ Approved.
+   Implication: [`lib/invoice-generator.js`](lib/invoice-generator.js)
+   three-state rendering is legally compliant.
+   [`lib/invoice-modes.js`](lib/invoice-modes.js)
+   `single_facture_three_states` mode is the production mode.
+   The `facture_d_acompte_separate` mode remains a
+   NOT_IMPLEMENTED stub for future regulatory changes.
+
+4. **Mentions légales (Q4)**
+   Question: Does the current facture template contain all
+   legally required mentions for an SAS in France (SIRET, SIREN,
+   APE, TVA, IBAN, BIC, Capital social, RCS, conditions de vente,
+   etc.)?
+   Answer: ✅ Approved — all required mentions present.
+   Implication: No changes to `lib/invoice-generator.js` needed.
+   The current layout at the `generateInvoiceHTML()` function is
+   legally compliant as-is.
+
+### Compliance guarantees
+
+- Cash-basis accounting is the production default
+- TVA is declared per payment, not per invoice
+- One invoice number per sale, evolving through three states
+- All mentions légales present in current template
+- Accountant review completed pre-delivery
+
+### What this means for operations
+
+- Sellers create sales with an expected down payment amount
+- Drivers collect the down payment at delivery
+- Admins record subsequent collections via
+  `/api/sales/[id]/collect` (specific sale) or
+  `/api/clients/[id]/collect` (FIFO walker across open sales)
+- Profit is recognized only when a sale reaches `remaining = 0`
+- VAT (20%) is tallied per collected payment for monthly
+  declarations
+- Invoice PDFs reflect the current state (pending / partial /
+  paid) at download time
+
+### Deferred regulatory scenarios (not active)
+
+- **`facture_d_acompte_separate` mode:** if French regulations
+  ever require separate Facture d'acompte + Facture définitive
+  documents, activate the stub at
+  [`lib/invoice-modes.js:28`](lib/invoice-modes.js#L28) and
+  implement the two-document flow per the accountant's updated
+  guidance. The stub currently throws `NOT_IMPLEMENTED` as a
+  forcing function so it cannot silently bypass compliance.

@@ -99,9 +99,10 @@ or in the first day of production use.
 
 ## Conditional (depends on Sessions 5 / 6)
 
-- [ ] **Session 5** — accountant compliance: Path A (approve as-is),
-      B (activate `facture_d_acompte_separate`), or C (new schema
-      requirements). Gated on accountant response.
+- [x] **Session 5** — accountant compliance: **Path A confirmed
+      on 2026-04-14.** Q1-Q4 approved, documentation-only update
+      (see [PROJECT_DOCUMENTATION.md § 15](../PROJECT_DOCUMENTATION.md)).
+      No code changes.
 - [ ] **Session 6** — voice feature decision: Path A (ship assist-only
       as-is), B (disable button until v1.1), or C (full rework).
       Gated on user voice testing results.
