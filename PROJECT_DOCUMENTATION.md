@@ -540,3 +540,113 @@ For non-trivial changes, this project uses **Three-Mind Architecture**: three pe
 | كاش / بنك / آجل | Cash / Bank / Credit |
 | نقدي | Cash (alt) |
 | إيجار / رواتب / صيانة | Rent / Salaries / Maintenance |
+
+---
+
+## 14. Error Monitoring and Observability
+
+### Where production errors go
+
+Every `console.error()` in an API route handler, every unhandled
+exception, and every 5xx response ends up in **Vercel Function Logs**.
+There is no external error aggregator configured — the only place to
+see what's going wrong in production is the Vercel dashboard.
+
+### How to access function logs
+
+1. https://vercel.com → Project `mohammad_nl` → **Deployments**
+2. Click the most recent production deployment (the one marked
+   "Production")
+3. Click the **Functions** tab
+4. Click any route (`/api/sales`, `/api/voice/process`, etc.)
+5. Click **Logs** — shows the last ~1 hour of invocations, newest first
+6. Filter by severity: `error` to isolate failures, `warn` for soft
+   failures
+
+**Shortcut:** `https://vercel.com/<team>/mohammad_nl/logs` goes
+directly to the logs for the current production deploy.
+
+**Log retention:** 1 hour on Hobby plan, 1 day on Pro, 7 days on
+Enterprise. Plan accordingly — if you need longer retention, enable
+Vercel's Log Drain integration to forward to an external store.
+
+### Critical routes to watch
+
+These are the routes where silent failures would cause the most
+business damage. Monitor their error rates during the first week
+after go-live.
+
+| Route | Why it matters | BUG-02 log pattern |
+|---|---|---|
+| `/api/sales/[id]/cancel` | Financial state change — wrong refund = wrong client balance | `[cancel] ...` / `[sale-cancel]` |
+| `/api/sales/[id]/collect` | Payment record insert — FEAT-04 collection flow | `[collect] error: ...` |
+| `/api/clients/[id]/collect` | FIFO walker — multi-sale atomic transaction | `[clients/collect] error: ...` |
+| `/api/voice/process` | Rate-limited, Groq failures, Whisper noise | `[voice/process] ...` |
+| `/api/invoices/[id]/pdf` | PDF generation failures = lost document trail | `[Invoice PDF]` |
+| `/api/auth/[...nextauth]` | Auth flow errors — wrong secret, wrong URL, JWT decode failures | Next-Auth internals (harder to grep) |
+| `/api/payments` | Legacy BUG-5A guard — should fire rarely now that FEAT-04 exists | `[payments] POST:` |
+
+### BUG-02 / BUG-07 log pattern
+
+The codebase uses a consistent `console.error` prefix convention from
+BUG-02 and BUG-07 so you can grep the logs:
+
+```js
+console.error('[sales] POST:', err);
+console.error('[voice/process] context lookup:', err);
+console.error('[cancel] commit error:', err);
+```
+
+When scanning Vercel logs, filter by the bracketed route tag to find
+the source module. Every silent `catch` across `app/api/**` was audited
+in BUG-02 and now emits a structured log line — anything that should
+go wrong will leave a fingerprint.
+
+### Known noise patterns to ignore
+
+- `[voice/process] context lookup:` 500ms timeouts during cold starts —
+  harmless, the catch block returns empty arrays and the request
+  still succeeds
+- `[voice/process] alias learning:` background fire-and-forget IIFE
+  errors — voice still returns the parsed result, only the alias
+  persistence silently fails
+- `[voice/process] voice_logs insert:` non-critical logging table
+  insert failures — voice still returns successfully
+- `[voice/process] getTopEntities:` similar — falls back to empty
+  entity list, voice still works
+- Next.js 16 RSC prefetch 404s on `/login?...` — harmless client-side
+  navigation noise
+
+### When to escalate
+
+Treat these as urgent and investigate the same day:
+
+- **Unhandled exceptions** (not `console.error` — actual 500s with
+  stack traces) — indicates a missed try/catch boundary
+- **Database connection failures** (`connection refused`, `SSL handshake
+  failed`, `password authentication failed`) — check Neon status page
+  first, then verify `POSTGRES_URL` hasn't been rotated accidentally
+- **Repeated auth failures** (429 rate-limit on CSRF, `getToken returned
+  null` loops) — possible NEXTAUTH_SECRET mismatch between env var
+  and signing key
+- **Voice route returning 500 with `GROQ_API_KEY missing`** — the env
+  var disappeared or was set for wrong scope
+- **Any `BONUS_CHOICE_REQUIRED` error reaching the user as a 500** —
+  the cancel dialog should catch this and show the bonus-choice UI;
+  if it's 500ing, the route layer needs investigation
+
+### v1.1 recommendation: Sentry
+
+Proactive alerting via Vercel function logs requires opening the
+dashboard and scanning. For a single-operator deployment this is
+usually fine. When the user base grows past ~50 daily active users,
+add Sentry free tier:
+
+- 5,000 events/month on free tier (more than enough for this app's
+  volume)
+- Email alerts on unhandled exceptions
+- Source maps for stack traces (trivial to configure with Next.js)
+- Integration guide: https://docs.sentry.io/platforms/javascript/guides/nextjs/
+
+**Not a v1.0 requirement** — the current `console.error` + Vercel
+logs pattern is adequate for launch.
