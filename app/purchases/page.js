@@ -190,11 +190,16 @@ function PurchasesContent() {
                 value={form.supplier}
                 onChange={(val) => setForm({ ...form, supplier: val })}
                 options={suppliers.map((s) => ({ name: s.name, value: s.name, label: s.name }))}
-                placeholder="اكتب اسم المورد..."
+                placeholder="Wahid Trading"
                 allowNew
                 newLabel="مورد جديد"
                 required
               />
+              {/* BUG-5 hotfix: Latin-only hint for French invoice compliance.
+                  Arabic input is still accepted — the backend auto-transliterates. */}
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                ℹ️ اسم المورد يجب أن يكون بالأحرف اللاتينية للفواتير
+              </div>
             </div>
             <div className="form-group">
               <label>المنتج *</label>

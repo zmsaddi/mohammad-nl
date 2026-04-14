@@ -146,7 +146,12 @@ function ClientsContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="client-name">اسم العميل *</label>
-                <input id="client-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="أدخل اسم العميل" required />
+                <input id="client-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ahmad Ali" required />
+                {/* BUG-5 hotfix: Latin-only hint for French invoice compliance.
+                    Arabic input is still accepted — the backend auto-transliterates. */}
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                  ℹ️ اسم العميل يجب أن يكون بالأحرف اللاتينية للفواتير (مثال: Ahmad, Samir)
+                </div>
               </div>
               <div className="form-group">
                 <label htmlFor="client-phone">رقم الهاتف</label>

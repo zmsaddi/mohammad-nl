@@ -261,11 +261,16 @@ function SalesContent() {
                   }
                 }}
                 options={clients.map((c) => ({ name: c.name, value: c.name, label: c.name, sub: c.phone || c.address || '', phone: c.phone, email: c.email, address: c.address }))}
-                placeholder="اكتب اسم العميل..."
+                placeholder="Ahmad Ali"
                 allowNew
                 newLabel="عميل جديد"
                 required
               />
+              {/* BUG-5 hotfix: Latin-only hint for French invoice compliance.
+                  Arabic input is still accepted — backend auto-transliterates. */}
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                ℹ️ اسم العميل بالأحرف اللاتينية (مثال: Ahmad, Samir)
+              </div>
             </div>
             <div className="form-group">
               <label htmlFor="sale-phone">هاتف العميل</label>
