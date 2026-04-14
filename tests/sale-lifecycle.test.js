@@ -131,6 +131,7 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     const result = await addSale({
       date:        today,
       clientName:  'Test Client',
+      clientAddress: 'Test Address',
       item:        'V20 Test Pro',
       quantity:    2,
       unitPrice:   1500,

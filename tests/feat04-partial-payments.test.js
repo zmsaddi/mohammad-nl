@@ -65,6 +65,7 @@ describe('FEAT-04: addSale downPaymentExpected', () => {
     const { saleId } = await addSale({
       date: today,
       clientName: 'F04 Client A',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 1,
       unitPrice: 1500,
@@ -81,6 +82,7 @@ describe('FEAT-04: addSale downPaymentExpected', () => {
     const { saleId } = await addSale({
       date: today,
       clientName: 'F04 Client B',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 2,
       unitPrice: 1500,
@@ -97,6 +99,7 @@ describe('FEAT-04: addSale downPaymentExpected', () => {
     const { saleId } = await addSale({
       date: today,
       clientName: 'F04 Client C',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 1,
       unitPrice: 1500,
@@ -113,6 +116,7 @@ describe('FEAT-04: addSale downPaymentExpected', () => {
       addSale({
         date: today,
         clientName: 'F04 Client D',
+        clientAddress: 'Test Address',
         item: 'FEAT04 Bike',
         quantity: 1,
         unitPrice: 1500,
@@ -144,6 +148,7 @@ describe('FEAT-04: updateDelivery(confirm) writes payment row', () => {
     const { saleId, deliveryId } = await addSale({
       date: today,
       clientName: 'F04 Cash Client',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 1,
       unitPrice: 1500,
@@ -185,6 +190,7 @@ describe('FEAT-04: updateDelivery(confirm) writes payment row', () => {
     const { saleId, deliveryId } = await addSale({
       date: today,
       clientName: 'F04 Partial Client',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 1,
       unitPrice: 1500,
@@ -225,6 +231,7 @@ describe('FEAT-04: updateDelivery(confirm) writes payment row', () => {
     const { saleId, deliveryId } = await addSale({
       date: today,
       clientName: 'F04 Pure Credit',
+      clientAddress: 'Test Address',
       item: 'FEAT04 Bike',
       quantity: 1,
       unitPrice: 1500,

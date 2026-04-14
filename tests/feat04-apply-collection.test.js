@@ -59,6 +59,9 @@ async function seedConfirmedCreditSale(opts = {}) {
     // throwing "ambiguous client" when the same name reappears across
     // multiple fixtures in the same test (e.g. the FIFO walker case).
     clientPhone: opts.clientPhone || `+31600${String(total).padStart(6, '0')}`,
+    // BUG-6 hotfix 2026-04-14: addSale requires an address when creating
+    // a new client. Test fixtures predate this rule — add a placeholder.
+    clientAddress: opts.clientAddress || 'Test Address',
     item: 'F04 Collect Bike',
     quantity: 1,
     unitPrice: total,
@@ -161,6 +164,7 @@ describe('FEAT-04: applyCollection', () => {
     const { saleId } = await addSale({
       date: today,
       clientName: 'F04 No-Confirm Client',
+      clientAddress: 'Test Address',
       item: 'F04 NoConfirm Bike',
       quantity: 1,
       unitPrice: 800,

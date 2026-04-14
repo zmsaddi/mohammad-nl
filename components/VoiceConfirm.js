@@ -330,10 +330,36 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                   )}
                 </div>
               </div>
-              <div>
-                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>عنوان التوصيل</label>
-                <input style={{ ...inputStyle, border: '1.5px solid #d1d5db' }} value={form.client_address || ''} onChange={(e) => setForm({ ...form, client_address: e.target.value })} placeholder="العنوان الكامل" />
-              </div>
+              {/* BUG-6 hotfix 2026-04-14: amber warning when voice extracted
+                  a new client name but no address. Backend enforces the
+                  requirement; this just guides the user before they click
+                  save. `isNewClient` matches the manual form's logic. */}
+              {(() => {
+                const isNewClient = form.client_name && !dbData.clients.some((c) => c.name === form.client_name);
+                const addressMissing = isNewClient && !form.client_address?.trim();
+                return (
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      عنوان التوصيل {isNewClient && <span style={{ color: '#f59e0b' }}>*</span>}
+                    </label>
+                    <input
+                      style={{
+                        ...inputStyle,
+                        border: addressMissing ? '2px solid #f59e0b' : '1.5px solid #d1d5db',
+                        background: addressMissing ? '#fffbeb' : undefined,
+                      }}
+                      value={form.client_address || ''}
+                      onChange={(e) => setForm({ ...form, client_address: e.target.value })}
+                      placeholder="العنوان الكامل"
+                    />
+                    {addressMissing && (
+                      <div style={{ fontSize: '0.72rem', color: '#92400e', marginTop: '3px' }}>
+                        ⚠️ عميل جديد — العنوان مطلوب للتوصيل
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>
                   المنتج {!dbData.products.some((p) => p.name === form.item) && form.item && <span style={{ color: '#f59e0b' }}>(جديد)</span>}

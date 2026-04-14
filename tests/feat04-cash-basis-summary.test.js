@@ -52,6 +52,7 @@ async function createConfirmed(name, price, dpe, date) {
   const { saleId, deliveryId } = await addSale({
     date,
     clientName: `Client-${name}`,
+    clientAddress: 'Test Address',
     item: name,
     quantity: 1,
     unitPrice: price,

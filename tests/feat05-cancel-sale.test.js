@@ -86,6 +86,7 @@ async function seedConfirmedSale() {
     date: today,
     clientName: 'FEAT05 Client',
     clientPhone: '+31601234567',
+    clientAddress: 'Test Address',
     item: 'FEAT05 Bike',
     quantity: 1,
     unitPrice: 1500,
@@ -391,6 +392,7 @@ describe('FEAT-05: cancelSale helper + entry-point parity', () => {
     const { saleId, deliveryId } = await addSale({
       date: today,
       clientName: 'FEAT05 Client',
+      clientAddress: 'Test Address',
       item: 'FEAT05 Bike',
       quantity: 1,
       unitPrice: 1500,

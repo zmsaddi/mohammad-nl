@@ -281,8 +281,39 @@ function SalesContent() {
               <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
             </div>
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label htmlFor="sale-address">عنوان التوصيل</label>
-              <input id="sale-address" type="text" value={form.clientAddress} onChange={(e) => setForm({ ...form, clientAddress: e.target.value })} placeholder="العنوان الكامل للتوصيل" />
+              {/* BUG-6 hotfix 2026-04-14: delivery address is required when
+                  the sale creates a new client. Existing clients inherit
+                  their stored address. `isNewClient` is true whenever the
+                  typed client name doesn't match any row in the clients
+                  list fetched at page load. Amber border + warning only
+                  when (new client AND empty address). */}
+              {(() => {
+                const isNewClient = form.clientName && !clients.some((c) => c.name === form.clientName);
+                const addressMissing = isNewClient && !form.clientAddress?.trim();
+                return (
+                  <>
+                    <label htmlFor="sale-address">
+                      عنوان التوصيل {isNewClient && <span style={{ color: '#f59e0b' }}>*</span>}
+                    </label>
+                    <input
+                      id="sale-address"
+                      type="text"
+                      value={form.clientAddress}
+                      onChange={(e) => setForm({ ...form, clientAddress: e.target.value })}
+                      placeholder="العنوان الكامل للتوصيل"
+                      style={{
+                        border: addressMissing ? '2px solid #f59e0b' : undefined,
+                        background: addressMissing ? '#fffbeb' : undefined,
+                      }}
+                    />
+                    {addressMissing && (
+                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: '4px' }}>
+                        ⚠️ عميل جديد — العنوان مطلوب للتوصيل
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
             <div className="form-group">
               <label htmlFor="sale-product">الصنف * (من المخزون)</label>
