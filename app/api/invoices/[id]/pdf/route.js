@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import { getToken }     from 'next-auth/jwt';
 import { sql }          from '@vercel/postgres';
 import { getSettings }  from '@/lib/db';
-import { generateInvoiceHTML } from '@/lib/invoice-generator';
+import { generateInvoiceBody } from '@/lib/invoice-modes';
 
 export async function GET(request, { params }) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -25,10 +25,18 @@ export async function GET(request, { params }) {
     // Next.js 16: params is a Promise
     const { id } = await params;
 
-    // Look up by ref_code first, then by numeric id
+    // Look up by ref_code first, then by numeric id.
+    // FEAT-04: LEFT JOIN sales so the generator receives payment_status
+    // and down_payment_expected for three-state rendering.
     const numericId = parseInt(id, 10) || 0;
     const { rows: invRows } = await sql`
-      SELECT * FROM invoices WHERE ref_code = ${id} OR id = ${numericId}
+      SELECT
+        i.*,
+        s.payment_status,
+        s.down_payment_expected
+      FROM invoices i
+      LEFT JOIN sales s ON s.id = i.sale_id
+      WHERE i.ref_code = ${id} OR i.id = ${numericId}
     `;
     if (!invRows.length) {
       return NextResponse.json({ error: 'الفاتورة غير موجودة' }, { status: 404 });
@@ -50,8 +58,19 @@ export async function GET(request, { params }) {
       }
     }
 
+    // FEAT-04: fetch collection payment history for this sale.
+    // Used by the generator to render the payments history block +
+    // compute the correct state pill.
+    const { rows: paymentRows } = await sql`
+      SELECT date, amount, payment_method, tva_amount
+      FROM payments
+      WHERE sale_id = ${invoice.sale_id}
+        AND type = 'collection'
+      ORDER BY date ASC, id ASC
+    `;
+
     const settings = await getSettings();
-    const html = generateInvoiceHTML(invoice, settings);
+    const html = generateInvoiceBody(invoice, settings, paymentRows);
 
     return new NextResponse(html, {
       status: 200,

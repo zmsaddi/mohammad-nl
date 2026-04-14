@@ -141,6 +141,11 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
       submitData.clientPhone = form.client_phone || '';
       submitData.clientAddress = form.client_address || '';
       submitData.clientEmail = form.client_email || '';
+      // FEAT-04: pass through the down_payment_expected value. Empty string
+      // means "use server-side reactive default based on payment_type".
+      if (form.down_payment_expected !== undefined && form.down_payment_expected !== '') {
+        submitData.downPaymentExpected = parseFloat(form.down_payment_expected) || 0;
+      }
     } else if (action === 'register_purchase') {
       endpoint = '/api/purchases';
       submitData.unitPrice = form.unit_price;
@@ -351,11 +356,38 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>طريقة الدفع</label>
-                <select style={fi('payment_type')} value={form.payment_type || 'كاش'} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
+                <select style={fi('payment_type')} value={form.payment_type || 'كاش'} onChange={(e) => {
+                  const newPT = e.target.value;
+                  const defaultDpe = newPT === 'آجل' ? 0 : (form.quantity || 0) * (form.unit_price || 0);
+                  setForm({ ...form, payment_type: newPT, down_payment_expected: defaultDpe });
+                }}>
                   <option value="كاش">كاش (عند التوصيل)</option>
                   <option value="بنك">بنك (تحويل)</option>
                   <option value="آجل">آجل (دين)</option>
                 </select>
+              </div>
+              {/* FEAT-04: down_payment_expected with reactive default.
+                  On first render (data landing from /api/voice/process) we
+                  seed the field if the server didn't. Editable by seller. */}
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#64748b' }}>الدفعة المقدمة المتوقعة (€)</label>
+                <input
+                  style={{ ...inputStyle, border: '1.5px solid #d1d5db' }}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={(() => {
+                    if (form.down_payment_expected !== undefined && form.down_payment_expected !== null && form.down_payment_expected !== '') {
+                      return form.down_payment_expected;
+                    }
+                    return form.payment_type === 'آجل' ? 0 : (form.quantity || 0) * (form.unit_price || 0);
+                  })()}
+                  onChange={(e) => setForm({ ...form, down_payment_expected: e.target.value })}
+                  placeholder="يُحسب تلقائياً حسب طريقة الدفع"
+                />
+                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                  المتبقي بعد التوصيل: {formatNumber(Math.max(0, ((form.quantity || 0) * (form.unit_price || 0)) - (parseFloat(form.down_payment_expected !== undefined && form.down_payment_expected !== '' ? form.down_payment_expected : (form.payment_type === 'آجل' ? 0 : (form.quantity || 0) * (form.unit_price || 0))) || 0)))}
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#64748b' }}>ملاحظات</label>

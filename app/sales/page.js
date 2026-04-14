@@ -42,8 +42,12 @@ function SalesContent() {
     quantity: '',
     unitPrice: '',
     paymentType: 'كاش',
+    downPaymentExpected: '',
     notes: '',
   });
+  // FEAT-04: track whether user manually edited down_payment_expected so
+  // we don't clobber their input on subsequent paymentType/total changes.
+  const [downPaymentTouched, setDownPaymentTouched] = useState(false);
 
   // Smart auto-fill: when client name matches, fill all their info
   const handleClientChange = (name) => {
@@ -58,6 +62,21 @@ function SalesContent() {
   };
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
+
+  // FEAT-04: reactive default for down_payment_expected. Updates whenever
+  // paymentType or total changes UNLESS the user manually edited the field.
+  // Defaults: كاش/بنك → full total, آجل → 0.
+  useEffect(() => {
+    if (downPaymentTouched) return;
+    const defaultVal = form.paymentType === 'آجل' ? 0 : total;
+    setForm((prev) => ({ ...prev, downPaymentExpected: defaultVal > 0 ? String(defaultVal) : '' }));
+  }, [form.paymentType, total, downPaymentTouched]);
+
+  const dpeNum = parseFloat(form.downPaymentExpected) || 0;
+  const dpeError = form.downPaymentExpected !== '' && (dpeNum < 0 || dpeNum > total + 0.005)
+    ? `الدفعة المقدمة يجب أن تكون بين 0 و ${total}`
+    : '';
+  const remainingPreview = Math.max(0, total - dpeNum);
 
   // BUG-30: reactive price-floor check. Recomputes on every render from
   // form.item + form.unitPrice + products + role. Used to:
@@ -123,6 +142,12 @@ function SalesContent() {
       addToast(priceFloorError, 'error');
       return;
     }
+    // FEAT-04: down payment validation (belt & suspenders — submit button
+    // is already disabled when dpeError is set)
+    if (dpeError) {
+      addToast(dpeError, 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       // Auto-create client if new
@@ -168,7 +193,8 @@ function SalesContent() {
           setWhatsappShare(shareData);
         }
 
-        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', notes: '' });
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', downPaymentExpected: '', notes: '' });
+        setDownPaymentTouched(false);
         fetchData();
       } else {
         const err = await res.json();
@@ -379,6 +405,29 @@ function SalesContent() {
                   سيُسجل كدين على العميل - يُدفع لاحقاً من صفحة تفاصيل العميل
                 </div>
               )}
+            </div>
+            {/* FEAT-04: down_payment_expected with reactive default + validation */}
+            <div className="form-group">
+              <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
+              <input
+                id="sale-dpe"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.downPaymentExpected}
+                onChange={(e) => {
+                  setDownPaymentTouched(true);
+                  setForm({ ...form, downPaymentExpected: e.target.value });
+                }}
+                placeholder={form.paymentType === 'آجل' ? '0 (اختياري — لفرض دفعة مقدمة على الدين)' : String(total)}
+                style={{
+                  border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
+                  background: dpeError ? '#fef2f2' : undefined,
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
+                {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
+              </div>
             </div>
             <div className="form-group">
               <label htmlFor="sale-notes">ملاحظات</label>

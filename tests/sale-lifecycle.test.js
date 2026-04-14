@@ -201,6 +201,19 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     expect(parseFloat(sale[0].paid_amount)).toBe(3000);
     expect(parseFloat(sale[0].remaining)).toBe(0);
     expect(sale[0].vin).toBe('TEST-VIN-001');
+    // FEAT-04: confirm also sets payment_status and writes a payments row
+    // for the collected down_payment_expected (default = full total on كاش).
+    expect(sale[0].payment_status).toBe('paid');
+
+    const { rows: collections } = await sql`
+      SELECT * FROM payments
+      WHERE sale_id = ${ctx.saleId} AND type = 'collection'
+    `;
+    expect(collections).toHaveLength(1);
+    expect(parseFloat(collections[0].amount)).toBe(3000);
+    expect(collections[0].payment_method).toBe('كاش');
+    // TVA proportional: 3000 / 6 = 500
+    expect(parseFloat(collections[0].tva_amount)).toBeCloseTo(500, 2);
 
     // Invoice row created.
     const { rows: inv } = await sql`SELECT * FROM invoices WHERE sale_id = ${ctx.saleId}`;

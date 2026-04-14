@@ -256,18 +256,22 @@ describe('FEAT-05: cancelSale helper + entry-point parity', () => {
 
   // ──────────────────────────────────────────────────────────────────────
   // Test 5: preview mode — no writes, correct shape.
-  // Note: refundAmount is 0 under pre-FEAT-04 behavior because
-  // updateDelivery(confirm) sets sales.paid_amount directly without
-  // inserting a payments row. The payment-row-per-collection behavior
-  // is FEAT-04's (Session 3). Once that lands, refundAmount will
-  // reflect the sum of actually-collected payments.
+  // FEAT-04 ACTIVATION: this test was flipped from refundAmount === 0 to
+  // refundAmount === 1500. Before FEAT-04 updateDelivery(confirm) set
+  // sales.paid_amount directly without inserting a payments row, so the
+  // cancelSale step-5 refund walker had nothing to return. Now that
+  // updateDelivery(confirm) writes a `type='collection'` payment row
+  // matching down_payment_expected, the refund walker picks up the
+  // seeded 1500€ payment and reports it to the preview caller.
   // ──────────────────────────────────────────────────────────────────────
-  it('previewCancelSale returns preview shape without any writes', async () => {
+  it('previewCancelSale returns preview shape without any writes (FEAT-04 activated)', async () => {
     const { saleId } = await seedConfirmedSale();
 
     const result = await previewCancelSale(saleId, 'test-admin');
 
-    expect(result.refundAmount).toBe(0);
+    // FEAT-04: seeded sale is كاش with default dpe = total = 1500, so
+    // updateDelivery(confirm) wrote a 1500€ collection payment row.
+    expect(result.refundAmount).toBe(1500);
     expect(result.preview.saleId).toBe(saleId);
     expect(result.preview.clientName).toBe('FEAT05 Client');
     expect(result.preview.item).toBe('FEAT05 Bike');

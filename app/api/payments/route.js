@@ -31,12 +31,15 @@ export async function POST(request) {
     const parsed = PaymentSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
 
-    // BUG 5A — block payments against cancelled or non-credit sales.
-    // Without this guard, an admin could record a debt payment on a refunded
-    // sale and silently corrupt the client's balance.
+    // BUG 5A — block payments against cancelled or already-settled sales.
+    // FEAT-04: the old guard checked payment_type !== 'آجل' which would
+    // reject a partial cash/bank sale collecting its remainder later. The
+    // new guard checks payment_status, which is set by updateDelivery(confirm)
+    // to 'paid' when fully collected and 'partial' otherwise. Only sales
+    // marked 'paid' reject further payments.
     if (parsed.data.saleId) {
       const { rows } = await sql`
-        SELECT status, payment_type FROM sales WHERE id = ${parsed.data.saleId}
+        SELECT status, payment_status FROM sales WHERE id = ${parsed.data.saleId}
       `;
       if (!rows.length) {
         return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
@@ -44,8 +47,8 @@ export async function POST(request) {
       if (rows[0].status === 'ملغي') {
         return NextResponse.json({ error: 'لا يمكن تسجيل دفعة على طلب ملغي' }, { status: 400 });
       }
-      if (rows[0].payment_type !== 'آجل') {
-        return NextResponse.json({ error: 'هذا الطلب ليس آجلاً — لا يوجد دين لتسديده' }, { status: 400 });
+      if (rows[0].payment_status === 'paid') {
+        return NextResponse.json({ error: 'هذا الطلب مدفوع بالكامل — لا يوجد دين لتسديده' }, { status: 400 });
       }
     }
 

@@ -301,6 +301,62 @@ function SummaryContent() {
             </div>
           </div>
 
+          {/* FEAT-04: Cash-basis P&L card. Displays revenue/COGS/gross/net
+              computed ONLY from fully-paid sales (payment_status = 'paid').
+              Shown alongside the accrual P&L above so the user can see
+              both "what I booked" and "what I actually collected". */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #0ea5e9' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#0369a1' }}>
+              قائمة الأرباح والخسائر — على أساس التحصيل الفعلي
+            </h3>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
+              (المبيعات المحصّلة بالكامل فقط — الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 500 }}>إيرادات محصّلة ({data.paidSalesCount || 0})</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#075985' }}>{formatNumber(data.totalRevenueCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة المحصّل</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGSCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#ecfeff', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0891b2', fontWeight: 500 }}>الربح الإجمالي (محصّل)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.grossProfitCashBasis || 0) >= 0 ? '#0891b2' : '#dc2626' }}>{formatNumber(data.grossProfitCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: (data.netProfitCashBasis || 0) >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>
+                <div style={{ fontSize: '0.8rem', color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626', fontWeight: 500 }}>صافي الربح (محصّل)</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>{formatNumber(data.netProfitCashBasis || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* FEAT-04: Pending collections + period VAT widget */}
+          {((data.pendingRevenue || 0) > 0 || (data.totalVatCollected || 0) > 0) && (
+            <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #f59e0b' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#92400e' }}>
+                التحصيلات والضريبة
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+                <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 500 }}>المبلغ المستحق التحصيل ({data.partialSalesCount || 0})</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309' }}>{formatNumber(data.pendingRevenue || 0)}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#92400e', marginTop: '4px' }}>
+                    TVA ضمن المتبقي: {formatNumber(data.pendingTva || 0)}
+                  </div>
+                </div>
+                <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 500 }}>TVA محصّلة في الفترة</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#5b21b6' }}>{formatNumber(data.totalVatCollected || 0)}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#6d28d9', marginTop: '4px' }}>
+                    من المدفوعات فعلياً
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Reserved Orders */}
           {(data.reservedCount > 0) && (
             <div className="card" style={{ marginBottom: '24px', padding: '16px', borderRight: '4px solid #f59e0b' }}>

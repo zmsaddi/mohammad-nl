@@ -469,16 +469,48 @@ function DeliveriesContent() {
             <div style={{ margin: '16px 0', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
               <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>العميل: <strong style={{ color: '#1e293b' }}>{confirmDelivery.row.client_name}</strong></div>
               <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>الأصناف: <strong style={{ color: '#1e293b' }}>{confirmDelivery.row.items}</strong></div>
-              {confirmDelivery.row.total_amount > 0 && (
-                <div style={{ padding: '12px', background: confirmDelivery.row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', borderRadius: '10px', textAlign: 'center', marginTop: '12px' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    {confirmDelivery.row.payment_type === 'آجل' ? 'دين على العميل' : 'المبلغ المطلوب تحصيله'}
+              {/* FEAT-04: driver collects the down_payment_expected amount
+                  set by the seller, NOT the full total. The BUG-04 rebuild
+                  pattern at app/api/deliveries/route.js already strips any
+                  driver-sent amounts from the PUT body, so display-only is
+                  safe. When dpe is 0 (pure credit sale) show "credit" pill;
+                  when dpe > 0 show the exact amount to collect + any
+                  remainder as a "debt" hint. */}
+              {(() => {
+                const dpe = parseFloat(confirmDelivery.row.down_payment_expected) || 0;
+                const totalAmt = parseFloat(confirmDelivery.row.total_amount) || 0;
+                const salePaymentType = confirmDelivery.row.sale_payment_type || confirmDelivery.row.payment_type;
+                const remainingAfter = Math.max(0, totalAmt - dpe);
+
+                if (totalAmt <= 0) return null;
+
+                if (dpe <= 0 && salePaymentType === 'آجل') {
+                  return (
+                    <div style={{ padding: '12px', background: '#fef3c7', borderRadius: '10px', textAlign: 'center', marginTop: '12px' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>دين على العميل — لا تحصّل شيء الآن</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#d97706' }}>
+                        إجمالي الدين: {formatNumber(totalAmt)}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ padding: '12px', background: remainingAfter > 0 ? '#ffedd5' : '#dcfce7', borderRadius: '10px', textAlign: 'center', marginTop: '12px' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      المبلغ المطلوب تحصيله الآن
+                    </div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: remainingAfter > 0 ? '#9a3412' : '#16a34a' }}>
+                      {formatNumber(dpe)}
+                    </div>
+                    {remainingAfter > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#9a3412', marginTop: '6px' }}>
+                        المتبقي بعد هذه الدفعة: {formatNumber(remainingAfter)} (يُحصّل لاحقاً)
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: confirmDelivery.row.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>
-                    {formatNumber(confirmDelivery.row.total_amount)}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
             <div className="modal-actions">
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'vin' })}>

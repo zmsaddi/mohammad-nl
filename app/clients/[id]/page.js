@@ -19,10 +19,15 @@ function ClientDetailContent({ params }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // FEAT-04: collection form now captures amount + method + optional
+  // sale picker. FIFO is the default — amount walks across all open
+  // credit sales oldest-first via POST /api/clients/[id]/collect.
+  // When the user picks a specific sale, the form POSTs to
+  // /api/sales/[id]/collect instead.
   const [paymentForm, setPaymentForm] = useState({
-    date: getTodayDate(),
     amount: '',
-    notes: '',
+    paymentMethod: 'كاش',
+    saleId: '', // '' = FIFO
   });
 
   const fetchData = async () => {
@@ -54,28 +59,36 @@ function ClientDetailContent({ params }) {
 
   const handlePayment = async (e) => {
     e.preventDefault();
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+    const amount = parseFloat(paymentForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       addToast('يرجى إدخال مبلغ صحيح', 'error');
       return;
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/payments', {
+      // FEAT-04: route selection — sale picker or FIFO walker
+      const endpoint = paymentForm.saleId
+        ? `/api/sales/${paymentForm.saleId}/collect`
+        : `/api/clients/${id}/collect`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: paymentForm.date,
-          clientName: client.name,
-          amount: paymentForm.amount,
-          notes: paymentForm.notes,
+          amount,
+          paymentMethod: paymentForm.paymentMethod,
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        addToast('تم تسجيل الدفعة بنجاح');
-        setPaymentForm({ date: getTodayDate(), amount: '', notes: '' });
+        if (data.applied && Array.isArray(data.applied) && data.applied.length > 1) {
+          addToast(`تم توزيع الدفعة على ${data.applied.length} طلبات`);
+        } else {
+          addToast('تم تسجيل الدفعة بنجاح');
+        }
+        setPaymentForm({ amount: '', paymentMethod: 'كاش', saleId: '' });
         fetchData();
       } else {
-        addToast('خطأ في تسجيل الدفعة', 'error');
+        addToast(data.error || 'خطأ في تسجيل الدفعة', 'error');
       }
     } catch {
       addToast('خطأ في الاتصال', 'error');
@@ -83,6 +96,14 @@ function ClientDetailContent({ params }) {
       setSubmitting(false);
     }
   };
+
+  // Open sales for the sale picker (FIFO alternative)
+  const openSales = sales.filter((s) =>
+    s.status === 'مؤكد' &&
+    parseFloat(s.remaining) > 0.005 &&
+    s.payment_status !== 'paid'
+  );
+  const tvaPreview = (parseFloat(paymentForm.amount) || 0) / 6;
 
   if (loading) {
     return (
@@ -149,7 +170,7 @@ function ClientDetailContent({ params }) {
         </div>
       </div>
 
-      {/* Payment Form */}
+      {/* Payment Form — FEAT-04: method + FIFO/sale-picker + live TVA preview */}
       {client.remainingDebt > 0 && (
         <div className="card" style={{ marginBottom: '24px', borderColor: '#fbbf24', borderWidth: '2px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
@@ -158,17 +179,59 @@ function ClientDetailContent({ params }) {
           <form onSubmit={handlePayment}>
             <div className="form-grid">
               <div className="form-group">
-                <label>التاريخ *</label>
-                <input type="date" value={paymentForm.date} onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })} required />
+                <label>المبلغ (€) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  placeholder="0"
+                  required
+                />
               </div>
               <div className="form-group">
-                <label>المبلغ *</label>
-                <input type="number" min="0" step="any" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} placeholder="0" required />
+                <label>طريقة الدفع *</label>
+                <div className="radio-group" style={{ marginTop: '6px' }}>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="collect-method"
+                      value="كاش"
+                      checked={paymentForm.paymentMethod === 'كاش'}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                    />
+                    كاش
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="collect-method"
+                      value="بنك"
+                      checked={paymentForm.paymentMethod === 'بنك'}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                    />
+                    بنك
+                  </label>
+                </div>
               </div>
-              <div className="form-group">
-                <label>ملاحظات</label>
-                <input type="text" value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} placeholder="ملاحظات" />
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label>الطلب (اختياري)</label>
+                <select
+                  value={paymentForm.saleId}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, saleId: e.target.value })}
+                >
+                  <option value="">FIFO — توزيع تلقائي على الطلبات الأقدم أولاً</option>
+                  {openSales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      #{s.id} — {s.date} — متبقي {formatNumber(s.remaining)} €
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b', margin: '8px 0 12px' }}>
+              TVA المحتسبة (20%): <strong>{formatNumber(tvaPreview)}</strong> €
             </div>
             <button type="submit" className="btn btn-success" disabled={submitting}>
               {submitting ? 'جاري التسجيل...' : 'تسجيل الدفعة'}
