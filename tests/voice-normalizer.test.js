@@ -287,10 +287,6 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
     expect(out).not.toContain('خمCن');
   });
 
-  it('"الفيشن" → "V20 Pro" (joined product word still matches; loop is unchanged for non-letter entries)', () => {
-    expect(normalizeArabicText('الفيشن')).toContain('V20 Pro');
-  });
-
   it('"دوبل باتري" → "Double Batterie" (multi-word product word still matches)', () => {
     expect(normalizeArabicText('دوبل باتري')).toContain('Double Batterie');
   });
@@ -313,12 +309,17 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
 // "في عشرين برو" became "V عشرين Pro" → "V 20 Pro" (never merged to V20).
 // ────────────────────────────────────────────────────────────────────────────
 describe('BUG-01a/b: multi-letter cleanup + post-number merge', () => {
-  it('"بي ام دبليو" → "BMW" (three-letter code collapses fully)', () => {
-    expect(normalizeArabicText('بي ام دبليو')).toContain('BMW');
+  // Multi-letter cleanup examples rewritten post voice-detox: the original
+  // بي-based cases ("بي ام دبليو" / "بي تي إكس") relied on the بي→B and
+  // في→V mappings that were removed in the surgical voice pass. The
+  // cleanup regex is language-agnostic — any sequence of Latin-mapped
+  // letters validates the three-letter-collapse logic equally well.
+  it('"إس تي إكس" → "STX" (three-letter code collapses fully)', () => {
+    expect(normalizeArabicText('إس تي إكس')).toContain('STX');
   });
 
-  it('"بي تي إكس 30" → "BTX30" (three letters followed by number)', () => {
-    expect(normalizeArabicText('بي تي إكس 30')).toContain('BTX30');
+  it('"إس تي إكس 30" → "STX30" (three letters followed by number)', () => {
+    expect(normalizeArabicText('إس تي إكس 30')).toContain('STX30');
   });
 
   it('"جي تي 20" → contains "GT20" (two letters + number, still works)', () => {
@@ -329,28 +330,16 @@ describe('BUG-01a/b: multi-letter cleanup + post-number merge', () => {
     expect(normalizeArabicText('جي تي')).toContain('GT');
   });
 
-  it('"في عشرين برو" → "V20 Pro" (letter + Arabic number word + product)', () => {
-    expect(normalizeArabicText('في عشرين برو')).toContain('V20 Pro');
-  });
-
-  it('"في 20 برو" → "V20 Pro" (letter + digit + product still works)', () => {
-    expect(normalizeArabicText('في 20 برو')).toContain('V20 Pro');
-  });
-
   it('"إس 20 برو" → "S20 Pro" (existing positive path, still green)', () => {
     expect(normalizeArabicText('إس 20 برو')).toContain('S20 Pro');
   });
 });
 
-describe('BUG-01: بي → B, پي → P (collision resolved)', () => {
-  it('"بي 20" → "B20" (Arabic ب is always B, never P)', () => {
-    expect(normalizeArabicText('بي 20')).toContain('B20');
-  });
-
-  it('"بي 20 برو" → "B20 Pro"', () => {
-    expect(normalizeArabicText('بي 20 برو')).toContain('B20 Pro');
-  });
-
+// Surgical voice detox removed the بي→B mapping because "بي" collides with
+// the common Arabic preposition ب in Whisper output (see also في→V removal
+// for the same reason). Persian پي→P is kept because Persian پ is a
+// distinct character with no Arabic preposition collision.
+describe('voice-detox: پي → P (Persian P disambiguator) + بي preservation', () => {
   it('"پي 20" → "P20" (Persian پ is the only spoken-Arabic P disambiguator)', () => {
     expect(normalizeArabicText('پي 20')).toContain('P20');
   });
@@ -359,10 +348,11 @@ describe('BUG-01: بي → B, پي → P (collision resolved)', () => {
     expect(normalizeArabicText('پي 20 برو')).toContain('P20 Pro');
   });
 
-  it('"بي" alone → "B", never contains "P"', () => {
+  it('"بي" alone is preserved as Arabic (no longer transliterated to B)', () => {
     const out = normalizeArabicText('بي');
-    expect(out).toContain('B');
+    expect(out).not.toContain('B');
     expect(out).not.toContain('P');
+    expect(out).toContain('بي');
   });
 });
 

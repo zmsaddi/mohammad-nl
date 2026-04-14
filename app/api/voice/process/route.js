@@ -12,6 +12,9 @@ import { buildVoiceSystemPrompt } from '@/lib/voice-prompt-builder';
 // BUG-28: phrase blacklist + soft-warning heuristic for hallucination defense.
 // Checks run between Whisper transcription and LLM extraction.
 import { isBlacklisted, isSuspiciouslyLongWithoutAction } from '@/lib/voice-blacklist';
+// Rule-based action classifier (sale/purchase/expense) — used as post-LLM
+// override so explicit verbs always win over Llama's classification.
+import { classifyAction } from '@/lib/voice-action-classifier';
 
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
@@ -73,16 +76,19 @@ export async function POST(request) {
           return { products: [], clients: [], suppliers: [], aliases: [] };
         });
 
+        // Action verbs + payment terms + color/variant keywords ONLY.
+        // Product-specific nicknames were removed in the surgical voice detox
+        // pass — they caused Whisper to bias toward hardcoded SKUs and the
+        // topEntities + full-catalog passes below already inject real DB
+        // product names when they exist.
         const PRIORITY_TERMS = [
-          // 1. Action verbs — critical
+          // 1. Action verbs — critical for classification
           'بعت', 'شريت', 'اشتريت', 'جبت', 'سلّمت', 'مصروف', 'صرفت', 'دفعت',
           // 2. Payment terms
           'كاش', 'بنك', 'آجل', 'نقدي', 'تحويل', 'دين',
-          // 3. Color / variant keywords
+          // 3. Color / variant keywords (language-level, not catalog-level)
           'أسود', 'سوداء', 'رمادي', 'أبيض', 'أزرق', 'أحمر', 'أخضر',
           'دوبل باتري', 'سينجل', 'NFC', 'بلوتوث',
-          // 4. Product model words
-          'برو', 'ليمتد', 'كروس', 'ماكس', 'ميني', 'الفيشن', 'الليمتد', 'الكروس', 'الطوي',
         ];
 
         const seen = new Set();
@@ -188,6 +194,12 @@ export async function POST(request) {
     // fabricates a full paragraph about the weather).
     const suspiciousLength = isSuspiciouslyLongWithoutAction(normalized);
 
+    // Rule-based action hint: computed BEFORE the LLM call, used as a
+    // post-LLM OVERRIDE below so an explicit verb ("بعت" / "اشتريت" /
+    // "دفعت") always wins over Llama's classification. Protects against
+    // sale↔purchase misclassification on ambiguous or mis-heard verbs.
+    const ruleAction = classifyAction(normalized);
+
     const { products, clients, suppliers, patterns, corrections, recentSales, recentPurchases, topClients, recentClientNames, recentSupplierNames } = dbResult;
 
     // DONE: Step 3C — system prompt built from the shared lib/voice-prompt-builder.js
@@ -248,19 +260,31 @@ export async function POST(request) {
       parsed.amount = parsed.amount ? parseFloat(parsed.amount) || null : null;
     }
 
+    // Warnings accumulator — populated by action override, entity resolver,
+    // BUG-30 floor, and the suspicious-length heuristic below.
+    const warnings = [];
+
     // === DETERMINE ACTION ===
     const ACTION_MAP = { sale: 'register_sale', purchase: 'register_purchase', expense: 'register_expense' };
     let action;
     if (parsed.action === 'clarification') {
-      const t = normalized.toLowerCase();
-      action = t.includes('بعت') || t.includes('بيع') ? 'register_sale' : t.includes('اشتريت') || t.includes('شريت') || t.includes('شراء') ? 'register_purchase' : 'register_expense';
+      // Clarification fallback: defer to the rule-based classifier, else expense.
+      // The inline verb-keyword chain that used to live here was promoted to
+      // lib/voice-action-classifier.js during the surgical voice detox pass.
+      action = ruleAction ? `register_${ruleAction}` : 'register_expense';
       parsed = { ...parsed.partial_data, ...parsed };
     } else {
       action = ACTION_MAP[parsed.action] || parsed.action;
     }
 
-    // DONE: Step 3E — geminiError removed; Groq is the only model so no fallback warning
-    const warnings = [];
+    // Post-LLM override: if an explicit sale/purchase/expense verb was
+    // detected in the normalized transcription and the LLM's classification
+    // disagrees, trust the verb. Protects accounting integrity against
+    // sale↔purchase misclassification.
+    if (ruleAction && action !== `register_${ruleAction}`) {
+      warnings.push('صحّحت التصنيف بناءً على فعل صريح في الكلام');
+      action = `register_${ruleAction}`;
+    }
 
     // === ENTITY RESOLUTION (uses pre-fetched context) ===
     const entityContext = { recentClients: recentClientNames, recentSuppliers: recentSupplierNames };
@@ -437,8 +461,10 @@ export async function POST(request) {
       warnings.push('لم أتعرف على عملية محددة في هذا الكلام — راجع الحقول بعناية');
     }
 
-    // FIXED: 2 — surface "add new product?" suggestion to the UI
-    const responseBody = { action, data: parsed, warnings, transcript: raw, normalized, missing_fields };
+    // FIXED: 2 — surface "add new product?" suggestion to the UI.
+    // _schema: bump when the extraction output shape changes so v1.1
+    // frontends can gate on it instead of breaking silently.
+    const responseBody = { _schema: 1, action, data: parsed, warnings, transcript: raw, normalized, missing_fields };
     if (parsed.isNewProduct === true) {
       warnings.push('المنتج غير موجود في القاعدة — هل تريد إضافته؟');
       responseBody.suggestAddProduct = true;

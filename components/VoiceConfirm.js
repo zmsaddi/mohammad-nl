@@ -187,6 +187,9 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                 }}>{label}</button>
               ))}
             </div>
+            <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 500 }}>
+              🔬 وضع المساعد التجريبي — راجع كل حقل قبل الحفظ
+            </div>
           </div>
           <button className="detail-modal-close" onClick={onCancel}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="20" height="20">
@@ -206,11 +209,22 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
             </div>
           )}
 
-          {missingFields.length > 0 && (
-            <div style={{ background: '#fff7ed', padding: '6px 12px', borderRadius: '8px', marginBottom: '8px', fontSize: '0.75rem', color: '#c2410c' }}>
-              الحقول المميزة بالبرتقالي لم يفهمها الذكاء الاصطناعي — يرجى مراجعتها
-            </div>
-          )}
+          {/* Unconditional review banner. Copy adapts to whether the LLM
+              flagged any missing fields. Catches confident-but-wrong LLM
+              extractions that populate every field but still need review. */}
+          <div style={{
+            background: missingFields.length > 0 ? '#fff7ed' : '#eff6ff',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            marginBottom: '8px',
+            fontSize: '0.75rem',
+            color: missingFields.length > 0 ? '#c2410c' : '#1e40af',
+            border: missingFields.length > 0 ? '1px solid #fdba74' : '1px solid #bfdbfe',
+          }}>
+            {missingFields.length > 0
+              ? 'الحقول المميزة بالبرتقالي لم يفهمها الذكاء الاصطناعي — يرجى مراجعتها'
+              : '✓ تأكد من صحة كل الحقول قبل الحفظ'}
+          </div>
 
           {/* ── SALE FORM ──────���──────────────────────────────────── */}
           {action === 'register_sale' && (
