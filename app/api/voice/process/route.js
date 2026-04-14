@@ -18,8 +18,14 @@ import { classifyAction } from '@/lib/voice-action-classifier';
 
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
-// Per-user sliding-window rate limiter (module-level — persists across warm invocations).
-// For cross-instance limits in a scaled deployment, replace with @vercel/kv.
+// Rate limiter notes (Session 7 hardening audit):
+// - In-memory Map keyed by username
+// - 10 requests per 60-second rolling window
+// - Module-scoped; persists across warm serverless invocations
+// - Cold starts reset the Map. For a 10-20 user production load
+//   this is acceptable. Under higher load, migrate to @vercel/kv
+//   or Vercel Edge Config for shared state.
+// Per-user sliding-window rate limiter.
 const voiceRateLimit = new Map();
 const RATE_WINDOW_MS = 60_000; // 1 minute window
 const RATE_MAX = 10;            // 10 voice calls per minute per user
