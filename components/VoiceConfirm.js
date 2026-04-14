@@ -180,7 +180,13 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
   });
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    // Hotfix 2026-04-14: backdrop onClick removed. Voice extraction data
+    // is expensive to re-enter (especially on mobile where accidental
+    // taps are common), so the dialog only closes via the ✓ save button,
+    // the × cancel button, or a successful save that unsets `result` in
+    // the parent. No ESC handler exists for this div-based modal, so ESC
+    // is already a no-op — no extra blocking needed.
+    <div className="modal-overlay">
       <div className="detail-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
         <div className="detail-modal-header">
           <div>

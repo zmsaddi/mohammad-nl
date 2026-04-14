@@ -464,8 +464,13 @@ function DeliveriesContent() {
       />
 
       {/* Delivery Confirmation Flow */}
+      {/* Hotfix 2026-04-14: backdrop onClick removed on both steps so
+          drivers can't accidentally dismiss the confirm flow and lose
+          their place (step 2 has a VIN input which the driver has to
+          enter carefully). Only the explicit "إلغاء" button and the
+          "تأكيد" button close the flow. */}
       {confirmDelivery && confirmDelivery.step === 'amount' && (
-        <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
             <h3>تأكيد التوصيل</h3>
             <div style={{ margin: '16px 0', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
@@ -529,7 +534,7 @@ function DeliveriesContent() {
         const requireVin = isBikeDelivery(confirmDelivery.row);
         const vinReady = vinInput.trim().length > 0;
         return (
-          <div className="modal-overlay" onClick={() => setConfirmDelivery(null)}>
+          <div className="modal-overlay">
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
               <h3>
                 رقم الهيكل (VIN)

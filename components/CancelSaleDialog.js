@@ -125,7 +125,12 @@ export default function CancelSaleDialog({
   };
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    // Hotfix 2026-04-14: backdrop onClick removed. Bonus-choice selection
+    // and the reason textarea are expensive to re-enter — users reported
+    // accidentally tapping outside the dialog and losing their input.
+    // The dialog now only closes via the "تأكيد الإلغاء" confirm button,
+    // the "رجوع" back button, or a successful cancellation.
+    <div className="modal-overlay">
       <div
         className="modal"
         onClick={(e) => e.stopPropagation()}
