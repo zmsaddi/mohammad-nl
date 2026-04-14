@@ -17,19 +17,24 @@ function LoginForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    const result = await signIn('credentials', {
-      username,
-      password,
-      redirect: false,
-    });
-
-    setLoading(false);
-
-    if (result?.error) {
-      setError('اسم المستخدم أو كلمة المرور غير صحيحة');
-    } else {
-      router.push(callbackUrl);
+    try {
+      const result = await signIn('credentials', {
+        username,
+        password,
+        redirect: false,
+      });
+      if (result?.error) {
+        setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+      } else {
+        router.push(callbackUrl);
+      }
+    } catch (err) {
+      console.error('[login] signIn:', err);
+      setError('خطأ في الاتصال');
+    } finally {
+      // BUG-4 hotfix 2026-04-14: always reset loading so the user can
+      // retry with corrected credentials after any failure path.
+      setLoading(false);
     }
   };
 

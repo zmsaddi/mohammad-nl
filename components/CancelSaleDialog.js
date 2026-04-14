@@ -114,12 +114,16 @@ export default function CancelSaleDialog({
       const data = await res.json();
       if (!res.ok) {
         setError(data?.error || data?.message || 'خطأ في تنفيذ الإلغاء');
-        setSubmitting(false);
         return;
       }
       onSuccess?.(data);
     } catch (err) {
+      console.error('[CancelSaleDialog] submit:', err);
       setError('خطأ في الاتصال');
+    } finally {
+      // BUG-4 hotfix 2026-04-14: always reset submitting so the user can
+      // correct a validation error (e.g., missing reason) and retry
+      // without the button being stuck disabled.
       setSubmitting(false);
     }
   };

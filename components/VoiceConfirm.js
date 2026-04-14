@@ -107,61 +107,77 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
     }
 
     setSaving(true);
-
     try {
-      await fetch('/api/voice/learn', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: transcript || '', aiData: data || {}, userData: form, actionType: action }),
-        cache: 'no-store',
-      });
-    } catch {} // Don't block save if learning fails
+      // BUG-10: voice learning is fire-and-forget — if it fails we still
+      // want the save to proceed. Isolated try/catch so the outer finally
+      // still resets `saving` on outer-try failures.
+      try {
+        await fetch('/api/voice/learn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: transcript || '', aiData: data || {}, userData: form, actionType: action }),
+          cache: 'no-store',
+        });
+      } catch {} // Don't block save if learning fails
 
-    const creates = [];
-    if (action === 'register_sale') {
-      if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }), cache: 'no-store' }).catch(() => {}));
-      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }), cache: 'no-store' }).catch(() => {}));
-    } else if (action === 'register_purchase') {
-      if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }), cache: 'no-store' }).catch(() => {}));
-      // DONE: Step 7 — pass the chosen category through so the product is filed correctly on first creation
-      if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }), cache: 'no-store' }).catch(() => {}));
-    }
-    if (creates.length) await Promise.all(creates);
-
-    const submitData = { ...form, date: getTodayDate() };
-    delete submitData.isNewClient;
-    delete submitData.isNewSupplier;
-    delete submitData.action;
-
-    let endpoint;
-    if (action === 'register_sale') {
-      endpoint = '/api/sales';
-      submitData.clientName = form.client_name;
-      submitData.unitPrice = form.unit_price;
-      submitData.paymentType = form.payment_type || 'كاش';
-      submitData.clientPhone = form.client_phone || '';
-      submitData.clientAddress = form.client_address || '';
-      submitData.clientEmail = form.client_email || '';
-      // FEAT-04: pass through the down_payment_expected value. Empty string
-      // means "use server-side reactive default based on payment_type".
-      if (form.down_payment_expected !== undefined && form.down_payment_expected !== '') {
-        submitData.downPaymentExpected = parseFloat(form.down_payment_expected) || 0;
+      const creates = [];
+      if (action === 'register_sale') {
+        if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }), cache: 'no-store' }).catch(() => {}));
+        if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }), cache: 'no-store' }).catch(() => {}));
+      } else if (action === 'register_purchase') {
+        if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }), cache: 'no-store' }).catch(() => {}));
+        // DONE: Step 7 — pass the chosen category through so the product is filed correctly on first creation
+        if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }), cache: 'no-store' }).catch(() => {}));
       }
-    } else if (action === 'register_purchase') {
-      endpoint = '/api/purchases';
-      submitData.unitPrice = form.unit_price;
-      submitData.paymentType = form.payment_type || 'كاش';
-      // DONE: Fix 5A — AI returns snake_case sell_price; keep camelCase fallback
-      // for users who edit the field manually. Backend addPurchase reads sellPrice.
-      submitData.sellPrice = form.sell_price || form.sellPrice || null;
-      // DONE: Fix 5A — pass category through so addProduct files it correctly
-      submitData.category = form.category || '';
-    } else if (action === 'register_expense') {
-      endpoint = '/api/expenses';
-      submitData.paymentType = form.payment_type || 'كاش';
-    }
+      if (creates.length) await Promise.all(creates);
 
-    onConfirm(endpoint, submitData);
+      const submitData = { ...form, date: getTodayDate() };
+      delete submitData.isNewClient;
+      delete submitData.isNewSupplier;
+      delete submitData.action;
+
+      let endpoint;
+      if (action === 'register_sale') {
+        endpoint = '/api/sales';
+        submitData.clientName = form.client_name;
+        submitData.unitPrice = form.unit_price;
+        submitData.paymentType = form.payment_type || 'كاش';
+        submitData.clientPhone = form.client_phone || '';
+        submitData.clientAddress = form.client_address || '';
+        submitData.clientEmail = form.client_email || '';
+        // FEAT-04: pass through the down_payment_expected value. Empty string
+        // means "use server-side reactive default based on payment_type".
+        if (form.down_payment_expected !== undefined && form.down_payment_expected !== '') {
+          submitData.downPaymentExpected = parseFloat(form.down_payment_expected) || 0;
+        }
+      } else if (action === 'register_purchase') {
+        endpoint = '/api/purchases';
+        submitData.unitPrice = form.unit_price;
+        submitData.paymentType = form.payment_type || 'كاش';
+        // DONE: Fix 5A — AI returns snake_case sell_price; keep camelCase fallback
+        // for users who edit the field manually. Backend addPurchase reads sellPrice.
+        submitData.sellPrice = form.sell_price || form.sellPrice || null;
+        // DONE: Fix 5A — pass category through so addProduct files it correctly
+        submitData.category = form.category || '';
+      } else if (action === 'register_expense') {
+        endpoint = '/api/expenses';
+        submitData.paymentType = form.payment_type || 'كاش';
+      }
+
+      // BUG-4 hotfix 2026-04-14: await onConfirm so the finally block only
+      // runs AFTER the parent's async save completes. If the parent rejects
+      // or shows a toast, the finally resets `saving` so the user can retry.
+      // On success, the parent typically unmounts us via setVoiceResult(null)
+      // and the setSaving(false) is a no-op on the unmounted component.
+      await onConfirm(endpoint, submitData);
+    } catch (err) {
+      console.error('[VoiceConfirm] submit:', err);
+      alert('خطأ في الحفظ — حاول مرة أخرى');
+    } finally {
+      // BUG-4 hotfix: always reset saving so the user can retry after a
+      // failed submit (e.g. BUG-21 ambiguous client from /api/sales).
+      setSaving(false);
+    }
   };
 
   // Base input style

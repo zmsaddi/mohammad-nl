@@ -120,7 +120,10 @@ function PurchasesContent() {
         const supData = await supRes.json().catch(() => ({}));
         if (supData?.ambiguous) {
           addToast(supData.message || 'يوجد مورد بنفس الاسم — أضف رقم هاتف للتمييز', 'error');
-          setSubmitting(false);
+          // BUG-4 cleanup 2026-04-14: removed redundant manual
+          // setSubmitting(false) here — the outer finally block already
+          // handles it. Keeping the return so the rest of the purchase
+          // flow is skipped.
           return;
         }
       }
