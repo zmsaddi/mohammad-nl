@@ -175,27 +175,47 @@ describe('Feature 2 — getSettlementDetails drill-down', () => {
     expect(details.linked_total).toBe(5);
   });
 
-  it('Test 3 — empty linked_items for profit_distribution', async () => {
+  // v1.1 S1.8 [F-005] — profit_distribution was removed from the
+  // settlements write path (addSettlement now throws). Legacy rows of
+  // that type still exist in production DBs from v1.0.x — the READ path
+  // (getSettlementDetails) must still return them correctly so the
+  // history table keeps rendering. This test seeds a legacy-style row
+  // via raw INSERT (bypassing addSettlement) and verifies the read path.
+  it('Test 3 — getSettlementDetails reads legacy profit_distribution rows (no linked_items)', async () => {
     const hash = bcryptjs.hashSync('test-password', 12);
     await sql`
       INSERT INTO users (username, password, name, role, active)
       VALUES ('detail-admin', ${hash}, 'Detail Admin', 'admin', true)
       ON CONFLICT (username) DO UPDATE SET active = true, role = 'admin'
     `;
-    const settlementId = await addSettlement({
-      date: '2026-04-15',
-      type: 'profit_distribution',
-      username: 'detail-admin',
-      description: 'Profit share Q2',
-      amount: 500,
-      settledBy: 'admin',
-    });
+    // Legacy row — direct INSERT, not via addSettlement (which now rejects)
+    const { rows } = await sql`
+      INSERT INTO settlements (date, type, username, description, amount, settled_by, notes)
+      VALUES ('2026-04-15', 'profit_distribution', 'detail-admin', 'Legacy profit share Q2', 500, 'admin', '')
+      RETURNING id
+    `;
+    const settlementId = rows[0].id;
     const details = await getSettlementDetails(settlementId);
     expect(details).toBeTruthy();
     expect(details.type).toBe('profit_distribution');
     expect(details.linked_items).toEqual([]);
     expect(details.linked_total).toBe(0);
+    await sql`DELETE FROM settlements WHERE id = ${settlementId}`;
     await sql`DELETE FROM users WHERE username = 'detail-admin'`;
+  });
+
+  // v1.1 S1.8 [F-005] — the write path is now blocked.
+  it('Test 3b — addSettlement rejects type=profit_distribution (F-005 write-path guard)', async () => {
+    await expect(
+      addSettlement({
+        date: '2026-04-15',
+        type: 'profit_distribution',
+        username: 'admin',
+        description: 'Profit share Q2',
+        amount: 500,
+        settledBy: 'admin',
+      })
+    ).rejects.toThrow(/profit_distribution.*لم يعد مقبولاً/);
   });
 
   it('Test 4 — returns null for non-existent settlement', async () => {

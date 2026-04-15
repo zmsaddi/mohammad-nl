@@ -111,26 +111,37 @@ describe('Feature 1 — settlement amount validation', () => {
     expect(typeof id).toBe('number');
   });
 
-  it('Test 4 — profit_distribution skips validation (null available)', async () => {
+  // v1.1 S1.8 [F-005] — profit_distribution was the v1.0.1 "no cap" escape
+  // hatch that let admins write uncapped payouts through the settlements
+  // path. v1.1 removes it from the write path entirely (new splits go
+  // through /profit-distributions which has the F-001 cap). The READ-side
+  // helper `getAvailableCredit` still returns null (since null meant
+  // "no cap" historically and UI code may check that), but the write
+  // must be rejected. This test verifies both.
+  it('Test 4 — profit_distribution: write path rejected, read path still null [v1.1 F-005]', async () => {
     const hash = bcryptjs.hashSync('test-password', 12);
     await sql`
       INSERT INTO users (username, password, name, role, active)
       VALUES ('val-admin', ${hash}, 'Admin User', 'admin', true)
       ON CONFLICT (username) DO UPDATE SET active = true, role = 'admin'
     `;
+    // Read path: getAvailableCredit still returns null for profit_distribution
+    // — semantic is "no strict cap in the legacy sense". Callers shouldn't use
+    // this anymore; kept for backwards compat with any lingering UI checks.
     const available = await getAvailableCredit('val-admin', 'profit_distribution');
     expect(available).toBeNull();
 
-    // Any amount is allowed (no strict cap in v1.0.1)
-    const id = await addSettlement({
-      date: '2026-04-15',
-      type: 'profit_distribution',
-      username: 'val-admin',
-      description: 'Profit share',
-      amount: 5000,
-      settledBy: 'admin',
-    });
-    expect(typeof id).toBe('number');
+    // Write path: addSettlement rejects with Arabic F-005 message.
+    await expect(
+      addSettlement({
+        date: '2026-04-15',
+        type: 'profit_distribution',
+        username: 'val-admin',
+        description: 'Profit share',
+        amount: 5000,
+        settledBy: 'admin',
+      })
+    ).rejects.toThrow(/profit_distribution.*لم يعد مقبولاً/);
   });
 
   it('Test 5 — zero available credit blocks any positive amount', async () => {
