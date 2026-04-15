@@ -137,20 +137,27 @@ describe('getClients aggregate — Bug 3 regression fix', () => {
   // Invariant: totalPaid ≤ totalSales, and debt math is self-consistent.
   // ───────────────────────────────────────────────────────────────
   it('Test 2 — mixed history invariants hold (paid ≤ sales, debt non-negative)', async () => {
-    await sql`
-      INSERT INTO clients (name, phone, address)
-      VALUES ('Agg Mixed', '+31600000002', 'Mixed Addr')
-    `;
+    // v1.0.3 — drop the manual INSERT seeded earlier. The previous version
+    // inserted Agg Mixed with phone='+31600000002' and then called
+    // seedConfirmedCashSale (which uses phone='+31600000001'), creating
+    // two distinct client rows. Pre-v1.0.3 getClients fan-outed the
+    // aggregate to both rows so the test passed by accident; v1.0.3's Bug C
+    // stopgap zeros the non-canonical row, breaking the test. Letting
+    // addSale create the client on the first call ensures a single row
+    // matches both calls' phone.
+    // (No manual INSERT here — addSale → addClient handles the upsert.)
 
     // Confirmed cash sale: 1500
     await seedConfirmedCashSale({ clientName: 'Agg Mixed', amount: 1500 });
 
-    // Confirmed credit sale with dpe=0, later partial collection
+    // Confirmed credit sale with dpe=0, later partial collection.
+    // Phone matches the helper's hardcoded value so addClient Step 1
+    // exact-match returns the existing row (no second client created).
     const { saleId: creditSaleId, deliveryId: creditDeliveryId } = await addSale({
       date: TODAY,
       clientName: 'Agg Mixed',
-      clientPhone: '+31600000002',
-      clientAddress: 'Mixed Addr',
+      clientPhone: '+31600000001',
+      clientAddress: 'Agg Test Addr',
       item: 'AGG Bike',
       quantity: 1,
       unitPrice: 1500,
@@ -163,8 +170,8 @@ describe('getClients aggregate — Bug 3 regression fix', () => {
       id: creditDeliveryId,
       date: TODAY,
       clientName: 'Agg Mixed',
-      clientPhone: '+31600000002',
-      address: 'Mixed Addr',
+      clientPhone: '+31600000001',
+      address: 'Agg Test Addr',
       items: 'AGG Bike (1)',
       totalAmount: 1500,
       status: 'تم التوصيل',
@@ -240,5 +247,65 @@ describe('getClients aggregate — Bug 3 regression fix', () => {
     expect(parseFloat(agg.totalSales)).toBe(0);
     expect(parseFloat(agg.totalPaid)).toBe(0);
     expect(parseFloat(agg.remainingDebt)).toBe(0);
+  });
+
+  // ───────────────────────────────────────────────────────────────
+  // Test 5 — Bug C stopgap: two client rows sharing a name. The
+  // single sale must be attributed only to the lowest-id row, NOT
+  // fan out to both. The duplicate row carries _duplicateOfId = the
+  // canonical row's id so the UI can show the مكرر badge.
+  //
+  // Live evidence reproducing this: 2 ZAKARIYA rows in production
+  // (id=1 phone='', id=2 phone='+34xxx') were both showing
+  // totalSales=950 / paid=500 / debt=450 from a single sale, and
+  // the /clients summary card displayed إجمالي الديون = 900.
+  // ───────────────────────────────────────────────────────────────
+  it('Test 5 — Bug C: two clients sharing a name → aggregate attributes to lowest-id only', async () => {
+    // Seed two clients with the literal same name. The unique partial
+    // index `(name, phone) WHERE phone <> ''` allows this because we
+    // give them different phones (one empty, one populated — the exact
+    // shape of the production state that surfaced the bug).
+    const { rows: c1 } = await sql`
+      INSERT INTO clients (name, phone, address)
+      VALUES ('Agg Shared', '', '')
+      RETURNING id
+    `;
+    const { rows: c2 } = await sql`
+      INSERT INTO clients (name, phone, address)
+      VALUES ('Agg Shared', '+31600005005', 'Real Addr')
+      RETURNING id
+    `;
+    const lowestId = Math.min(c1[0].id, c2[0].id);
+    const higherId = Math.max(c1[0].id, c2[0].id);
+
+    // Seed one confirmed cash sale of 500 for 'Agg Shared'
+    await seedConfirmedCashSale({ clientName: 'Agg Shared', amount: 500 });
+
+    const all = await getClients(true);
+    const sharedRows = all.filter((r) => r.name === 'Agg Shared');
+    expect(sharedRows).toHaveLength(2);
+
+    const canonical = sharedRows.find((r) => r.id === lowestId);
+    const duplicate = sharedRows.find((r) => r.id === higherId);
+
+    // Canonical (lowest id) sees the full sale
+    expect(canonical).toBeDefined();
+    expect(parseFloat(canonical.totalSales)).toBe(500);
+    expect(parseFloat(canonical.totalPaid)).toBe(500); // confirmed cash sale
+    expect(parseFloat(canonical.remainingDebt)).toBe(0);
+    expect(canonical._duplicateOfId).toBeNull();
+
+    // Duplicate is zeroed out and tagged
+    expect(duplicate).toBeDefined();
+    expect(parseFloat(duplicate.totalSales)).toBe(0);
+    expect(parseFloat(duplicate.totalPaid)).toBe(0);
+    expect(parseFloat(duplicate.remainingDebt)).toBe(0);
+    expect(duplicate._duplicateOfId).toBe(lowestId);
+
+    // The summary card adds across all rows. Pre-fix the user saw
+    // إجمالي الديون = 2 × debt. Post-fix it should equal the canonical
+    // row's debt only (because duplicate rows contribute zero).
+    const totalDebtSum = all.reduce((s, c) => s + (parseFloat(c.remainingDebt) || 0), 0);
+    expect(totalDebtSum).toBe(0); // both rows: 0 (sale fully paid on confirmation)
   });
 });

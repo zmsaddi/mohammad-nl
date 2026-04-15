@@ -1,11 +1,68 @@
-# Vitesse Eco v1.0.0 — Delivery Handoff Guide
+# Vitesse Eco v1.0.3 — Delivery Handoff Guide
 
 | | |
 |---|---|
-| **Version** | `v1.0.0` |
+| **Version** | `v1.0.3` (v1.0.0 → v1.0.1 → v1.0.2 → v1.0.3 cumulative) |
 | **Production URL** | https://mohammadnl.vercel.app |
-| **Test coverage** | 518+ assertions verified |
+| **Test coverage** | 435+ unit tests + 518+ production assertions |
 | **Primary docs** | [README.md](../README.md), [PROJECT_DOCUMENTATION.md](../PROJECT_DOCUMENTATION.md), [SETUP.md](../SETUP.md), [CHANGELOG.md](../CHANGELOG.md), this file, [v1.1-backlog.md](v1.1-backlog.md) |
+
+---
+
+## ⚠️ CRITICAL — BEFORE REAL CUSTOMER DATA
+
+### `.env.test` points at the production DB
+
+A file named `.env.test` in the repo root currently contains the
+**production** Neon connection string. Discovered during the v1.0.3
+investigation (2026-04-15). The misnamed file means:
+
+- Every `npx vitest run` execution loads `.env.test` for its DB
+- Several tests use `TRUNCATE` on business tables to reset state
+- Running tests against this file **WILL WIPE PRODUCTION DATA**
+
+**Why it's been safe so far:**
+- No real customer data has been entered yet
+- The test fixtures use disposable `TESTBUG_*`, `pd-*`, `agg-*`,
+  `top-*`, `idemp-*`, etc. prefixes that don't collide with real
+  business records — but TRUNCATE doesn't care about prefixes, it
+  wipes the whole table
+
+**BEFORE Step 5 (real data entry), you MUST isolate the test branch:**
+
+1. Open https://console.neon.tech → your project
+2. **Branches** tab → **Create branch**
+   - Name: `test-branch`
+   - Source: head of `main`
+3. Open the new branch's connection details and copy both connection
+   strings (pooled and non-pooling)
+4. In the repo, rename the misnamed file:
+   ```bash
+   mv .env.test .env.production.local
+   ```
+   (the new name signals "this is real production credentials, do not
+   use for tests")
+5. Create a new `.env.test` with the **test-branch** URLs:
+   ```
+   POSTGRES_URL="postgresql://...test-branch...?sslmode=require"
+   POSTGRES_URL_NON_POOLING="postgresql://...test-branch...?sslmode=require"
+   NEXTAUTH_SECRET="test-secret-do-not-use-in-production"
+   NEXTAUTH_URL="http://localhost:3000"
+   ```
+6. Verify: `cat .env.test` shows the **test-branch** host, NOT main
+7. Run `npx vitest run tests/cancel-rule-rbac.test.js` (a small file)
+   to sanity-check the connection wires up
+8. Only then proceed to Step 5 (real customer data entry)
+
+**The Vercel deployment is unaffected** — Vercel's environment
+variables are configured separately in the dashboard and do not
+read from any `.env*` file in this repo. Vercel keeps pointing at
+production. Only your *local* `vitest run` is at risk.
+
+**Failure to isolate = total data loss on the next test run.**
+
+This isolation step will become unnecessary once a v1.1 cleanup
+moves the `.env.test` rename into a tracked migration.
 
 ---
 
@@ -94,6 +151,31 @@ DBs.
 After this step, the `/profit-distributions` admin page is fully
 operational. Only users with `role='admin'` can create a
 distribution; managers can view history.
+
+### Step 1.7 — Run the v1.0.3 bug repair cleanup (3 minutes)
+
+v1.0.3 ships fixes for three bugs (cash dpe mutability, client
+duplication, aggregate fan-out). Before real data entry, wipe the
+test ZAKARIYA records that surfaced these bugs.
+
+1. Stay in the Neon SQL Editor.
+2. Open [scripts/cleanup/v1-0-3-bug-repair.sql](../scripts/cleanup/v1-0-3-bug-repair.sql).
+3. Copy the file → paste → Run.
+4. Inspect the **BEFORE / AFTER** tables printed by the script.
+5. Expected: every row in **AFTER CLEANUP** shows `n=0`.
+6. If the AFTER counts are all zero, the `COMMIT;` at the end has
+   already persisted. If anything looks wrong, restore from the
+   safety snapshot you took at the top of Step 1.
+
+This wipes:
+- 2 ZAKARIYA client rows (the Bug B duplicate)
+- 1 sale (V20V PRO, 950, the Bug A evidence)
+- 1 collection payment (500, auto-inserted on confirmation)
+- 1 delivery + 1 invoice (INV-202604-2748)
+- 1 unsettled seller bonus (35€ to yasin)
+
+The user `yasin` and the `admin` user (display name 'ZAKARIYA')
+remain — only their **client** records are deleted.
 
 ### Step 2 — Admin password rotation (5 minutes)
 

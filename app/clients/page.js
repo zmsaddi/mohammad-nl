@@ -247,9 +247,34 @@ function ClientsContent() {
               </thead>
               <tbody>
                 {sortedRows.map((client) => (
-                  <tr key={client.id}>
+                  <tr
+                    key={client.id}
+                    style={client._duplicateOfId ? { background: '#fffbeb' } : undefined}
+                  >
                     <td>{client.id}</td>
-                    <td style={{ fontWeight: 600 }}>{client.name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {client.name}
+                      {/* v1.0.3 Bug C — duplicate-name client rows are flagged
+                          by getClients with _duplicateOfId. The aggregate is
+                          attributed to the lowest-id row only; the others show
+                          a 'مكرر' badge so the admin can manually merge or
+                          delete them. The proper fix (sales.client_id FK) ships
+                          in v1.1 — see docs/v1.1-backlog.md § 4.4. */}
+                      {client._duplicateOfId && (
+                        <span style={{
+                          marginRight: '8px',
+                          padding: '2px 8px',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          borderRadius: '6px',
+                          border: '1px solid #fde68a',
+                        }}>
+                          ⚠️ مكرر — انظر #{client._duplicateOfId}
+                        </span>
+                      )}
+                    </td>
                     <td>{client.phone}</td>
                     <td className="number-cell">{formatNumber(client.totalSales)}</td>
                     <td className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>

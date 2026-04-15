@@ -76,13 +76,28 @@ function SalesContent() {
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
 
-  // FEAT-04: reactive default for down_payment_expected. Updates whenever
-  // paymentType or total changes UNLESS the user manually edited the field.
-  // Defaults: كاش/بنك → full total, آجل → 0.
+  // FEAT-04: reactive default for down_payment_expected.
+  //
+  // v1.0.3 Bug A hardening: cash/بنك sales now FORCE dpe = total
+  // unconditionally — the touched flag no longer protects a manual edit
+  // when the payment type is non-credit. Pre-v1.0.3, a seller could type
+  // a partial dpe on a كاش sale, the touched flag would freeze it, and
+  // the driver would later collect that partial amount. Live evidence:
+  // sales.id=1 had كاش/950/500 from this exact flow. Now any change to
+  // paymentType / quantity / unitPrice resets dpe to total for non-credit
+  // and clears the touched flag, so the input stays in sync with the
+  // computed total and the disabled UI control matches the server rule.
   useEffect(() => {
+    if (form.paymentType !== 'آجل') {
+      // Cash / bank: dpe is locked to total. Always overwrite + clear touched.
+      const newDpe = total > 0 ? String(total) : '';
+      setForm((prev) => (prev.downPaymentExpected === newDpe ? prev : { ...prev, downPaymentExpected: newDpe }));
+      if (downPaymentTouched) setDownPaymentTouched(false);
+      return;
+    }
+    // آجل: reactive default unless the user has manually edited.
     if (downPaymentTouched) return;
-    const defaultVal = form.paymentType === 'آجل' ? 0 : total;
-    setForm((prev) => ({ ...prev, downPaymentExpected: defaultVal > 0 ? String(defaultVal) : '' }));
+    setForm((prev) => ({ ...prev, downPaymentExpected: '' }));
   }, [form.paymentType, total, downPaymentTouched]);
 
   const dpeNum = parseFloat(form.downPaymentExpected) || 0;
@@ -486,7 +501,9 @@ function SalesContent() {
                 </div>
               )}
             </div>
-            {/* FEAT-04: down_payment_expected with reactive default + validation */}
+            {/* FEAT-04: down_payment_expected with reactive default + validation
+                v1.0.3 Bug A: input is now disabled for cash/bank sales and locked
+                to the computed total. Only آجل (credit) sales allow editing dpe. */}
             <div className="form-group">
               <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
               <input
@@ -495,16 +512,35 @@ function SalesContent() {
                 min="0"
                 step="0.01"
                 value={form.downPaymentExpected}
+                disabled={form.paymentType !== 'آجل'}
                 onChange={(e) => {
+                  // Defensive: shouldn't fire when disabled, but ignore the value
+                  // if the user somehow gets one through (browser autofill, etc.)
+                  if (form.paymentType !== 'آجل') return;
                   setDownPaymentTouched(true);
                   setForm({ ...form, downPaymentExpected: e.target.value });
                 }}
                 placeholder={form.paymentType === 'آجل' ? '0 (اختياري — لفرض دفعة مقدمة على الدين)' : String(total)}
                 style={{
                   border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
-                  background: dpeError ? '#fef2f2' : undefined,
+                  background: dpeError ? '#fef2f2' : (form.paymentType !== 'آجل' ? '#f1f5f9' : undefined),
+                  cursor: form.paymentType !== 'آجل' ? 'not-allowed' : undefined,
                 }}
               />
+              {form.paymentType !== 'آجل' && (
+                <div style={{
+                  marginTop: '6px',
+                  padding: '8px 12px',
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  color: '#92400e',
+                  fontWeight: 600,
+                }}>
+                  ⚠️ البيع النقدي/البنكي يُحصَّل بالكامل عند التوصيل — لا يمكن تعديل المبلغ
+                </div>
+              )}
               <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
                 {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
               </div>
