@@ -29,6 +29,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# stray script output (stress runs, smoke runs, ad-hoc probes)
+*.log
+# editor swap files
+*.swp
+*.swo
 
 # env files (can opt-in for committing if needed)
 .env*
