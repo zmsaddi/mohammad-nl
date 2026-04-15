@@ -6,10 +6,19 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 
+// v1.1 S1.8 — `profit_distribution` deprecated from this form. Legacy rows
+// with this type still exist in the settlements table (pre-v1.1 data); we
+// keep the display entry so the history table can render their label, but
+// FORM_TYPES (used by the new-settlement <select>) excludes it. New profit
+// splits must go through /profit-distributions.
 const TYPES = {
   seller_payout:       { label: 'دفع بونص بائع',  color: '#16a34a', bg: '#dcfce7' },
   driver_payout:       { label: 'دفع بونص سائق',  color: '#7c3aed', bg: '#ede9fe' },
-  profit_distribution: { label: 'توزيع أرباح',     color: '#1e40af', bg: '#dbeafe' },
+  profit_distribution: { label: 'توزيع أرباح (قديم — استخدم /profit-distributions)', color: '#1e40af', bg: '#dbeafe' },
+};
+const FORM_TYPES = {
+  seller_payout: TYPES.seller_payout,
+  driver_payout: TYPES.driver_payout,
 };
 
 function SettlementsContent() {
@@ -236,7 +245,7 @@ function SettlementsContent() {
               <div className="form-group">
                 <label>النوع *</label>
                 <select value={form.type} onChange={(e) => handleTypeChange(e.target.value)}>
-                  {Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  {Object.entries(FORM_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div className="form-group">
