@@ -49,6 +49,21 @@ async function seedUsers() {
   }
 }
 
+// v1.1 F-001 — addProfitDistribution now caps the base amount at
+// collected(period) − already_distributed(period). Feature-2 mechanics
+// tests below predate the cap and don't specify periods (null period
+// = all-time bucket). Tests that only verify split math / row persistence
+// call seedCapPool() to ensure the cap is non-binding. Tests that
+// exercise the cap itself live in tests/invariants/profit-distribution-
+// solvency.test.js. Test 7 (getCollectedRevenueForPeriod) does NOT call
+// seedCapPool because it audits the pool math directly.
+async function seedCapPool(amount = 10000) {
+  await sql`
+    INSERT INTO payments (date, client_name, amount, sale_id, type, payment_method, tva_amount, created_by, notes)
+    VALUES ('2026-01-01', 'cap-seed', ${amount}, NULL, 'collection', 'كاش', 0, 'test-seed', 'F-001 test pool')
+  `;
+}
+
 describe('Feature 2 — profit_distributions', () => {
   beforeAll(async () => { await initDatabase(); }, 30000);
   beforeEach(async () => {
@@ -63,6 +78,7 @@ describe('Feature 2 — profit_distributions', () => {
 
   // ──────────────────────────────────────────────────────────────
   it('Test 1 — valid distribution (sum = 100%) succeeds + rows persisted', async () => {
+    await seedCapPool();
     const result = await addProfitDistribution({
       baseAmount: 2000,
       recipients: [
@@ -150,6 +166,7 @@ describe('Feature 2 — profit_distributions', () => {
 
   // ──────────────────────────────────────────────────────────────
   it('Test 5 — computes amounts correctly for 25/15/20/20/20 split of 2000', async () => {
+    await seedCapPool();
     // Matches the user example: 2000 base, 5 recipients
     const result = await addProfitDistribution({
       baseAmount: 2000,
@@ -181,6 +198,7 @@ describe('Feature 2 — profit_distributions', () => {
 
   // ──────────────────────────────────────────────────────────────
   it('Test 6 — getProfitDistributions returns grouped rows with recipients array', async () => {
+    await seedCapPool();
     await addProfitDistribution({
       baseAmount: 1000,
       recipients: [
