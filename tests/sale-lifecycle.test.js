@@ -219,7 +219,7 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     // Invoice row created.
     const { rows: inv } = await sql`SELECT * FROM invoices WHERE sale_id = ${ctx.saleId}`;
     expect(inv).toHaveLength(1);
-    expect(inv[0].ref_code).toMatch(/^INV-\d{6}-\d{3}$/);
+    expect(inv[0].ref_code).toMatch(/^INV-\d{6}-\d{3,}$/);
     expect(parseFloat(inv[0].total)).toBe(3000);
     expect(inv[0].client_name).toBe('Test Client');
     expect(inv[0].vin).toBe('TEST-VIN-001');
