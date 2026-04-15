@@ -156,8 +156,37 @@ PAGE_ROLES = {
 ### 3.4 Field-level rules
 - **Sellers** never receive `buy_price` from `/api/products`.
 - **Sellers** cannot sell below the recommended `sell_price` (server enforces).
-- **Sellers** can only edit/cancel their own orders **while status = `محجوز`**.
+- **Sellers** can only edit their own orders **while status = `محجوز`**.
 - **Drivers** see only deliveries assigned to them; can only set status to `تم التوصيل`.
+
+### 3.5 Sale cancellation — locked rule (v1.0)
+
+The cancel-authority matrix is enforced by a single shared helper
+[lib/cancel-rule.js](lib/cancel-rule.js) — imported from both
+server routes and UI button visibility on `/sales` and
+`/clients/[id]`. Defense in depth: UI hides buttons per the rule,
+routes reject with `403 { error: 'ليس لديك صلاحية إلغاء هذا الطلب' }`
+if somehow bypassed.
+
+| role | `محجوز` (reserved) | `مؤكد` (confirmed) |
+|---|---|---|
+| admin | ✅ allowed | ✅ allowed |
+| manager | ✅ allowed | ❌ **BLOCKED** |
+| seller | ✅ own sale only | ❌ BLOCKED |
+| driver | ❌ blocked | ❌ blocked |
+
+A sale already in `ملغي` state is never re-cancellable by any role
+(the idempotency guard in `cancelSale` — see § 6.5 — throws
+`'الطلب مُلغى مسبقاً'` even for admin).
+
+Enforcement points:
+- [app/api/sales/[id]/cancel/route.js](app/api/sales/[id]/cancel/route.js) `POST` — the admin/manager cancel entry.
+- [app/api/sales/route.js](app/api/sales/route.js) `DELETE` — the seller delete-own-reserved entry and secondary admin/manager path.
+- [components/CancelSaleDialog.js](components/CancelSaleDialog.js) — invoked from `/sales` and `/clients/[id]`.
+
+**Any new cancel entry point MUST import `canCancelSale` from the
+helper.** Inlining the matrix anywhere else creates drift risk.
+Regression coverage lives at [tests/cancel-rule-rbac.test.js](tests/cancel-rule-rbac.test.js) — 11 tests covering every cell.
 
 ---
 
@@ -341,13 +370,97 @@ On `status → تم التوصيل`:
    - Driver (`role='driver'` only): `fixed (5)`
    - Inserted into `bonuses` with `settled=false`.
 
-### 6.5 Delivery cancellation
-Atomic reversal: stock returned, sale → `ملغي`, invoice deleted, bonuses for that `delivery_id` deleted.
+### 6.5 Sale cancellation — FEAT-05 + idempotency guard
+
+The atomic cancel helper is `cancelSale()` ([lib/db.js:979](lib/db.js#L979)),
+reached via four entry points that all share the same 12-step flow:
+
+1. `commitCancelSale` — the commit wrapper used by `/api/sales/[id]/cancel` POST
+2. `previewCancelSale` — read-only preview for the `CancelSaleDialog` before confirm
+3. `cancelDelivery` — used by the deliveries page admin flow
+4. `voidInvoice` — used by the invoices page admin flow
+5. `deleteSale` — used by the `DELETE /api/sales?id=X` route (seller + admin)
+
+All five share the helper → any correctness fix lives in one place.
+
+**Locked cancel rule** — role × status matrix is enforced by
+[lib/cancel-rule.js](lib/cancel-rule.js). See § 3.5 for the full table.
+Both `POST /api/sales/[id]/cancel` and `DELETE /api/sales` import
+`canCancelSale` and reject forbidden combinations with a 403 before
+the helper runs.
+
+**Idempotency guard (Session 8 Phase 0.5 hotfix)** — `cancelSale` throws
+`'الطلب مُلغى مسبقاً'` if the sale row is already `ملغي` in commit
+mode. Preview mode is still allowed so the admin dialog can render the
+"already cancelled" state. Without this guard, a double-cancel would
+re-run Step 5 (the refund insert loop) and Step 11 (the cancellations
+audit insert), doubly-negating already-refunded collections on confirmed
+sales and polluting the audit table. The UI prevents double-click in
+practice, but the BUG 4 submit-retry hotfix re-enables buttons after
+errors so a network-slow click can race — hence the server-side guard.
+Regression coverage: [tests/idempotency-double-cancel.test.js](tests/idempotency-double-cancel.test.js).
+
+Effect on the ledger: stock is returned, sale row → `ملغي`, invoice
+soft-voided (or hard-deleted in `invoiceMode='delete'`), bonuses for
+that `delivery_id` are disposed per `bonusActions` (keep or remove),
+an audit row is written to `cancellations`, and the payment refund
+loop writes one negative-amount payment row per original collection.
 
 ### 6.6 Debt & payments
-- Only sales with `payment_type = 'آجل'` accrue debt.
-- `calculateClientDebt(sales, payments)` in [lib/utils.js](lib/utils.js) — `ΣcreditSales − Σpayments`.
-- Client detail page lists sales, payments, running balance.
+
+- Only sales with `payment_type = 'آجل'` accrue debt at creation time;
+  any confirmed sale (including partial-cash or dpe mixed sales) can
+  carry remaining balance post-delivery.
+- [`sales.paid_amount`](lib/db.js) and [`sales.remaining`](lib/db.js)
+  are the **ledger of truth**. They are maintained by:
+  - `updateDelivery` on confirm (writes down_payment_expected)
+  - `applyCollectionInTx` on every collection (writes collection rows + updates aggregates)
+  - `cancelSale` on cancel (zeroes both + writes negative refund rows)
+- `getClients(withDebt=true)` aggregate reads **only from the sales
+  ledger** — see Bug 3 fix note below.
+- Client detail page [app/clients/[id]/page.js](app/clients/[id]/page.js)
+  renders client info, a full payment-registration form (FIFO +
+  specific-sale picker + live TVA preview), the sales history table
+  (with per-row invoice PDF and cancel buttons wired to the locked
+  rule), and the payments history table (with method + linked sale id
+  columns).
+
+#### Bug 3 fix — `getClients` aggregate (v1 pre-delivery)
+
+**FEAT-04 regression.** Pre-FEAT-04, cash/bank sales had no payment
+row — money was counted by `SUM(sales.total WHERE cash/bank confirmed)`.
+FEAT-04 added a `type='collection'` payment row on every delivery
+confirm ([lib/db.js:2181-2194](lib/db.js#L2181-L2194)), so the legacy
+aggregate started double-counting: both the sale's `total` (one branch)
+AND the matching payment row (another branch). Production example: Ali
+Test with one 900€ cash sale reported `totalPaid=1800`.
+
+The fix ([lib/db.js:1395-1424](lib/db.js#L1395-L1424)) rewrites the
+aggregate to read solely from the sales ledger:
+
+```js
+const totalSales = clientSales
+  .filter((s) => s.status !== 'ملغي')
+  .reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
+
+const totalPaid = clientSales
+  .filter((s) => s.status === 'مؤكد')
+  .reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+
+const remainingDebt = clientSales
+  .filter((s) => s.status === 'مؤكد' && s.payment_status !== 'paid' && s.payment_status !== 'cancelled')
+  .reduce((sum, s) => sum + (parseFloat(s.remaining) || 0), 0);
+```
+
+Zero `payments` table scan — the collection rows are mirrors of
+`sales.paid_amount`, not additional evidence. The sales ledger is the
+single source of truth and was verified at 100% pass rate across 540
+stress ops in Phase 0.5.
+
+**Convention for future contributors:** never compute client totals by
+scanning both `sales` and `payments`. Pick one source (sales for
+outstanding balances, payments for audit-trail reports) and stick to it.
+Regression coverage: [tests/clients-aggregate-correctness.test.js](tests/clients-aggregate-correctness.test.js) — 4 tests including the exact Ali Test 900→1800 case.
 
 ### 6.7 Bonus settlement
 Admin records a payout in `/settlements`; backend updates matched bonus rows to `settled=true, settlement_id=X`.
@@ -512,18 +625,32 @@ For non-trivial changes, this project uses **Three-Mind Architecture**: three pe
 
 | File | Purpose |
 |---|---|
-| [lib/db.js](lib/db.js) | Schema init + every DB operation (~2530 lines) |
+| [lib/db.js](lib/db.js) | Schema init + every DB operation (~2600 lines) |
 | [lib/auth.js](lib/auth.js) | NextAuth Credentials provider, JWT callbacks |
+| [lib/cancel-rule.js](lib/cancel-rule.js) | **Locked cancel rule matrix** — `canCancelSale(sale, user)` pure function, single source of truth for sale cancellation authority. Used by both routes and UI. See § 3.5 and § 6.5. |
+| [lib/use-sorted-rows.js](lib/use-sorted-rows.js) | Click-to-sort hook for list pages. Non-destructive, numeric-aware, NULL-handling. Wired to all 8 list pages. See § 17.1. |
+| [lib/invoice-generator.js](lib/invoice-generator.js) | French facture HTML generator (v1: client signature block removed). |
 | [lib/utils.js](lib/utils.js) | `formatNumber`, `getTodayDate`, `calculateClientDebt`, `EXPENSE_CATEGORIES`, `generateRefCode` |
 | [lib/entity-resolver.js](lib/entity-resolver.js) | 3-layer fuzzy matching |
 | [lib/voice-normalizer.js](lib/voice-normalizer.js) | Arabic numerals + dialect normalization |
 | [middleware.js](middleware.js) | Page + API auth & RBAC |
+| [app/api/sales/[id]/cancel/route.js](app/api/sales/[id]/cancel/route.js) | FEAT-05 cancel endpoint — preview + commit. Calls `canCancelSale` for 403 gating. |
+| [app/api/sales/route.js](app/api/sales/route.js) | `DELETE` also uses `canCancelSale` (seller delete-own-reserved path). |
 | [app/api/voice/process/route.js](app/api/voice/process/route.js) | Whisper → normalize → LLM pipeline (the only voice extraction route after PERF-03) |
 | [app/api/deliveries/route.js](app/api/deliveries/route.js) | Delivery PUT triggers invoice + bonuses |
 | [app/api/summary/route.js](app/api/summary/route.js) | Dashboard aggregates |
+| [app/clients/[id]/page.js](app/clients/[id]/page.js) | Client detail page — profile, payment-registration form, sales + payments history tables with invoice PDF + cancel buttons. |
+| [components/CancelSaleDialog.js](components/CancelSaleDialog.js) | Admin cancel dialog (preview + confirm with bonus disposition). |
 | [components/VoiceButton.js](components/VoiceButton.js) | MediaRecorder UX |
 | [components/VoiceConfirm.js](components/VoiceConfirm.js) | Edit + confidence review |
+| [tests/cancel-rule-rbac.test.js](tests/cancel-rule-rbac.test.js) | 11-test matrix coverage for the cancel rule. |
+| [tests/clients-aggregate-correctness.test.js](tests/clients-aggregate-correctness.test.js) | 4-test regression guard against Bug 3 double-count (real Neon branch). |
+| [tests/idempotency-double-cancel.test.js](tests/idempotency-double-cancel.test.js) | Session 8 Phase 0.5 hotfix coverage for `cancelSale` re-execution guard. |
+| [scripts/smoke-test.mjs](scripts/smoke-test.mjs) | Phase 0 production smoke (86 assertions). |
+| [scripts/stress-test.mjs](scripts/stress-test.mjs) | Phase 0.5 production stress (540 ops, 6 rules, 46 assertions). |
 | [README.md](README.md) / [SETUP.md](SETUP.md) / [AI_ARCHITECTURE_REVIEW.md](AI_ARCHITECTURE_REVIEW.md) | Existing docs |
+| [docs/v1-pre-delivery-study.md](docs/v1-pre-delivery-study.md) | Session 9 Phase A scope study (7 items, v1.0 vs v1.1 split). |
+| [docs/pre-delivery-checklist.md](docs/pre-delivery-checklist.md) | Session 10 handoff checklist. |
 
 ---
 
@@ -872,3 +999,129 @@ Cold starts reset the limiter. Adequate for 10-20 user load.
 - **E2E voice test harness** — record 30 Arabic audio samples,
   run them through the full pipeline, assert extraction
   correctness. Deferred to v1.1 alongside VoiceConfirm rewrite.
+
+---
+
+## 17. v1.0 Pre-Delivery Polish (Sessions 8-9)
+
+The comprehensive pre-delivery PR ([master `4bb7b69`](../../commit/4bb7b69))
+bundles two critical production bugs and six UI/UX items into a
+single deploy. This section is the "what's new for contributors"
+summary — each change has a deeper reference above or in its own
+file.
+
+### 17.1 Conventions introduced
+
+**Shared cancel-rule helper — [lib/cancel-rule.js](lib/cancel-rule.js).**
+Pure function that takes `(sale, user)` and returns a boolean. Used
+by both server routes and UI button visibility. See § 3.5 for the
+matrix and § 6.5 for the idempotency guard. Any new cancel entry
+point must import this helper — inlining the rule anywhere else
+creates drift risk. 11 unit tests at [tests/cancel-rule-rbac.test.js](tests/cancel-rule-rbac.test.js).
+
+**Sortable tables hook — [lib/use-sorted-rows.js](lib/use-sorted-rows.js).**
+~75 LOC hook with a tiny API: `const { sortedRows, requestSort,
+getSortIndicator } = useSortedRows(rows, defaultSort)`. Non-
+destructive, numeric-aware (coerces NUMERIC-as-string from
+@vercel/postgres), NULL-handling (trailing). Wired to all 8 list
+pages with click-to-sort headers and ↑↓ indicators. Any new list
+page should use it.
+
+**Client-side filter bars.** `/sales`, `/clients`, and `/deliveries`
+now expose filter bars (date range + entity search + status + payment
+status + seller/driver dropdowns where relevant). Pattern: `useState`
+per filter + inline `.filter()` on the rows array, fed into
+`useSortedRows`. Client-side because row volumes are under 500 on
+every page. Reference implementation is [app/sales/page.js](app/sales/page.js).
+The remaining 5 list pages (purchases, expenses, settlements,
+invoices, stock) are deferred to v1.1 — same pattern when added.
+
+**Single source of truth for client aggregates.** `getClients(withDebt=true)`
+now reads only from the sales ledger. Never compute client totals
+by scanning both `sales` and `payments` — see § 6.6 Bug 3 fix.
+
+### 17.2 Bugs fixed
+
+- **Bug 1 — `/clients/[id]` string/number coercion.** Next.js 16
+  `use(params).id` is always a string; the JSON payload returns
+  `c.id` as a number. `Array.find((c) => c.id === id)` never matched
+  → 100% of client detail pages showed "not found". Fixed at
+  [app/clients/[id]/page.js:37](app/clients/[id]/page.js#L37) with
+  `Number(id)`. Lesson: any future param-driven `.find` must coerce
+  to the expected primitive type.
+
+- **Bug 3 — `getClients` aggregate double-count.** See § 6.6. Ali Test
+  in production reported `totalPaid=1800` for a single 900€ cash sale.
+
+- **Bug 2 — confirmed not a bug.** The user-reported "withDebt filter
+  broken" was a misread of the API contract. `withDebt` is an
+  enrichment flag (populates `totalSales/totalPaid/remainingDebt`), not
+  a filter. Documented in the JSDoc at [lib/db.js:1382](lib/db.js#L1382).
+
+### 17.3 UI/UX items shipped
+
+- **Item 1 — invoice signature.** Client signature block removed from
+  [lib/invoice-generator.js](lib/invoice-generator.js). Only
+  `Signature du vendeur` remains. `Mode de paiement` preserved.
+  Single shared template → applies to all three invoice states.
+
+- **Item 2 — filters on 3 pages.** Sales/clients/deliveries (see § 17.1
+  convention note).
+
+- **Item 3 — column sorting on 8 pages.** Via the shared hook.
+
+- **Item 5a — invoice PDF button** per confirmed sale on the client
+  detail page. Wired via a `LEFT JOIN invoices` added to `getSales()`
+  so the payload includes `invoice_ref_code`.
+
+- **Item 5b — cancel button** per sale on the client detail page.
+  Visibility gated by `canCancelSale`.
+
+- **Item 5c — payments history enrichment.** `payment_method` and
+  `sale_id` columns added to the payments table display. Refund rows
+  (negative amounts) render in red; collections in green.
+
+### 17.4 Deferred to v1.1
+
+**Item 4 — توزيع أرباح (profit distribution) multi-recipient split dialog.**
+The `profit_distribution` settlement type already exists in the UI
+and [`addSettlement`](lib/db.js#L3027) accepts it — the gap is the
+multi-recipient percentage-split UI. Deferred because the business
+rules are not pinned down. Seven open questions for the accountant,
+documented in full at [docs/v1-pre-delivery-study.md](docs/v1-pre-delivery-study.md) § Item 4. Summary of blockers:
+
+1. What is the "base" being distributed — gross collected revenue, net
+   profit after costs, or a custom formula?
+2. Should percentages be pre-configured per user (`users.profit_share`
+   column) or entered per distribution?
+3. Must percentages sum to exactly 100%, or can the company retain a
+   share?
+4. **French SAS tax treatment** — declared as bonuses (payroll, social
+   charges) or dividends (annual declaration)? **← accountant question.**
+5. Does profit distribution appear on the cash-basis P&L as an expense,
+   or below-the-line like bonuses?
+6. Recipient eligibility — admin + manager only, or any role?
+7. Reversibility — can a committed profit distribution be cancelled,
+   and if so, does it reverse the individual recipient rows or create
+   negative settlements?
+
+**Item 2 completion.** Filters for the remaining 5 list pages
+(purchases, expenses, settlements, invoices, stock-beyond-search).
+Non-blocking — same `useState` + `.filter()` + `useSortedRows` pattern.
+
+**Voice pipeline.** See § 16 v1.1 recommendations.
+
+### 17.5 Test count
+
+v0.9 (Session 7) had 338 unit tests. Session 8 + Session 9 delivered:
+
+| Session | Tests added | Total |
+|---|---:|---:|
+| Session 8 Phase 0.5 stress hotfix | +4 (idempotency-double-cancel) | 371 |
+| Session 9 v1 pre-delivery | +15 (11 cancel-rule-rbac + 4 clients-aggregate-correctness) | **386** |
+
+Plus non-vitest production verification:
+- **Phase 0 smoke** — 86/86 assertions against production (HTTP + DB reads)
+- **Phase 0.5 stress** — 46/46 assertions at 540 operations, including the
+  Rule 6 idempotency regression (20 double-cancels blocked + 20
+  double-confirms silent-no-op)
