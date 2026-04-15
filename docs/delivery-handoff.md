@@ -76,6 +76,25 @@ After this step, the supplier-credit UI on `/purchases` is fully
 operational (paid amount field on the form, status column on the
 list, and the 💰 دفع button on partial/pending rows).
 
+### Step 1.6 — Run the v1.0.2 profit distribution migration (2 minutes)
+
+v1.0.2 added the `profit_distributions` table (Feature 2). Same
+pattern as Step 1.5: idempotent, mirrored in `initDatabase()` for
+fresh deploys, provided as a manual SQL file for existing production
+DBs.
+
+1. Stay in the Neon SQL Editor.
+2. Open [scripts/migrations/2026-04-15-profit-distributions.sql](../scripts/migrations/2026-04-15-profit-distributions.sql).
+3. Copy the file → paste → Run.
+4. Verify via the embedded `information_schema` queries — the
+   `profit_distributions` table and its three indexes should appear.
+5. Running the file twice is safe (`CREATE TABLE IF NOT EXISTS` +
+   `CREATE INDEX IF NOT EXISTS`).
+
+After this step, the `/profit-distributions` admin page is fully
+operational. Only users with `role='admin'` can create a
+distribution; managers can view history.
+
 ### Step 2 — Admin password rotation (5 minutes)
 
 The default `admin / admin123` must be rotated before exposing the
@@ -180,16 +199,30 @@ Navigate to `/users`. Add an account for each real staff member:
 
 Cover these topics verbally with each role:
 
-#### Admin training (~20 min)
+#### Admin training (~25 min)
 
 - Dashboard interpretation (accrual vs cash-basis P&L, pending
-  collections widget, low stock alerts)
+  collections widget, low stock alerts, top sellers widget, supplier
+  performance with total/paid/remaining)
 - Sales lifecycle: create → confirm → collect → optionally cancel
 - **Cancel rule** — admin can cancel anything including confirmed;
   manager and seller can only cancel reserved sales
-- Settlements: pay accumulated bonuses to seller/driver users
+- Settlements: pay accumulated bonuses to seller/driver users (with
+  v1.0.1 amount validation + drill-down + auto-fill)
+- **Profit distribution** (v1.0.2): `/profit-distributions` page.
+  Enter a base amount (optionally auto-fill from collected revenue
+  for a date range), pick admin/manager recipients, assign
+  percentages that must sum to 100%. Only admin can create; manager
+  can view.
+- **Supplier credit** (v1.0.1): leave "المدفوع الآن" blank for full
+  payment, or enter a partial amount to create a credit purchase.
+  Use the 💰 دفع button on the list to record subsequent payments.
 - User management
-- Invoice PDF generation and download
+- **Invoice PDF** — now stamped with the official company stamp
+  (`public/stamp.png`) instead of text signatures. Prints on a
+  single A4 page for typical 1–5 line-item invoices. **Verify
+  visually** on the first real sale: open the PDF, press Ctrl+P,
+  confirm one page + stamp visible.
 
 #### Seller training (~15 min)
 
