@@ -33,7 +33,16 @@ function PurchasesContent() {
     sellPrice: '',
     paymentType: 'كاش',
     notes: '',
+    // v1.0.1 Feature 6 — supplier credit. Empty string = "pay in full"
+    // (default = total). Any other value goes through as the initial
+    // down payment, with payment_status derived from the ratio.
+    paidAmount: '',
   });
+
+  // v1.0.1 Feature 6 — pay-supplier dialog state. Opens when user clicks
+  // "💰 دفع" on a partial/pending purchase.
+  const [paySupplierState, setPaySupplierState] = useState(null);
+  // { purchaseId, total, currentPaid, amount, paymentMethod, notes, submitting }
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
 
@@ -143,7 +152,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
         fetchData();
       } else {
         const err = await res.json();
@@ -288,6 +297,35 @@ function PurchasesContent() {
                 </label>
               </div>
             </div>
+            {/* v1.0.1 Feature 6 — supplier credit: paid_amount on the
+                purchase form. Blank defaults to "pay in full now"
+                (backward compat). Any value ≥ 0 and ≤ total creates a
+                partial/pending purchase. */}
+            <div className="form-group">
+              <label htmlFor="pur-paid">المدفوع الآن (اختياري)</label>
+              <input
+                id="pur-paid"
+                type="number"
+                min="0"
+                step="any"
+                value={form.paidAmount}
+                onChange={(e) => setForm({ ...form, paidAmount: e.target.value })}
+                placeholder={`الافتراضي: ${formatNumber(total)}`}
+                style={{
+                  border: (parseFloat(form.paidAmount) || 0) > total + 0.01
+                    ? '2px solid #dc2626'
+                    : undefined,
+                }}
+              />
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                اتركه فارغاً للدفع بالكامل. للشراء بالدين، أدخل المبلغ المدفوع الآن والباقي يُسجّل لاحقاً.
+                {form.paidAmount !== '' && total > 0 && (
+                  <>
+                    {' '}المتبقي: <strong style={{ color: '#dc2626' }}>{formatNumber(Math.max(0, total - (parseFloat(form.paidAmount) || 0)))}</strong>
+                  </>
+                )}
+              </div>
+            </div>
             <div className="form-group">
               <label htmlFor="pur-notes">ملاحظات</label>
               <input id="pur-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
@@ -327,9 +365,12 @@ function PurchasesContent() {
                   <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('quantity')}</th>
                   <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{getSortIndicator('unit_price')}</th>
                   <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{getSortIndicator('total')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
+                  {/* v1.0.1 Feature 6 — supplier credit columns */}
+                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }}>المدفوع{getSortIndicator('paid_amount')}</th>
+                  <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }}>الحالة{getSortIndicator('payment_status')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>طريقة الدفع{getSortIndicator('payment_type')}</th>
                   <th>ملاحظات</th>
-                  {isAdmin && <th>إجراءات</th>}
+                  <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -354,15 +395,55 @@ function PurchasesContent() {
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    {/* v1.0.1 Feature 6 — paid + status cells */}
+                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                      {formatNumber(row.paid_amount ?? row.total)}
+                    </td>
+                    <td>
+                      {(() => {
+                        const status = row.payment_status || 'paid';
+                        const style = status === 'paid'
+                          ? { bg: '#dcfce7', fg: '#166534', label: 'مدفوع' }
+                          : status === 'partial'
+                          ? { bg: '#ffedd5', fg: '#9a3412', label: 'جزئي' }
+                          : { bg: '#fef3c7', fg: '#92400e', label: 'معلق' };
+                        return (
+                          <span className="status-badge" style={{ background: style.bg, color: style.fg }}>
+                            {style.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'كاش'}</span></td>
                     <td>{row.notes}</td>
-                    {isAdmin && (
-                      <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                          حذف
-                        </button>
-                      </td>
-                    )}
+                    <td>
+                      <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                        {/* v1.0.1 Feature 6 — "pay now" button for partial/pending */}
+                        {row.payment_status && row.payment_status !== 'paid' && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#16a34a', color: 'white', padding: '4px 8px' }}
+                            onClick={() => setPaySupplierState({
+                              purchaseId: row.id,
+                              supplier: row.supplier,
+                              total: parseFloat(row.total) || 0,
+                              currentPaid: parseFloat(row.paid_amount) || 0,
+                              amount: '',
+                              paymentMethod: 'كاش',
+                              notes: '',
+                              submitting: false,
+                            })}
+                          >
+                            💰 دفع
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
+                            حذف
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -398,6 +479,133 @@ function PurchasesContent() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />
+
+      {/* v1.0.1 Feature 6 — pay-supplier dialog */}
+      {paySupplierState && (() => {
+        const s = paySupplierState;
+        const remaining = Math.max(0, s.total - s.currentPaid);
+        const amt = parseFloat(s.amount) || 0;
+        const exceeds = amt > remaining + 0.01;
+        const canSubmit = amt > 0 && !exceeds && !s.submitting;
+        const handlePay = async () => {
+          setPaySupplierState({ ...s, submitting: true });
+          try {
+            const res = await fetch(`/api/purchases/${s.purchaseId}/pay`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: amt,
+                paymentMethod: s.paymentMethod,
+                notes: s.notes,
+              }),
+              cache: 'no-store',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+              addToast('تم تسجيل الدفعة بنجاح');
+              setPaySupplierState(null);
+              fetchData();
+            } else {
+              addToast(data.error || 'خطأ في تسجيل الدفعة', 'error');
+              setPaySupplierState({ ...s, submitting: false });
+            }
+          } catch {
+            addToast('خطأ في الاتصال', 'error');
+            setPaySupplierState({ ...s, submitting: false });
+          }
+        };
+        return (
+          <div
+            onClick={() => setPaySupplierState(null)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 1000, padding: '20px',
+            }}
+          >
+            <div
+              className="card"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '440px', width: '100%' }}
+            >
+              <h3 style={{ marginTop: 0, fontSize: '1.05rem' }}>دفع للمورد — {s.supplier}</h3>
+              <div style={{ background: '#f9fafb', padding: '10px 12px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.85rem' }}>
+                <div>الإجمالي: <strong>{formatNumber(s.total)}€</strong></div>
+                <div>مدفوع سابقاً: <strong style={{ color: '#16a34a' }}>{formatNumber(s.currentPaid)}€</strong></div>
+                <div>المتبقي: <strong style={{ color: '#dc2626' }}>{formatNumber(remaining)}€</strong></div>
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label>المبلغ *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={s.amount}
+                  onChange={(e) => setPaySupplierState({ ...s, amount: e.target.value })}
+                  placeholder={formatNumber(remaining)}
+                  style={{
+                    border: exceeds ? '2px solid #dc2626' : undefined,
+                  }}
+                />
+                {exceeds && (
+                  <div style={{ marginTop: '4px', color: '#dc2626', fontSize: '0.78rem' }}>
+                    المبلغ يتجاوز المتبقي
+                  </div>
+                )}
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label>وسيلة الدفع</label>
+                <div className="radio-group" style={{ marginTop: '6px' }}>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="supplier-pay-method"
+                      value="كاش"
+                      checked={s.paymentMethod === 'كاش'}
+                      onChange={(e) => setPaySupplierState({ ...s, paymentMethod: e.target.value })}
+                    />
+                    كاش
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="supplier-pay-method"
+                      value="بنك"
+                      checked={s.paymentMethod === 'بنك'}
+                      onChange={(e) => setPaySupplierState({ ...s, paymentMethod: e.target.value })}
+                    />
+                    بنك
+                  </label>
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label>ملاحظات</label>
+                <input
+                  type="text"
+                  value={s.notes}
+                  onChange={(e) => setPaySupplierState({ ...s, notes: e.target.value })}
+                  placeholder="ملاحظات اختيارية"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setPaySupplierState(null)}
+                >
+                  إلغاء
+                </button>
+                <button
+                  className="btn btn-success"
+                  disabled={!canSubmit}
+                  onClick={handlePay}
+                >
+                  {s.submitting ? 'جاري التسجيل...' : 'تأكيد الدفع'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </AppLayout>
   );
 }

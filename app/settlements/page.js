@@ -7,9 +7,9 @@ import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 
 const TYPES = {
-  seller_payout: { label: 'دفع بونص بائع', color: '#16a34a', bg: '#dcfce7' },
-  driver_payout: { label: 'دفع بونص سائق', color: '#7c3aed', bg: '#ede9fe' },
-  profit_distribution: { label: 'توزيع أرباح', color: '#1e40af', bg: '#dbeafe' },
+  seller_payout:       { label: 'دفع بونص بائع',  color: '#16a34a', bg: '#dcfce7' },
+  driver_payout:       { label: 'دفع بونص سائق',  color: '#7c3aed', bg: '#ede9fe' },
+  profit_distribution: { label: 'توزيع أرباح',     color: '#1e40af', bg: '#dbeafe' },
 };
 
 function SettlementsContent() {
@@ -20,7 +20,22 @@ function SettlementsContent() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const [form, setForm] = useState({ date: getTodayDate(), type: 'seller_payout', username: '', description: '', amount: '', notes: '' });
+  // v1.0.1 Feature 3 — eligible-users list for the currently selected
+  // settlement type. Refetched every time the type changes.
+  const [eligibleUsers, setEligibleUsers] = useState([]);
+
+  // v1.0.1 Feature 2 — details modal state. When set, a modal shows the
+  // full drill-down for the clicked settlement.
+  const [detailsState, setDetailsState] = useState(null); // { loading, data }
+
+  const [form, setForm] = useState({
+    date: getTodayDate(),
+    type: 'seller_payout',
+    username: '',
+    description: '',
+    amount: '',
+    notes: '',
+  });
 
   const fetchData = async () => {
     try {
@@ -36,8 +51,30 @@ function SettlementsContent() {
     finally { setLoading(false); }
   };
 
+  // v1.0.1 Feature 3 — reload eligible users whenever the form type changes
+  const fetchEligible = async (type) => {
+    try {
+      const res = await fetch(`/api/users/eligible-for-settlement?type=${type}`, { cache: 'no-store' });
+      const data = await res.json();
+      setEligibleUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setEligibleUsers([]);
+    }
+  };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchEligible(form.type); }, [form.type]);
+
+  // Find the currently-selected user's live credit from eligibleUsers.
+  // For profit_distribution the credit is null (no strict cap).
+  const selectedUser = eligibleUsers.find((u) => u.username === form.username);
+  const availableCredit = selectedUser?.available_credit;
+  const amountNum = parseFloat(form.amount) || 0;
+  // Feature 1 — live validation: allow 1 cent tolerance to match backend.
+  const exceedsCredit = availableCredit !== null &&
+                        availableCredit !== undefined &&
+                        amountNum > availableCredit + 0.01;
 
   // Item 3 — click-to-sort on the settlements history table, default newest first
   const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
@@ -55,36 +92,108 @@ function SettlementsContent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.description || !form.amount) { addToast('الوصف والمبلغ مطلوبين', 'error'); return; }
+    if (!form.description || !form.amount) {
+      addToast('الوصف والمبلغ مطلوبين', 'error');
+      return;
+    }
+    if (exceedsCredit) {
+      addToast('المبلغ يتجاوز الرصيد المتاح', 'error');
+      return;
+    }
     try {
-      const res = await fetch('/api/settlements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form), cache: 'no-store' });
+      const res = await fetch('/api/settlements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+        cache: 'no-store',
+      });
       if (res.ok) {
         addToast('تم تسجيل التسوية');
         setForm({ date: getTodayDate(), type: 'seller_payout', username: '', description: '', amount: '', notes: '' });
-        setShowForm(false); fetchData();
-      } else { const d = await res.json(); addToast(d.error, 'error'); }
+        setShowForm(false);
+        fetchData();
+      } else {
+        const d = await res.json();
+        addToast(d.error || 'خطأ', 'error');
+      }
     } catch { addToast('خطأ', 'error'); }
   };
 
+  // v1.0.1 Feature 3 + 4 — when the user picks a recipient, auto-fill
+  // amount with their available credit and pre-fill a sensible
+  // description. They can still edit both before submit.
+  const handleUserChange = (username) => {
+    const user = eligibleUsers.find((u) => u.username === username);
+    setForm((prev) => {
+      const next = { ...prev, username };
+      // Auto-fill amount (Feature 4). Null means profit_distribution
+      // with no strict cap — leave amount empty for manual entry.
+      if (user?.available_credit != null && user.available_credit > 0.005) {
+        next.amount = user.available_credit.toFixed(2);
+      } else if (user?.available_credit != null) {
+        // Zero credit — still let them pick, but blank the amount
+        next.amount = '';
+      }
+      // Auto-fill description from the user's real name
+      if (user && !prev.description) {
+        const roleLabel = prev.type === 'seller_payout' ? 'بائع'
+          : prev.type === 'driver_payout' ? 'سائق'
+          : 'إدارة';
+        next.description = `تسوية ${roleLabel} — ${user.name || username}`;
+      }
+      return next;
+    });
+  };
+
+  const handleTypeChange = (type) => {
+    setForm((prev) => ({
+      ...prev,
+      type,
+      username: '',
+      amount: '',
+      description: '',
+    }));
+  };
+
   const handleQuickSettle = (username, total) => {
-    const user = (Array.isArray(users) ? users : []).find((u) => u.username === username);
     const role = unsettledByUser[username]?.role;
+    const type = role === 'driver' ? 'driver_payout' : 'seller_payout';
+    // Open the form with the type pre-set; the useEffect above refetches
+    // eligibleUsers for this type, then we fill username + amount.
     setForm({
       date: getTodayDate(),
-      type: role === 'driver' ? 'driver_payout' : 'seller_payout',
+      type,
       username,
-      description: `تسوية بونص ${user?.name || username} - ${unsettledByUser[username]?.count || 0} عمليات`,
+      description: '',
       amount: String(Math.round(total * 100) / 100),
       notes: '',
     });
     setShowForm(true);
   };
 
+  // v1.0.1 Feature 2 — open the drill-down modal for a specific settlement
+  const openDetails = async (settlementId) => {
+    setDetailsState({ loading: true, data: null });
+    try {
+      const res = await fetch(`/api/settlements/${settlementId}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setDetailsState({ loading: false, data });
+      } else {
+        addToast('خطأ في جلب التفاصيل', 'error');
+        setDetailsState(null);
+      }
+    } catch {
+      addToast('خطأ في الاتصال', 'error');
+      setDetailsState(null);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="page-header">
         <h2>التسويات</h2>
-        <p>تسوية حسابات البائعين والسائقين</p>
+        <p>تسوية حسابات البائعين والسائقين وتوزيع الأرباح</p>
       </div>
 
       {/* Unsettled Bonuses */}
@@ -114,7 +223,7 @@ function SettlementsContent() {
         </div>
       )}
 
-      {/* Settlement Form */}
+      {/* Settlement Form — v1.0.1 Features 1/3/4 */}
       {showForm && (
         <div className="card" style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>تسجيل تسوية</h3>
@@ -126,20 +235,67 @@ function SettlementsContent() {
               </div>
               <div className="form-group">
                 <label>النوع *</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <select value={form.type} onChange={(e) => handleTypeChange(e.target.value)}>
                   {Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label>المستخدم</label>
-                <select value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })}>
+                <label>المستخدم *</label>
+                {/* v1.0.1 Feature 3 — filtered by role per selected type.
+                    Users with zero credit are kept in the list but marked
+                    "لا يوجد رصيد" so the admin sees the full roster. */}
+                <select value={form.username} onChange={(e) => handleUserChange(e.target.value)} required>
                   <option value="">-- اختر --</option>
-                  {(Array.isArray(users) ? users : []).map((u) => <option key={u.id} value={u.username}>{u.name} ({u.role})</option>)}
+                  {eligibleUsers.map((u) => {
+                    const hasCredit = u.available_credit == null || u.available_credit > 0.005;
+                    const suffix = u.available_credit == null
+                      ? ''
+                      : hasCredit
+                      ? ` — ${u.available_credit.toFixed(2)}€`
+                      : ' — لا يوجد رصيد';
+                    return (
+                      <option
+                        key={u.username}
+                        value={u.username}
+                        style={{ color: hasCredit ? '#1a1a1a' : '#94a3b8' }}
+                      >
+                        {u.name || u.username}{suffix}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="form-group">
                 <label>المبلغ *</label>
-                <input type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  required
+                  style={{
+                    border: exceedsCredit ? '2px solid #dc2626' : undefined,
+                    background: exceedsCredit ? '#fef2f2' : undefined,
+                  }}
+                />
+                {/* v1.0.1 Feature 1 — live available-credit display */}
+                {availableCredit != null && form.username && (
+                  <div style={{
+                    marginTop: '6px',
+                    fontSize: '0.78rem',
+                    color: exceedsCredit ? '#dc2626' : '#16a34a',
+                    fontWeight: 600,
+                  }}>
+                    الرصيد المتاح: {availableCredit.toFixed(2)}€
+                    {exceedsCredit && ' — المبلغ يتجاوز الرصيد!'}
+                  </div>
+                )}
+                {availableCredit === null && form.username && (
+                  <div style={{ marginTop: '6px', fontSize: '0.72rem', color: '#64748b' }}>
+                    توزيع الأرباح — لا يوجد حد أعلى
+                  </div>
+                )}
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label>الوصف *</label>
@@ -151,7 +307,13 @@ function SettlementsContent() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="submit" className="btn btn-primary">تسجيل التسوية</button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={exceedsCredit}
+              >
+                تسجيل التسوية
+              </button>
               <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>إلغاء</button>
             </div>
           </form>
@@ -181,6 +343,7 @@ function SettlementsContent() {
                   <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('amount')}</th>
                   <th onClick={() => requestSort('settled_by')} style={{ cursor: 'pointer' }}>بواسطة{getSortIndicator('settled_by')}</th>
                   <th>ملاحظات</th>
+                  <th>التفاصيل</th>
                 </tr></thead>
                 <tbody>
                   {sortedRows.map((s) => {
@@ -195,6 +358,14 @@ function SettlementsContent() {
                         <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(s.amount)}</td>
                         <td>{s.settled_by}</td>
                         <td>{s.notes}</td>
+                        <td>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => openDetails(s.id)}
+                          >
+                            🔍 تفاصيل
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -204,6 +375,128 @@ function SettlementsContent() {
           )
         )}
       </div>
+
+      {/* v1.0.1 Feature 2 — drill-down modal */}
+      {detailsState && (
+        <div
+          className="modal-overlay"
+          onClick={() => setDetailsState(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '20px',
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem' }}>تفاصيل التسوية</h3>
+              <button className="btn btn-outline btn-sm" onClick={() => setDetailsState(null)}>✕</button>
+            </div>
+            {detailsState.loading && <div className="loading-overlay"><div className="spinner"></div></div>}
+            {detailsState.data && (
+              <>
+                {/* Header card — settlement summary */}
+                <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.9rem' }}>
+                    <div><strong>المستخدم:</strong> {detailsState.data.username || '—'}</div>
+                    <div><strong>النوع:</strong> {TYPES[detailsState.data.type]?.label || detailsState.data.type}</div>
+                    <div><strong>التاريخ:</strong> {detailsState.data.date}</div>
+                    <div><strong>المبلغ:</strong> {formatNumber(detailsState.data.amount)}€</div>
+                    <div><strong>بواسطة:</strong> {detailsState.data.settled_by}</div>
+                    <div><strong>الوصف:</strong> {detailsState.data.description}</div>
+                    {detailsState.data.notes && (
+                      <div style={{ gridColumn: 'span 2' }}><strong>ملاحظات:</strong> {detailsState.data.notes}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Linked items table — bonuses/sales covered by this settlement */}
+                <h4 style={{ fontSize: '0.95rem', marginBottom: '8px', color: '#374151' }}>
+                  العمليات المرتبطة ({detailsState.data.linked_items?.length || 0})
+                </h4>
+                {(!detailsState.data.linked_items || detailsState.data.linked_items.length === 0) ? (
+                  <div className="empty-state" style={{ padding: '16px' }}>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      {detailsState.data.type === 'profit_distribution'
+                        ? 'توزيع أرباح لا يرتبط بعمليات محددة'
+                        : 'لا توجد عمليات مرتبطة بهذه التسوية'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>التاريخ</th>
+                          <th>الطلب</th>
+                          <th>العميل</th>
+                          <th>المنتج</th>
+                          <th>إجمالي البيع</th>
+                          <th>البونص</th>
+                          <th>الفاتورة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailsState.data.linked_items.map((it) => (
+                          <tr key={it.bonus_id}>
+                            <td>{it.bonus_id}</td>
+                            <td>{it.bonus_date}</td>
+                            <td>#{it.sale_id || '—'}</td>
+                            <td>{it.client_name}</td>
+                            <td>{it.sale_item}</td>
+                            <td className="number-cell">{formatNumber(it.sale_total)}</td>
+                            <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                              {formatNumber(it.total_bonus)}
+                            </td>
+                            <td>
+                              {it.invoice_ref_code ? (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: '#1a3a2a', color: 'white', padding: '4px 8px' }}
+                                  onClick={() => window.open(`/api/invoices/${it.invoice_ref_code}/pdf`, '_blank')}
+                                >
+                                  📄
+                                </button>
+                              ) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'left', fontWeight: 700 }}>
+                            إجمالي البونصات المسواة:
+                          </td>
+                          <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>
+                            {formatNumber(detailsState.data.linked_total || 0)}
+                          </td>
+                          <td></td>
+                        </tr>
+                        {Math.abs((detailsState.data.linked_total || 0) - (detailsState.data.amount || 0)) > 0.01 && (
+                          <tr>
+                            <td colSpan="6" style={{ textAlign: 'left', fontSize: '0.78rem', color: '#b45309' }}>
+                              ⚠️ الفرق عن مبلغ التسوية:
+                            </td>
+                            <td className="number-cell" style={{ fontSize: '0.78rem', color: '#b45309' }}>
+                              {formatNumber((detailsState.data.amount || 0) - (detailsState.data.linked_total || 0))}
+                            </td>
+                            <td></td>
+                          </tr>
+                        )}
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

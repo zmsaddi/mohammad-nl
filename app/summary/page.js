@@ -656,31 +656,47 @@ function SummaryContent() {
             </div>
           )}
 
-          {/* DONE: Fix 2 — top clients by confirmed revenue */}
-          {data.topClients?.length > 0 && (
+          {/* v1.0.1 Feature 5 — top sellers replaces top clients per user request.
+              Sources:
+              - topSellers[] from getSummaryData (only users whose role is
+                literally 'seller' are counted; admin/manager-created sales
+                do NOT appear here, matching the locked bonus eligibility rule)
+              - each entry shows sales count, total revenue, and accrued
+                seller bonuses for the period
+              The legacy topClients field is still returned from the API for
+              backward compat with any external consumer, just not rendered. */}
+          {data.topSellers?.length > 0 && (
             <div className="card" style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-                أفضل العملاء
+                أفضل البائعين
               </h3>
               <div className="table-container">
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>الترتيب</th>
-                      <th>العميل</th>
-                      <th>عدد الطلبات</th>
-                      <th>إجمالي الشراء</th>
+                      <th>البائع</th>
+                      <th>عدد المبيعات</th>
+                      <th>إجمالي المبيعات</th>
+                      {canSeeCosts && <th>البونص المستحق</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.topClients.map((c, i) => (
-                      <tr key={c.name}>
+                    {data.topSellers.map((s, i) => (
+                      <tr key={s.username}>
                         <td style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                         </td>
-                        <td style={{ fontWeight: 600 }}>{c.name}</td>
-                        <td className="number-cell">{c.count}</td>
-                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(c.revenue)}</td>
+                        <td style={{ fontWeight: 600 }}>{s.name || s.username}</td>
+                        <td className="number-cell">{s.salesCount}</td>
+                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                          {formatNumber(s.totalSales)}
+                        </td>
+                        {canSeeCosts && (
+                          <td className="number-cell" style={{ color: '#7c3aed', fontWeight: 600 }}>
+                            {formatNumber(s.totalBonus)}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
