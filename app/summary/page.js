@@ -705,7 +705,10 @@ function SummaryContent() {
             </div>
           )}
 
-          {/* DONE: Fix 5 — supplier performance (admin only) */}
+          {/* v1.0.2 Feature 3 — supplier performance with total / paid /
+              remaining columns, mirroring the v1.0.1 supplier credit flow.
+              Remaining is red when > 0 (outstanding debt to supplier),
+              green when fully settled. */}
           {isAdmin && data.topSuppliers?.length > 0 && (
             <div className="card" style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
@@ -716,20 +719,36 @@ function SummaryContent() {
                   <thead>
                     <tr>
                       <th>المورد</th>
-                      <th>عدد الطلبات</th>
-                      <th>أنواع المنتجات</th>
-                      <th>إجمالي المدفوع</th>
+                      <th>الطلبات</th>
+                      <th>الأنواع</th>
+                      <th>إجمالي</th>
+                      <th>مدفوع</th>
+                      <th>متبقي</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.topSuppliers.map((s) => (
-                      <tr key={s.name}>
-                        <td style={{ fontWeight: 600 }}>{s.name}</td>
-                        <td className="number-cell">{s.orders}</td>
-                        <td className="number-cell">{s.itemCount}</td>
-                        <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(s.totalSpent)}</td>
-                      </tr>
-                    ))}
+                    {data.topSuppliers.map((s) => {
+                      const remaining = parseFloat(s.totalRemaining) || 0;
+                      return (
+                        <tr key={s.name}>
+                          <td style={{ fontWeight: 600 }}>{s.name}</td>
+                          <td className="number-cell">{s.orders}</td>
+                          <td className="number-cell">{s.itemCount}</td>
+                          <td className="number-cell" style={{ fontWeight: 600 }}>
+                            {formatNumber(s.totalSpent)}
+                          </td>
+                          <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                            {formatNumber(s.totalPaid)}
+                          </td>
+                          <td className="number-cell" style={{
+                            color: remaining > 0.005 ? '#dc2626' : '#16a34a',
+                            fontWeight: 700,
+                          }}>
+                            {formatNumber(remaining)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

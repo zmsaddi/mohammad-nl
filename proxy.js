@@ -14,6 +14,9 @@ const PAGE_ROLES = {
   '/deliveries': ['admin', 'manager', 'seller', 'driver'],
   '/users': ['admin'],
   '/settlements': ['admin'],
+  // v1.0.2 Feature 2 — profit distribution page. Admin + manager can
+  // view history; only admin can POST (enforced at route layer).
+  '/profit-distributions': ['admin', 'manager'],
   // DONE: Step 5 — invoice settings page (admin only)
   '/settings': ['admin'],
 };
