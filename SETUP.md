@@ -105,14 +105,52 @@ NEXTAUTH_SECRET=<any string — tests don't really use this>
 
 > ⚠️ **لا تستخدم فرع الإنتاج أو فرع التطوير اليومي هنا.** الاختبارات ستحذف البيانات.
 
+#### v1.1 F-009 — حارس صارم على `POSTGRES_URL`
+
+اعتباراً من v1.1، تُرفض اختبارات المجموعة إذا لم يُعرّف `POSTGRES_URL` نفسه
+كبيئة اختبار. يجب أن يحتوي **اسم المضيف (host)** أو **اسم قاعدة البيانات** على
+أحد المُعرّفات التالية (غير حساسة لحالة الأحرف):
+
+```
+test  |  sandbox  |  dev  |  staging  |  preview  |  ephemeral
+```
+
+أمثلة مقبولة:
+
+```
+postgresql://user:pw@ep-test-sandbox.example.neon.tech/neondb?sslmode=require
+postgresql://user:pw@ep-prod.example.neon.tech/neondb-test?sslmode=require
+```
+
+أمثلة **مرفوضة** (ستتسبب بفشل `pretest` قبل أي اتصال بقاعدة البيانات):
+
+```
+postgresql://user:pw@ep-winter-wave.example.neon.tech/neondb?sslmode=require   ← مرفوض
+postgresql://user:pw@prod-db.example.com/customers?sslmode=require              ← مرفوض
+```
+
+لتشخيص ما يُشير إليه `.env.test` الحالي:
+
+```bash
+node scripts/env-test-doctor.mjs
+```
+
+السكربت يطبع المضيف واسم قاعدة البيانات ويُجري فحص `current_database()` الحي قبل أي
+DDL. رمز الخروج 0 = آمن للتشغيل، 1 = رفض، 2 = فشل الفحص (شبكة/اتصال).
+
+المرجع: [F-009 في docs/v1-1-comprehensive-study.md](docs/v1-1-comprehensive-study.md).
+
 ### 4.2 تشغيل المجموعة الكاملة
 
 ```bash
-# تشغيل مرة واحدة
+# تشغيل مرة واحدة — يُشغّل env-test-doctor أولاً (pretest hook)
+npm test
+
+# الطريقة القديمة (لا تشغّل الحارس — استخدم فقط بعد التحقق اليدوي)
 npx vitest run
 
-# مع المراقبة (إعادة تشغيل تلقائي على التغييرات)
-npx vitest
+# مع المراقبة
+npm run test:ui
 
 # اختبار ملف معين فقط
 npx vitest run tests/sale-lifecycle.test.js
@@ -120,6 +158,10 @@ npx vitest run tests/sale-lifecycle.test.js
 # اختبار وحدة ملف معين (no DB)
 npx vitest run tests/voice-normalizer.test.js
 ```
+
+> ✅ `npm test` هو الطريقة الصحيحة اعتباراً من v1.1 — يُشغّل حارس `env-test-doctor`
+> تلقائياً قبل vitest. إذا كان `.env.test` يُشير إلى الإنتاج، سيرفض تشغيل الاختبارات
+> مع رسالة `F-009 env-test guard REFUSING TO RUN`.
 
 المجموعة الحالية: **206 اختبار، 13 ملف**. الاختبارات التي لا تحتاج DB تستخدم mocks
 (راجع `tests/bug04-deliveries-driver-put.test.js` كمثال).
