@@ -82,9 +82,15 @@ jobs:
           NEXTAUTH_URL=http://localhost:3000
           EOF
       - name: Vitest (mock + unit suites)
+        # NOTE: bug14-deliveries-post-contract.test.js and
+        # bug21-supplier-ambiguity.test.js are REAL-DB tests despite the
+        # "contract" / "mock-style" naming — they import sql from
+        # @vercel/postgres and TRUNCATE real tables. They run in the
+        # test-real-db job, not here.
         run: |
           npx vitest run \
             tests/setup.test-env.guard.test.js \
+            tests/ignore-expected-ddl.test.js \
             tests/authz/ \
             tests/voice-normalizer.test.js \
             tests/voice-no-phantoms.test.js \
@@ -103,9 +109,7 @@ jobs:
             tests/bug04b-driver-put-edge-cases.test.js \
             tests/bug05-summary-date-window.test.js \
             tests/bug08-bonus-driver-fallback.test.js \
-            tests/bug14-deliveries-post-contract.test.js \
             tests/bug14-schemas.test.js \
-            tests/bug21-supplier-ambiguity.test.js \
             tests/bug30-products-put-mirror.test.js \
             tests/bug30-sales-buy-price-floor.test.js \
             tests/manual-form-coercion.test.js \
