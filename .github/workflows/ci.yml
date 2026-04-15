@@ -1,0 +1,143 @@
+name: ci
+
+# v1.1 S1.5 — F-069 fix. Pre-v1.1 there was no CI/CD at all; 6 releases
+# in 72 hours shipped with no lint/test/build gate. This workflow runs
+# on every push and PR to master.
+#
+# Required repository secret:
+#   NEON_TEST_BRANCH_URL — Postgres connection string for a dedicated
+#     Neon test branch. Must contain "test|sandbox|dev|staging|preview|
+#     ephemeral" in host or database name per the F-009 guard, otherwise
+#     env-test-doctor will refuse.
+#
+# Jobs:
+#   - lint        : ESLint (non-blocking for now — see continue-on-error)
+#   - build       : next build (must pass)
+#   - test-mock   : vitest run on unit/mock tests that don't need a DB
+#   - test-real   : vitest run on real-DB integration tests (gated on
+#                   NEON_TEST_BRANCH_URL secret being set — skipped in
+#                   forks without the secret)
+#
+# Branch protection: users must enable "require CI green before merge"
+# via Settings → Branches → master. Claude cannot toggle that.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+        continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Next build
+        run: npm run build
+        env:
+          # Placeholder values — build does not hit the DB. Real URLs come
+          # from Vercel's env at deploy time.
+          POSTGRES_URL: 'postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require'
+          POSTGRES_URL_NON_POOLING: 'postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require'
+          NEXTAUTH_SECRET: 'ci-test-secret-not-used-in-production-at-all-00000'
+          NEXTAUTH_URL: 'http://localhost:3000'
+
+  test-mock:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Write .env.test with safe-marker placeholder
+        # Mock-only tests still load tests/setup.test-env.js which runs
+        # the F-009 guard. Give it a URL that passes the safe-pattern
+        # check; the mock tests never actually connect.
+        run: |
+          cat > .env.test <<'EOF'
+          POSTGRES_URL=postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require
+          POSTGRES_URL_NON_POOLING=postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require
+          NEXTAUTH_SECRET=ci-test-secret-not-used-in-production-at-all-00000
+          NEXTAUTH_URL=http://localhost:3000
+          EOF
+      - name: Vitest (mock + unit suites)
+        run: |
+          npx vitest run \
+            tests/setup.test-env.guard.test.js \
+            tests/authz/ \
+            tests/voice-normalizer.test.js \
+            tests/voice-no-phantoms.test.js \
+            tests/voice-action-classifier.test.js \
+            tests/bug06-voice-normalizer-coverage.test.js \
+            tests/bug28-voice-blacklist.test.js \
+            tests/bug09-sell-price-prompt.test.js \
+            tests/bug10-missed-field-learn.test.js \
+            tests/hotfix-voice-null-fields.test.js \
+            tests/latin-transformation.test.js \
+            tests/alias-generator.test.js \
+            tests/api-error-logging.test.js \
+            tests/bug03-init-reset-gate.test.js \
+            tests/bug04-deliveries-driver-put.test.js \
+            tests/bug04a-vin-preservation.test.js \
+            tests/bug04b-driver-put-edge-cases.test.js \
+            tests/bug05-summary-date-window.test.js \
+            tests/bug08-bonus-driver-fallback.test.js \
+            tests/bug14-deliveries-post-contract.test.js \
+            tests/bug14-schemas.test.js \
+            tests/bug21-supplier-ambiguity.test.js \
+            tests/bug30-products-put-mirror.test.js \
+            tests/bug30-sales-buy-price-floor.test.js \
+            tests/manual-form-coercion.test.js \
+            tests/feat04-invoice-modes.test.js \
+            tests/cancel-rule-rbac.test.js
+        env:
+          POSTGRES_URL: 'postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require'
+          POSTGRES_URL_NON_POOLING: 'postgresql://ci:ci@ci-test-host.example.com/neondb-test?sslmode=require'
+          NEXTAUTH_SECRET: 'ci-test-secret-not-used-in-production-at-all-00000'
+
+  test-real-db:
+    runs-on: ubuntu-latest
+    needs: build
+    # Skip this job if the secret is missing (e.g. fork PR) so the rest
+    # of the pipeline still runs.
+    if: ${{ vars.ENABLE_REAL_DB_TESTS == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Write .env.test from NEON_TEST_BRANCH_URL secret
+        run: |
+          cat > .env.test <<EOF
+          POSTGRES_URL=${{ secrets.NEON_TEST_BRANCH_URL }}
+          POSTGRES_URL_NON_POOLING=${{ secrets.NEON_TEST_BRANCH_URL_NON_POOLING }}
+          NEXTAUTH_SECRET=ci-test-secret-not-used-in-production-at-all-00000
+          NEXTAUTH_URL=http://localhost:3000
+          EOF
+      - name: env-test-doctor (F-009 guard)
+        run: node scripts/env-test-doctor.mjs
+      - name: Vitest (real-DB integration suites)
+        run: npm test

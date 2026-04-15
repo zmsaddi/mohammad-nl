@@ -166,6 +166,33 @@ npx vitest run tests/voice-normalizer.test.js
 المجموعة الحالية: **206 اختبار، 13 ملف**. الاختبارات التي لا تحتاج DB تستخدم mocks
 (راجع `tests/bug04-deliveries-driver-put.test.js` كمثال).
 
+### 4.3 GitHub Actions CI (v1.1 — F-069)
+
+اعتباراً من v1.1، الملف `.github/workflows/ci.yml` يُشغّل على كل push و PR إلى
+`master`. الوظائف:
+
+1. **lint** — ESLint (غير حاجب حالياً — `continue-on-error: true`)
+2. **build** — `next build` يجب أن ينجح
+3. **test-mock** — vitest على اختبارات mock/وحدة (لا تحتاج قاعدة بيانات)
+4. **test-real-db** — vitest على اختبارات التكامل الحقيقية (تُخطى ما لم يُفعَّل)
+
+**أسرار GitHub المطلوبة** (Settings → Secrets and variables → Actions):
+
+| السر / المتغير | النوع | الوصف |
+|-----------------|-------|-------|
+| `NEON_TEST_BRANCH_URL` | Secret | رابط `POSTGRES_URL` لفرع Neon مخصص للاختبار |
+| `NEON_TEST_BRANCH_URL_NON_POOLING` | Secret | نفسه بصيغة non-pooling |
+| `ENABLE_REAL_DB_TESTS` | Variable | اضبط على `"true"` لتفعيل وظيفة `test-real-db` |
+
+**حماية الفرع** (Settings → Branches → `master` branch protection rule):
+
+- [ ] Require a pull request before merging
+- [ ] Require status checks to pass before merging (select `build`, `test-mock`)
+- [ ] Require branches to be up to date before merging
+- [ ] Include administrators (اختياري لكن يُستحسن)
+
+Claude لا يستطيع تفعيل هذه الحمايات تلقائياً — يجب على المستخدم تفعيلها من واجهة GitHub.
+
 ---
 
 ## 5. ملء الأسماء البديلة (Alias Backfill)
