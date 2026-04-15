@@ -56,39 +56,36 @@ Tests added: **6** · Merge commit: `2dea127`
 
 ---
 
-### S1.2 — F-065: settlements POST role check [CRITICAL — FALSE POSITIVE]
+### S1.2 — F-065: settlements POST role check [CRITICAL — FALSE POSITIVE] — **DONE**
 
 Domain 5 audit reported the route was gated on `!token` only. **Verified false:** `app/api/settlements/route.js:26` already enforces `token.role !== 'admin'`. Only admins can POST. Drivers/sellers/managers get 403.
 
-- [-] Mark as false positive · No code change · Study annotation: add "VERIFIED CLOSED — route already enforces admin-only at L26"
-- [ ] Add explicit regression test (defense in depth): `tests/authz/settlements-post-rbac.test.js` asserting 403 for seller/driver/manager, 200 for admin
-- [ ] Commit + push
+- [-] Marked as false positive in study doc §5.7
+- [x] Regression test `tests/authz/settlements-post-rbac.test.js` — 5 cases (admin→200, manager/seller/driver/anon→403)
 
-Tests added: 4 (one per role) · Commit: __
+Tests added: 5 · Merge commit: `ffbc2ce`
 
 ---
 
-### S1.3 — F-066: expenses POST role check [CRITICAL — FALSE POSITIVE]
+### S1.3 — F-066: expenses POST role check [CRITICAL — FALSE POSITIVE] — **DONE**
 
 Domain 5 audit reported no role check. **Verified false:** `app/api/expenses/route.js:26` enforces `['admin','manager'].includes(token.role)`. Drivers and sellers are blocked.
 
-- [-] Mark as false positive · Study annotation same pattern as F-065
-- [ ] Add regression test `tests/authz/expenses-post-rbac.test.js`
-- [ ] Commit + push
+- [-] Marked as false positive in study doc §5.7
+- [x] Regression test `tests/authz/expenses-post-rbac.test.js` — 5 cases (admin+manager→200, seller/driver→403, anon→401)
 
-Tests added: 4 · Commit: __
+Tests added: 5 · Merge commit: `ffbc2ce`
 
 ---
 
-### S1.4 — F-067: voice POST role check [CRITICAL — FALSE POSITIVE]
+### S1.4 — F-067: voice POST role check [CRITICAL — FALSE POSITIVE] — **DONE**
 
 Domain 5 audit reported no role check. **Verified false:** `app/api/voice/process/route.js:45` enforces `['admin','manager','seller'].includes(token.role)` AND has a per-user sliding-window rate limit (10 req/min).
 
-- [-] Mark as false positive · Study annotation: route has BOTH role gate AND rate limit; driver POST returns 403
-- [ ] Add regression test `tests/authz/voice-process-rbac.test.js` asserting driver → 403
-- [ ] Commit + push
+- [-] Marked as false positive in study doc §5.7
+- [x] Regression test `tests/authz/voice-process-rbac.test.js` — 2 cases (driver→403, anon→401)
 
-Tests added: 2 · Commit: __
+Tests added: 2 · Merge commit: `ffbc2ce`
 
 ---
 
