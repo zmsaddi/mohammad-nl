@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pretest": "node scripts/env-test-doctor.mjs",
+    "test": "vitest run",
+    "test:ui": "vitest",
+    "test:unsafe": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vercel/postgres": "^0.10.0",
