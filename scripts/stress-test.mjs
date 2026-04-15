@@ -739,6 +739,159 @@ async function rule5_concurrent() {
   console.log(`  R5 parallel collects: ${totalSucceeded}/50 succeeded (expect 50 if all 5×10 serialized cleanly)`);
 }
 
+// ── Rule 6: Idempotency (40 ops) ──────────────────────────────
+//
+// Verifies the Session 8 Phase 0.5 idempotency hotfix at scale:
+//
+//   1. cancelSale double-execution is blocked by the new explicit guard
+//      at lib/db.js:1008 ('الطلب مُلغى مسبقاً' throw). 20 double-cancel
+//      attempts, each expected to fail on the second call.
+//
+//   2. updateDelivery confirm double-execution is already idempotent via
+//      the same-status shortcut at lib/db.js:2141 (silent early return,
+//      HTTP 200, no state change). 20 double-confirm attempts, each
+//      expected to succeed silently on the second call with no duplicate
+//      payment rows and no duplicate bonus rows.
+async function rule6_idempotency() {
+  startRule('rule6', 'Idempotency guards (40 ops: 20 double-cancel + 20 double-confirm)');
+
+  // ─── Part A: 20 double-cancel attempts ───
+  //
+  // Seed 20 fresh reserved sales (cheapest path — no payments, no bonuses,
+  // so we isolate the guard from the refund/bonus side-effects the unit
+  // tests already cover). The guard at Step 1 fires before any Step 5/11
+  // writes, so blocking here still validates the full protection.
+  await loginAs(USERS.seller.username, USERS.seller.password);
+  const cancelSales = [];
+  for (let i = 0; i < 20; i++) {
+    const product = pickRandom(STRESS_PRODUCTS);
+    const client = pickRandom(STRESS_CLIENTS);
+    const r = await createSale({
+      product, client,
+      quantity: 1,
+      unitPrice: product.sellPrice,
+      paymentType: 'كاش',
+      dpe: product.sellPrice,
+    });
+    if (r.ok && r.id) cancelSales.push(r.id);
+    else assert(`R6 seed cancel sale ${i + 1}/20`, false, { status: r.status, data: r.data });
+  }
+  assert('R6 20 seed sales for double-cancel', cancelSales.length === 20, {
+    actual: cancelSales.length,
+  });
+
+  await loginAdmin();
+  let firstCancelOk = 0;
+  let secondCancelBlocked = 0;
+  for (const saleId of cancelSales) {
+    // First cancel — must succeed
+    const first = await apiPost(`/api/sales/${saleId}/cancel`, {
+      reason: 'STRESS R6 double-cancel first',
+      invoiceMode: 'soft',
+      bonusActions: null,
+    });
+    if (first.res.ok) firstCancelOk++;
+
+    // Second cancel on the same sale — must be rejected with the Arabic
+    // idempotency error. Route layer maps the throw to HTTP 400 with the
+    // err.message forwarded as the body's `error` field.
+    const second = await apiPost(`/api/sales/${saleId}/cancel`, {
+      reason: 'STRESS R6 double-cancel second',
+      invoiceMode: 'soft',
+      bonusActions: null,
+    });
+    if (second.res.status === 400 && /مُلغى مسبقاً/.test(second.data?.error || '')) {
+      secondCancelBlocked++;
+    } else {
+      assert(`R6 double-cancel sale ${saleId}`, false, {
+        secondStatus: second.res.status,
+        secondError: second.data?.error,
+      });
+    }
+  }
+  assert('R6 20 first cancels succeeded', firstCancelOk === 20, { actual: firstCancelOk });
+  assert('R6 20 second cancels blocked with Arabic idempotency error',
+    secondCancelBlocked === 20, { actual: secondCancelBlocked });
+
+  // Verify audit trail: each doubly-cancelled sale must have exactly ONE
+  // row in cancellations, not two. We check this via the sales state:
+  // payment_status should still be 'cancelled' and the sale should still
+  // be 'ملغي' — the failed second cancel did not mutate state.
+  const allSalesAfterR6A = await getAllSales();
+  const cancelledR6A = allSalesAfterR6A.filter((s) => cancelSales.includes(s.id));
+  const properlyCancelled = cancelledR6A.filter(
+    (s) => s.status === 'ملغي' && s.payment_status === 'cancelled'
+  ).length;
+  assert('R6 all 20 cancelled sales have stable state after double-cancel',
+    properlyCancelled === 20, { actual: properlyCancelled });
+
+  // ─── Part B: 20 double-confirm attempts ───
+  //
+  // updateDelivery is ALREADY idempotent via lib/db.js:2141
+  // `if (oldStatus === data.status) return;`. A second PUT with the same
+  // status is a silent no-op (HTTP 200, no writes). We verify it at scale
+  // to guard against regressions: payment rows and bonus counts must not
+  // grow between the two confirmations.
+  await loginAs(USERS.seller.username, USERS.seller.password);
+  const confirmSales = [];
+  for (let i = 0; i < 20; i++) {
+    const product = pickRandom(STRESS_PRODUCTS);
+    const client = pickRandom(STRESS_CLIENTS);
+    const r = await createSale({
+      product, client,
+      quantity: 1,
+      unitPrice: product.sellPrice,
+      paymentType: 'كاش',
+      dpe: product.sellPrice,
+    });
+    if (r.ok && r.id) confirmSales.push(r.id);
+    else assert(`R6 seed confirm sale ${i + 1}/20`, false, { status: r.status, data: r.data });
+  }
+  assert('R6 20 seed sales for double-confirm', confirmSales.length === 20, {
+    actual: confirmSales.length,
+  });
+
+  await loginAdmin();
+  const deliveriesR6 = await getAllDeliveries();
+  const bonusBefore = await countStressBonuses();
+  let firstConfirmOk = 0;
+  let secondConfirmOk = 0;
+  for (let i = 0; i < confirmSales.length; i++) {
+    const saleId = confirmSales[i];
+    // First confirmation — must succeed
+    const first = await confirmDelivery(saleId, `STRESSR6VIN${String(i).padStart(4, '0')}`,
+      USERS.driver.username, deliveriesR6);
+    if (first.ok) firstConfirmOk++;
+
+    // Second confirmation with the same payload — must also return 200
+    // (silent no-op, not an error). The delivery row's status is already
+    // 'تم التوصيل', so updateDelivery returns early at L2141.
+    const second = await confirmDelivery(saleId, `STRESSR6VIN${String(i).padStart(4, '0')}`,
+      USERS.driver.username, deliveriesR6);
+    if (second.ok) secondConfirmOk++;
+    else {
+      assert(`R6 double-confirm sale ${saleId}`, false, {
+        secondStatus: second.status, result: second,
+      });
+    }
+  }
+  assert('R6 20 first confirms succeeded', firstConfirmOk === 20, { actual: firstConfirmOk });
+  assert('R6 20 second confirms silent-succeeded (idempotent)',
+    secondConfirmOk === 20, { actual: secondConfirmOk });
+
+  // Verify no double side-effects: bonus count must grow by exactly 40
+  // (one seller + one driver per confirmed sale), not 80.
+  const bonusAfter = await countStressBonuses();
+  const sellerDelta = bonusAfter.seller - bonusBefore.seller;
+  const driverDelta = bonusAfter.driver - bonusBefore.driver;
+  assert('R6 exactly 20 seller bonuses generated (no double)',
+    sellerDelta === 20, { expected: 20, actual: sellerDelta });
+  assert('R6 exactly 20 driver bonuses generated (no double)',
+    driverDelta === 20, { expected: 20, actual: driverDelta });
+
+  console.log(`  R6 idempotency: 20/20 double-cancel blocked, 20/20 double-confirm no-op, bonus delta seller=${sellerDelta} driver=${driverDelta}`);
+}
+
 // ── Main ───────────────────────────────────────────────────────
 async function main() {
   const totalStart = Date.now();
