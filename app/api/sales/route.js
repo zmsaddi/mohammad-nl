@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt';
 import { getSales, addSale, deleteSale, updateSale } from '@/lib/db';
 import { SaleSchema, SaleUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
+import { canCancelSale, CANCEL_DENIED_ERROR } from '@/lib/cancel-rule';
 
 async function checkAuth(request) {
   return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -120,6 +121,9 @@ export async function PUT(request) {
 export async function DELETE(request) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  // Session 9 locked cancel rule — driver blocked at the outer gate.
+  // admin + manager + seller may reach here, and the shared helper
+  // below enforces the role × status matrix exactly.
   if (!['admin', 'manager', 'seller'].includes(token.role)) {
     return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
   }
@@ -129,11 +133,13 @@ export async function DELETE(request) {
     const { sql: sqlQ } = await import('@vercel/postgres');
     const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${id}`;
     if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
-    if (rows[0].status !== 'محجوز') {
-      return NextResponse.json({ error: 'لا يمكن إلغاء طلب بعد التوصيل' }, { status: 403 });
-    }
-    if (token.role === 'seller' && rows[0].created_by !== token.username) {
-      return NextResponse.json({ error: 'لا يمكنك إلغاء طلب غيرك' }, { status: 403 });
+    // canCancelSale implements the full matrix — admin anything, manager
+    // reserved only, seller own-reserved only, driver never. It replaces
+    // the previous bespoke checks (status === 'محجوز' + seller ownership)
+    // which would have let a manager cancel a confirmed sale via this
+    // route if they went around the /api/sales/[id]/cancel entry point.
+    if (!canCancelSale(rows[0], { role: token.role, username: token.username })) {
+      return NextResponse.json({ error: CANCEL_DENIED_ERROR }, { status: 403 });
     }
     await deleteSale(id);
     return NextResponse.json({ success: true });

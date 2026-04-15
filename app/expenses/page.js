@@ -7,6 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function ExpensesContent() {
   const { data: session } = useSession();
@@ -42,6 +43,12 @@ function ExpensesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+
+  // Item 3 — click-to-sort, default newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    rows,
+    { key: 'date', direction: 'desc' }
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -167,18 +174,18 @@ function ExpensesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>التاريخ</th>
-                  <th>الفئة</th>
-                  <th>الوصف</th>
-                  <th>المبلغ</th>
-                  <th>الدفع</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
+                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>الوصف{getSortIndicator('description')}</th>
+                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('amount')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
                   <th>ملاحظات</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td>{row.id}</td>
                     <td>{row.date}</td>

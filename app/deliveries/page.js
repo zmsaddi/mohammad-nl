@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 const DELIVERY_STATUSES = [
   { value: 'قيد الانتظار', label: 'قيد الانتظار', color: '#f59e0b', bg: '#fef3c7' },
@@ -54,6 +55,9 @@ function DeliveriesContent() {
   const [confirmDelivery, setConfirmDelivery] = useState(null); // {row, step: 'amount'|'vin'}
   const [vinInput, setVinInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterDriver, setFilterDriver] = useState('all');
   const [showForm, setShowForm] = useState(false);
   // FEAT-05: cancellation dialog state. When an admin clicks the status
   // dropdown to 'ملغي' OR the delete button, we open the CancelSaleDialog
@@ -210,7 +214,23 @@ function DeliveriesContent() {
     setDeleteId(null);
   };
 
-  const filtered = filterStatus ? rows.filter((r) => r.status === filterStatus) : rows;
+  // Item 2 — extend existing status filter with date range + driver
+  const filtered = rows.filter((r) => {
+    if (filterStatus && r.status !== filterStatus) return false;
+    if (filterDateFrom && r.date < filterDateFrom) return false;
+    if (filterDateTo && r.date > filterDateTo) return false;
+    if (filterDriver !== 'all' && (r.assigned_driver || '') !== filterDriver) return false;
+    return true;
+  });
+  // Item 3 — click-to-sort, default to newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    filtered,
+    { key: 'date', direction: 'desc' }
+  );
+  // Driver dropdown options derived from row data
+  const driverOptions = Array.from(
+    new Set(rows.map((r) => r.assigned_driver).filter(Boolean))
+  );
 
   // Stats
   const pending = rows.filter((r) => r.status === 'قيد الانتظار').length;
@@ -336,54 +356,75 @@ function DeliveriesContent() {
 
       {/* Deliveries Table */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل التوصيلات ({filtered.length})
+            سجل التوصيلات ({sortedRows.length}/{rows.length})
           </h3>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+          {!showForm && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+              + توصيلة جديدة
+            </button>
+          )}
+        </div>
+
+        {/* Item 2 — filter bar */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
+          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+          >
+            <option value="">كل الحالات</option>
+            {DELIVERY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <select
+            value={filterDriver}
+            onChange={(e) => setFilterDriver(e.target.value)}
+            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+          >
+            <option value="all">كل السائقين</option>
+            {driverOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          {(filterDateFrom || filterDateTo || filterStatus || filterDriver !== 'all') && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterStatus(''); setFilterDriver('all'); }}
             >
-              <option value="">كل الحالات</option>
-              {DELIVERY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            {!showForm && (
-              <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
-                + توصيلة جديدة
-              </button>
-            )}
-          </div>
+              ✕ مسح
+            </button>
+          )}
         </div>
 
         {loading ? (
           <div className="loading-overlay"><div className="spinner"></div></div>
-        ) : filtered.length === 0 ? (
+        ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />
-            <h3>{filterStatus ? 'لا توجد توصيلات بهذه الحالة' : 'لا توجد توصيلات بعد'}</h3>
-            <p>أضف أول توصيلة بالضغط على الزر أعلاه</p>
+            <h3>{rows.length === 0 ? 'لا توجد توصيلات بعد' : 'لا توجد نتائج'}</h3>
+            <p>{rows.length === 0 ? 'أضف أول توصيلة بالضغط على الزر أعلاه' : 'جرّب تعديل الفلاتر'}</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>الكود</th>
-                  <th>التاريخ</th>
-                  <th>العميل</th>
-                  <th>الهاتف</th>
-                  <th>العنوان</th>
-                  <th>الأصناف</th>
-                  <th>المبلغ</th>
-                  <th>السائق</th>
-                  <th>الحالة</th>
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>الكود{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }}>العميل{getSortIndicator('client_name')}</th>
+                  <th onClick={() => requestSort('client_phone')} style={{ cursor: 'pointer' }}>الهاتف{getSortIndicator('client_phone')}</th>
+                  <th onClick={() => requestSort('address')} style={{ cursor: 'pointer' }}>العنوان{getSortIndicator('address')}</th>
+                  <th onClick={() => requestSort('items')} style={{ cursor: 'pointer' }}>الأصناف{getSortIndicator('items')}</th>
+                  <th onClick={() => requestSort('total_amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('total_amount')}</th>
+                  <th onClick={() => requestSort('assigned_driver')} style={{ cursor: 'pointer' }}>السائق{getSortIndicator('assigned_driver')}</th>
+                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>الحالة{getSortIndicator('status')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
                     <td>{row.date}</td>

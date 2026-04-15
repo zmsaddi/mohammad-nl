@@ -5,19 +5,28 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
+import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
+import { canCancelSale } from '@/lib/cancel-rule';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function ClientDetailContent({ params }) {
   const { id } = use(params);
   const { data: session } = useSession();
   const addToast = useToast();
   const isAdmin = session?.user?.role === 'admin';
+  const currentUser = session?.user
+    ? { role: session.user.role, username: session.user.username }
+    : null;
 
   const [client, setClient] = useState(null);
   const [sales, setSales] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // Item 5b: shares state with the admin-side CancelSaleDialog. When set,
+  // the dialog opens and drives the /api/sales/[id]/cancel flow.
+  const [cancelSaleState, setCancelSaleState] = useState(null);
 
   // FEAT-04: collection form now captures amount + method + optional
   // sale picker. FIFO is the default — amount walks across all open
@@ -34,7 +43,10 @@ function ClientDetailContent({ params }) {
     try {
       const clientsRes = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
       const clientsData = await clientsRes.json();
-      const found = clientsData.find((c) => c.id === id);
+      // Bug 1: use(params).id is always a string in Next.js 16, but the
+      // JSON response returns c.id as a number. Strict equality needs a
+      // coerce or the .find() never matches and the page 404s.
+      const found = clientsData.find((c) => c.id === Number(id));
 
       if (found) {
         setClient(found);
@@ -105,6 +117,10 @@ function ClientDetailContent({ params }) {
     s.payment_status !== 'paid'
   );
   const tvaPreview = (parseFloat(paymentForm.amount) || 0) / 6;
+
+  // Item 3 — click-to-sort on both tables. Default sort: newest first.
+  const salesSort = useSortedRows(sales, { key: 'date', direction: 'desc' });
+  const paymentsSort = useSortedRows(payments, { key: 'date', direction: 'desc' });
 
   if (loading) {
     return (
@@ -255,18 +271,20 @@ function ClientDetailContent({ params }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>التاريخ</th>
-                  <th>الصنف</th>
-                  <th>الكمية</th>
-                  <th>سعر الوحدة</th>
-                  <th>الإجمالي</th>
-                  <th>الدفع</th>
-                  <th>المدفوع</th>
-                  <th>المتبقي</th>
+                  {/* Item 3: click-to-sort on every column */}
+                  <th onClick={() => salesSort.requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{salesSort.getSortIndicator('date')}</th>
+                  <th onClick={() => salesSort.requestSort('item')} style={{ cursor: 'pointer' }}>الصنف{salesSort.getSortIndicator('item')}</th>
+                  <th onClick={() => salesSort.requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{salesSort.getSortIndicator('quantity')}</th>
+                  <th onClick={() => salesSort.requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{salesSort.getSortIndicator('unit_price')}</th>
+                  <th onClick={() => salesSort.requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{salesSort.getSortIndicator('total')}</th>
+                  <th onClick={() => salesSort.requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{salesSort.getSortIndicator('payment_type')}</th>
+                  <th onClick={() => salesSort.requestSort('paid_amount')} style={{ cursor: 'pointer' }}>المدفوع{salesSort.getSortIndicator('paid_amount')}</th>
+                  <th onClick={() => salesSort.requestSort('remaining')} style={{ cursor: 'pointer' }}>المتبقي{salesSort.getSortIndicator('remaining')}</th>
+                  <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {sales.map((row) => (
+                {salesSort.sortedRows.map((row) => (
                   <tr key={row.id}>
                     <td>{row.date}</td>
                     <td>{row.item}</td>
@@ -285,6 +303,32 @@ function ClientDetailContent({ params }) {
                     <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a' }}>
                       {formatNumber(row.remaining)}
                     </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                        {/* Item 5a: invoice PDF button for confirmed sales that have an invoice row */}
+                        {row.status === 'مؤكد' && row.invoice_ref_code && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#1a3a2a', color: 'white', padding: '4px 8px' }}
+                            onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}
+                            title="Télécharger la facture PDF"
+                          >
+                            📄 فاتورة
+                          </button>
+                        )}
+                        {/* Item 5b: cancel button — visibility gated by the locked cancel rule
+                            (lib/cancel-rule.js). The backend route is the source of truth; this
+                            is purely UI polish. */}
+                        {canCancelSale(row, currentUser) && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => setCancelSaleState({ saleId: row.id, invoiceMode: 'soft' })}
+                          >
+                            ✕ إلغاء
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -293,7 +337,7 @@ function ClientDetailContent({ params }) {
         )}
       </div>
 
-      {/* Payments History */}
+      {/* Payments History — Item 5c: enriched with method + sale id */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
@@ -307,24 +351,59 @@ function ClientDetailContent({ params }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>التاريخ</th>
-                  <th>المبلغ</th>
+                  <th onClick={() => paymentsSort.requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{paymentsSort.getSortIndicator('date')}</th>
+                  <th onClick={() => paymentsSort.requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{paymentsSort.getSortIndicator('amount')}</th>
+                  <th onClick={() => paymentsSort.requestSort('payment_method')} style={{ cursor: 'pointer' }}>الطريقة{paymentsSort.getSortIndicator('payment_method')}</th>
+                  <th onClick={() => paymentsSort.requestSort('sale_id')} style={{ cursor: 'pointer' }}>طلب #{paymentsSort.getSortIndicator('sale_id')}</th>
                   <th>ملاحظات</th>
                 </tr>
               </thead>
               <tbody>
-                {payments.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.date}</td>
-                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(row.amount)}</td>
-                    <td>{row.notes}</td>
-                  </tr>
-                ))}
+                {paymentsSort.sortedRows.map((row) => {
+                  const amt = parseFloat(row.amount) || 0;
+                  const isRefund = row.type === 'refund' || amt < 0;
+                  return (
+                    <tr key={row.id}>
+                      <td>{row.date}</td>
+                      <td className="number-cell" style={{ color: isRefund ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                        {formatNumber(amt)}
+                      </td>
+                      <td>
+                        <span className="status-badge" style={{
+                          background: row.payment_method === 'بنك' ? '#dbeafe' : '#dcfce7',
+                          color: row.payment_method === 'بنك' ? '#1e40af' : '#16a34a',
+                        }}>
+                          {row.payment_method || 'كاش'}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>
+                        {row.sale_id ? `#${row.sale_id}` : '-'}
+                      </td>
+                      <td>{row.notes}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Item 5b: shared CancelSaleDialog. Only mounted while we have a
+          cancelSaleState — the dialog handles its own preview/confirm flow
+          and calls onSuccess/onCancel when done. */}
+      {cancelSaleState && (
+        <CancelSaleDialog
+          saleId={cancelSaleState.saleId}
+          invoiceMode={cancelSaleState.invoiceMode || 'soft'}
+          onCancel={() => setCancelSaleState(null)}
+          onSuccess={() => {
+            setCancelSaleState(null);
+            fetchData();
+            addToast('تم إلغاء الطلب بنجاح');
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

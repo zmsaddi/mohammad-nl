@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { previewCancelSale, commitCancelSale } from '@/lib/db';
+import { canCancelSale, CANCEL_DENIED_ERROR } from '@/lib/cancel-rule';
+import { sql } from '@vercel/postgres';
 
 /**
  * FEAT-05: cancellation preview + commit endpoints.
@@ -60,12 +62,31 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   const token = await checkAuth(request);
   if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  // Session 9 locked cancel rule — admin + manager reach the route layer;
+  // sellers use the DELETE /api/sales route for their own reserved path.
+  // Drivers are blocked at the outer gate.
   if (!['admin', 'manager'].includes(token.role)) {
     return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   }
 
   const saleId = parseId(await params);
   if (!saleId) return NextResponse.json({ error: 'معرّف الطلب غير صحيح' }, { status: 400 });
+
+  // Locked rule enforcement — managers may NOT cancel confirmed sales,
+  // even though the outer admin+manager gate lets them reach here. Look
+  // up the row first and let the shared canCancelSale() helper decide.
+  // Same helper powers UI button visibility, so the two layers can never
+  // drift apart.
+  const { rows: saleRows } = await sql`
+    SELECT status, created_by FROM sales WHERE id = ${saleId}
+  `;
+  if (!saleRows.length) {
+    return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
+  }
+  const sale = saleRows[0];
+  if (!canCancelSale(sale, { role: token.role, username: token.username })) {
+    return NextResponse.json({ error: CANCEL_DENIED_ERROR }, { status: 403 });
+  }
 
   let body;
   try {

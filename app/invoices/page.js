@@ -6,6 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import DetailModal from '@/components/DetailModal';
 import { formatNumber } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function InvoicesContent() {
   const { data: session } = useSession();
@@ -41,6 +42,12 @@ function InvoicesContent() {
     inv.client_name?.includes(search) || inv.ref_code?.includes(search) || inv.item?.includes(search) || inv.vin?.includes(search)
   );
 
+  // Item 3 — click-to-sort, default newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    filtered,
+    { key: 'date', direction: 'desc' }
+  );
+
   return (
     <AppLayout>
       <div className="page-header">
@@ -74,21 +81,20 @@ function InvoicesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>رقم الفاتورة</th>
-                  <th>التاريخ</th>
-                  <th>العميل</th>
-                  <th>المنتج</th>
-                  <th>الكمية</th>
-                  <th>الإجمالي</th>
-                  <th>الدفع</th>
-                  <th>VIN</th>
-                  <th>البائع</th>
-                  {/* DONE: Step 4 — PDF action column */}
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>رقم الفاتورة{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }}>العميل{getSortIndicator('client_name')}</th>
+                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }}>المنتج{getSortIndicator('item')}</th>
+                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('quantity')}</th>
+                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{getSortIndicator('total')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
+                  <th onClick={() => requestSort('vin')} style={{ cursor: 'pointer' }}>VIN{getSortIndicator('vin')}</th>
+                  <th onClick={() => requestSort('seller_name')} style={{ cursor: 'pointer' }}>البائع{getSortIndicator('seller_name')}</th>
                   <th>الفاتورة</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((inv) => (
+                {sortedRows.map((inv) => (
                   <tr key={inv.id} className="clickable-row" onClick={() => setSelectedInvoice(inv)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{inv.ref_code}</td>
                     <td>{inv.date}</td>

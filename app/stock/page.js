@@ -7,6 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function StockContent() {
   const { data: session } = useSession();
@@ -78,6 +79,12 @@ function StockContent() {
   if (categoryFilter !== 'all') {
     filtered = filtered.filter((p) => p.category === categoryFilter);
   }
+
+  // Item 3 — click-to-sort on column headers, default name ascending
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    filtered,
+    { key: 'name', direction: 'asc' }
+  );
 
   const totalProducts = products.length;
   // ARC-06: parseFloat on every NUMERIC read so reducers don't string-concat.
@@ -234,7 +241,7 @@ function StockContent() {
 
         {loading ? (
           <div className="loading-overlay"><div className="spinner"></div></div>
-        ) : filtered.length === 0 ? (
+        ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{search || filter !== 'all' ? 'لا توجد نتائج' : 'لا توجد منتجات بعد'}</h3>
             <p>المنتجات تُضاف تلقائياً عند الشراء</p>
@@ -244,22 +251,20 @@ function StockContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>المنتج</th>
-                  <th>الفئة</th>
-                  {/* DONE: Bug 4 — buy_price + inventory value columns hidden from sellers */}
-                  {canSeeCosts && <th>سعر الشراء</th>}
-                  <th>سعر البيع</th>
-                  {/* DONE: Step 2G — admin can tune the per-product low-stock threshold */}
-                  {isAdmin && <th>حد التنبيه</th>}
-                  <th>الكمية</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>المنتج{getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
+                  {canSeeCosts && <th onClick={() => requestSort('buy_price')} style={{ cursor: 'pointer' }}>سعر الشراء{getSortIndicator('buy_price')}</th>}
+                  <th onClick={() => requestSort('sell_price')} style={{ cursor: 'pointer' }}>سعر البيع{getSortIndicator('sell_price')}</th>
+                  {isAdmin && <th onClick={() => requestSort('low_stock_threshold')} style={{ cursor: 'pointer' }}>حد التنبيه{getSortIndicator('low_stock_threshold')}</th>}
+                  <th onClick={() => requestSort('stock')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('stock')}</th>
                   {canSeeCosts && <th>قيمة المخزون</th>}
                   <th>الحالة</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => {
+                {sortedRows.map((p) => {
                   const value = (p.stock || 0) * (p.buy_price || 0);
                   // DONE: Step 2F — replace hardcoded ≤5 threshold with per-product getStatus()
                   const status = getStatus(p);

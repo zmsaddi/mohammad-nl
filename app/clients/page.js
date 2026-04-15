@@ -7,6 +7,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function ClientsContent() {
   const { data: session } = useSession();
@@ -18,6 +19,7 @@ function ClientsContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [search, setSearch] = useState('');
+  const [hasDebtFilter, setHasDebtFilter] = useState('all'); // 'all' | 'debt' | 'clear'
   const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
@@ -97,11 +99,21 @@ function ClientsContent() {
     setDeleteId(null);
   };
 
-  const filtered = clients.filter((c) =>
-    c.name?.includes(search) || c.phone?.includes(search)
+  const filtered = clients.filter((c) => {
+    if (search && !(c.name?.includes(search) || c.phone?.includes(search))) return false;
+    const debt = parseFloat(c.remainingDebt) || 0;
+    if (hasDebtFilter === 'debt' && debt <= 0.005) return false;
+    if (hasDebtFilter === 'clear' && debt > 0.005) return false;
+    return true;
+  });
+
+  // Item 3 — click-to-sort, default to name ascending
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    filtered,
+    { key: 'name', direction: 'asc' }
   );
 
-  const totalDebt = clients.reduce((sum, c) => sum + (c.remainingDebt || 0), 0);
+  const totalDebt = clients.reduce((sum, c) => sum + (parseFloat(c.remainingDebt) || 0), 0);
 
   return (
     <AppLayout>
@@ -186,7 +198,7 @@ function ClientsContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             قائمة العملاء
           </h3>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="بحث بالاسم أو الهاتف..."
@@ -194,6 +206,16 @@ function ClientsContent() {
               onChange={(e) => setSearch(e.target.value)}
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             />
+            <select
+              value={hasDebtFilter}
+              onChange={(e) => setHasDebtFilter(e.target.value)}
+              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              title="تصفية حسب الدين"
+            >
+              <option value="all">الكل</option>
+              <option value="debt">عليه دين</option>
+              <option value="clear">بدون دين</option>
+            </select>
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة عميل
@@ -214,17 +236,17 @@ function ClientsContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>اسم العميل</th>
-                  <th>رقم الهاتف</th>
-                  <th>إجمالي المشتريات</th>
-                  <th>المدفوع</th>
-                  <th>الدين المتبقي</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>اسم العميل{getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }}>رقم الهاتف{getSortIndicator('phone')}</th>
+                  <th onClick={() => requestSort('totalSales')} style={{ cursor: 'pointer' }}>إجمالي المشتريات{getSortIndicator('totalSales')}</th>
+                  <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }}>المدفوع{getSortIndicator('totalPaid')}</th>
+                  <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((client) => (
+                {sortedRows.map((client) => (
                   <tr key={client.id}>
                     <td>{client.id}</td>
                     <td style={{ fontWeight: 600 }}>{client.name}</td>

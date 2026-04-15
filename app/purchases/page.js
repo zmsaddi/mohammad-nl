@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber, getTodayDate, PRODUCT_CATEGORIES } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function PurchasesContent() {
   const { data: session } = useSession();
@@ -70,6 +71,12 @@ function PurchasesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+
+  // Item 3 — click-to-sort, default newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    rows,
+    { key: 'date', direction: 'desc' }
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -312,22 +319,21 @@ function PurchasesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>الكود</th>
-                  <th>التاريخ</th>
-                  <th>المورد</th>
-                  <th>المنتج</th>
-                  {/* DONE: Step 6 — category column */}
-                  <th>الفئة</th>
-                  <th>الكمية</th>
-                  <th>سعر الوحدة</th>
-                  <th>الإجمالي</th>
-                  <th>الدفع</th>
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>الكود{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('supplier')} style={{ cursor: 'pointer' }}>المورد{getSortIndicator('supplier')}</th>
+                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }}>المنتج{getSortIndicator('item')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
+                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('quantity')}</th>
+                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{getSortIndicator('unit_price')}</th>
+                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{getSortIndicator('total')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
                   <th>ملاحظات</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
                     <td>{row.date}</td>

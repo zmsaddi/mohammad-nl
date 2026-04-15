@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, getTodayDate } from '@/lib/utils';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 const TYPES = {
   seller_payout: { label: 'دفع بونص بائع', color: '#16a34a', bg: '#dcfce7' },
@@ -37,6 +38,12 @@ function SettlementsContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+
+  // Item 3 — click-to-sort on the settlements history table, default newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    Array.isArray(settlements) ? settlements : [],
+    { key: 'date', direction: 'desc' }
+  );
 
   // Calculate unsettled bonuses per user — ARC-06: parseFloat for NUMERIC.
   const unsettledByUser = {};
@@ -165,9 +172,18 @@ function SettlementsContent() {
           ) : (
             <div className="table-container">
               <table className="data-table">
-                <thead><tr><th>#</th><th>التاريخ</th><th>النوع</th><th>المستخدم</th><th>الوصف</th><th>المبلغ</th><th>بواسطة</th><th>ملاحظات</th></tr></thead>
+                <thead><tr>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }}>النوع{getSortIndicator('type')}</th>
+                  <th onClick={() => requestSort('username')} style={{ cursor: 'pointer' }}>المستخدم{getSortIndicator('username')}</th>
+                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>الوصف{getSortIndicator('description')}</th>
+                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('amount')}</th>
+                  <th onClick={() => requestSort('settled_by')} style={{ cursor: 'pointer' }}>بواسطة{getSortIndicator('settled_by')}</th>
+                  <th>ملاحظات</th>
+                </tr></thead>
                 <tbody>
-                  {settlements.map((s) => {
+                  {sortedRows.map((s) => {
                     const t = TYPES[s.type];
                     return (
                       <tr key={s.id}>

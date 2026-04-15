@@ -9,6 +9,8 @@ import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
+import { canCancelSale } from '@/lib/cancel-rule';
+import { useSortedRows } from '@/lib/use-sorted-rows';
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -17,6 +19,9 @@ function SalesContent() {
   const isAdmin = role === 'admin';
   const canSeeCosts = role === 'admin' || role === 'manager';
   const isSeller = role === 'seller';
+  const currentUser = session?.user
+    ? { role: session.user.role, username: session.user.username }
+    : null;
 
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
@@ -25,6 +30,14 @@ function SalesContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+
+  // Item 2 — filter state for /sales list
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterClient, setFilterClient] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPayStatus, setFilterPayStatus] = useState('all');
+  const [filterSeller, setFilterSeller] = useState('all');
   // FEAT-05: cancellation dialog state. Admin "حذف" on a sale row opens the
   // CancelSaleDialog with invoiceMode='delete' — the dialog forces 'remove'
   // for both bonuses (keep option hidden) because of FK cascade rules.
@@ -122,6 +135,30 @@ function SalesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+
+  // Item 2 — filter pipeline. Client-side because row volumes are small
+  // (Phase 0.5 production shows ~200 rows). Server-side can come later
+  // if the list grows past ~500 rows.
+  const filteredRows = rows.filter((r) => {
+    if (filterDateFrom && r.date < filterDateFrom) return false;
+    if (filterDateTo && r.date > filterDateTo) return false;
+    if (filterClient && !r.client_name?.toLowerCase().includes(filterClient.toLowerCase())) return false;
+    if (filterStatus !== 'all' && (r.status || 'محجوز') !== filterStatus) return false;
+    if (filterPayStatus !== 'all' && r.payment_status !== filterPayStatus) return false;
+    if (filterSeller !== 'all' && r.created_by !== filterSeller) return false;
+    return true;
+  });
+
+  // Item 3 — click-to-sort, defaulting to newest first
+  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+    filteredRows,
+    { key: 'date', direction: 'desc' }
+  );
+
+  // Seller list for the filter dropdown (derived from row data)
+  const sellerOptions = Array.from(
+    new Set(rows.map((r) => r.created_by).filter(Boolean))
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -489,40 +526,75 @@ function SalesContent() {
 
       {/* Data Table */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المبيعات ({rows.length})
+            سجل المبيعات ({sortedRows.length}/{rows.length})
           </h3>
+        </div>
+
+        {/* Item 2 — filter bar */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
+          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="text" placeholder="بحث عميل..." value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px', minWidth: '160px' }} />
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <option value="all">كل الحالات</option>
+            <option value="محجوز">محجوز</option>
+            <option value="مؤكد">مؤكد</option>
+            <option value="ملغي">ملغي</option>
+          </select>
+          <select value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <option value="all">كل حالات الدفع</option>
+            <option value="pending">معلق</option>
+            <option value="partial">جزئي</option>
+            <option value="paid">مدفوع</option>
+            <option value="cancelled">ملغي</option>
+          </select>
+          {canSeeCosts && (
+            <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+              <option value="all">كل البائعين</option>
+              {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          {(filterDateFrom || filterDateTo || filterClient || filterStatus !== 'all' || filterPayStatus !== 'all' || filterSeller !== 'all') && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterClient(''); setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all'); }}
+            >
+              ✕ مسح
+            </button>
+          )}
         </div>
 
         {loading ? (
           <div className="loading-overlay"><div className="spinner"></div></div>
-        ) : rows.length === 0 ? (
+        ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>لا توجد مبيعات بعد</h3>
-            <p>سجّل أول عملية بيع من النموذج أعلاه</p>
+            <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج'}</h3>
+            <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر'}</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>الكود</th>
-                  <th>التاريخ</th>
-                  <th>العميل</th>
-                  <th>الصنف</th>
-                  <th>الكمية</th>
-                  <th>سعر الوحدة</th>
-                  <th>الإجمالي</th>
-                  {canSeeCosts && <th>التكلفة</th>}
-                  {canSeeCosts && <th>الربح</th>}
-                  <th>الحالة</th>
-                  <th>الدفع</th>
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>الكود{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }}>العميل{getSortIndicator('client_name')}</th>
+                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }}>الصنف{getSortIndicator('item')}</th>
+                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('quantity')}</th>
+                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{getSortIndicator('unit_price')}</th>
+                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{getSortIndicator('total')}</th>
+                  {canSeeCosts && <th onClick={() => requestSort('cost_total')} style={{ cursor: 'pointer' }}>التكلفة{getSortIndicator('cost_total')}</th>}
+                  {canSeeCosts && <th onClick={() => requestSort('profit')} style={{ cursor: 'pointer' }}>الربح{getSortIndicator('profit')}</th>}
+                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>الحالة{getSortIndicator('status')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
                     <td>{row.date}</td>
@@ -574,11 +646,12 @@ function SalesContent() {
                         >
                           <svg viewBox="0 0 24 24" width="14" height="14" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.737.813.813-2.737-.149-.252A8 8 0 1112 20z"/></svg>
                         </button>
-                        {/* DONE: Bug 8 — sellers can delete their own reserved sales (admin can delete any)
-                            FEAT-05 — admin delete now routes through CancelSaleDialog (audit + bonus
-                            decision). Sellers deleting their own RESERVED sale still use the old path
-                            because reserved sales have no bonuses/payments yet — plain DELETE is safe. */}
-                        {isAdmin && row.status !== 'ملغي' && (
+                        {/* v1 pre-delivery — locked cancel rule wired via canCancelSale.
+                            Admin gets the full CancelSaleDialog (can cancel reserved + confirmed,
+                            handles bonuses/refunds). Manager + seller reach this branch only for
+                            reserved sales and use the simple DELETE path (no bonuses/payments on
+                            reserved). Driver never sees a cancel button. */}
+                        {canCancelSale(row, currentUser) && isAdmin && (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
@@ -586,7 +659,7 @@ function SalesContent() {
                             حذف
                           </button>
                         )}
-                        {isSeller && row.created_by === session?.user?.username && row.status === 'محجوز' && (
+                        {canCancelSale(row, currentUser) && !isAdmin && (
                           <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
                             حذف
                           </button>
