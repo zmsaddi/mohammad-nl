@@ -1104,11 +1104,11 @@ Fix: create `lib/api-errors.js` exporting `apiError(err, fallback)` + `ApiUserEr
 
 ### 5.7 Dimension 7 — Authorization
 
-**[CRITICAL F-065]** — **Settlements POST has no role check.** `app/api/settlements/route.js:31` — auth gate is `if (!token) return 401` only. The schema accepts `type: 'seller_payout'` and any `username`. Inside `addSettlement` (`lib/db.js:3387`) there's a balance check but no caller-role check. **A driver account can hit POST /api/settlements and create a payout row for any user.** This is a privilege escalation bug worth immediate attention.
+**[CLOSED — FALSE POSITIVE F-065]** — Domain 5 audit agent reported settlements POST as unguarded. **Verified false** against `app/api/settlements/route.js:26`: the route enforces `token.role !== 'admin'` → 403 for manager, seller, driver, and unauthenticated callers. The audit agent apparently read only the outer `if (!token)` check and missed the role line two statements later. Regression test: `tests/authz/settlements-post-rbac.test.js` (5 cases, all green) locks the behavior. Study correction committed 2026-04-15.
 
-**[HIGH F-066]** — **Expenses POST** has no role check — any authenticated user (drivers included) can create expenses. Same pattern as settlements.
+**[CLOSED — FALSE POSITIVE F-066]** — Domain 5 reported expenses POST unguarded. **Verified false** against `app/api/expenses/route.js:26`: the route enforces `['admin','manager'].includes(token.role)`. Drivers and sellers return 403. Regression test: `tests/authz/expenses-post-rbac.test.js` (5 cases, all green).
 
-**[HIGH F-067]** — `app/api/voice/process/route.js:46` is auth-gated but role-unguarded. Any seller or driver can invoke the Groq API at will → billing risk and a vector for a compromised account to drain the company's Groq budget.
+**[CLOSED — FALSE POSITIVE F-067]** — Domain 5 reported voice POST unguarded. **Verified false** against `app/api/voice/process/route.js:45`: the route enforces `['admin','manager','seller'].includes(token.role)` AND has a per-user sliding-window rate limit (10 req/min). Drivers return 403. Regression test: `tests/authz/voice-process-rbac.test.js` (2 cases, all green).
 
 **[MEDIUM F-068]** — Auth is copy-pasted per route. `checkAuth` function duplicated in `sales/route.js:8`, `clients/route.js:7`, `payments/route.js:7`, `profit-distributions/route.js:10`, `sales/[id]/cancel/route.js:29`. Each reimplements `if (!['admin','manager'].includes(token.role))` checks and picks its own error string.
 
