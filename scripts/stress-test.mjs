@@ -916,6 +916,7 @@ async function main() {
     ['Rule 3', rule3_cancellation],
     ['Rule 4', rule4_bonusEligibility],
     ['Rule 5', rule5_concurrent],
+    ['Rule 6', rule6_idempotency],
   ];
   for (const [name, fn] of ruleRunners) {
     try {
