@@ -29,30 +29,30 @@
 
 Goal: after this sprint, the system is safe for real customer data. Every CRITICAL from the study is either closed or marked false-positive with evidence.
 
-### S1.1 — F-009: `.env.test` hard guard [CRITICAL, autonomous]
+### S1.1 — F-009: `.env.test` hard guard [CRITICAL, autonomous] — **DONE**
 
 Current state: `.env.test` URL `postgresql://...@ep-winter-wave-alho9ws5-pooler...` appears to be the production Neon branch. `.env.local` on master is a blank template (real credentials only in `.env.test` on the dev machine). `tests/setup.test-env.js` only checks "URL is set" and "starts with postgresql://". Risk: `npm test` on the wrong shell wipes production.
 
-**Autonomous fix (guard-only, ships in this sprint):**
+**Autonomous fix (guard-only, SHIPPED):**
 
-- [ ] Rewrite `tests/setup.test-env.js` with layered refusal checks:
-      - Refuse if `POSTGRES_URL` doesn't match `/test|sandbox|dev/i` in host or DB name
-      - Refuse if `POSTGRES_URL === POSTGRES_URL_NON_POOLING` resolves to the production hostname literal `ep-winter-wave-alho9ws5`
-      - Refuse if `NODE_ENV === 'production'`
-      - Refuse if a probe `SELECT current_database()` returns a name not matching `/test|sandbox|dev/i`
-      - Print DB host + name before any test runs
-- [ ] Add `scripts/env-test-doctor.mjs` — standalone script the user runs to report what their `.env.test` points at without running any DDL
-- [ ] Wire `"pretest": "node scripts/env-test-doctor.mjs"` in `package.json`
-- [ ] Add a regression test for the guard itself (runs vitest with a fake URL, expects throw)
-- [ ] Commit + push
+- [x] Rewrite `tests/setup.test-env.js` with layered refusal checks (URL class parse, safe-pattern on host OR db name, NODE_ENV, trailing-whitespace strip, NON_POOLING parity)
+- [x] Add `scripts/env-test-doctor.mjs` — live `SELECT current_database()` probe + non-seed user count (refuses if > 10)
+- [x] Wire `"pretest": "node scripts/env-test-doctor.mjs"` in `package.json` — also added `test`, `test:ui`, `typecheck` scripts
+- [x] Add a regression test for the guard itself — `tests/setup.test-env.guard.test.js`, 6 cases, spawns child nodes with poisoned envs, all 6 pass
+- [x] Widen `.gitignore` from `.claude/worktrees/` to `.claude/` (prevents local Claude state leaking into commits)
+- [x] SETUP.md §4.1/§4.2 documents safe-pattern rule + doctor script + `npm test` entry point
+- [x] Build green: `npm run build` passes
+- [x] Commit + merge to master — `2dea127` (merge), `07a9c2d` (feature)
 
-**User action required (not autonomous, tracked as blocker):**
+**User action still required (tracked as blocker for DB tests):**
 
 - [!] Create a dedicated Neon branch `test-sandbox` (Neon console → Branches → Create). User must do this; Claude has no Neon API access.
-- [!] Rotate `neondb_owner` password on production branch (credentials visible in `.env.test` on this dev machine and may have been committed historically — see F-071).
+- [!] Rotate `neondb_owner` password on production branch (credentials visible in `.env.test` on this dev machine — see F-071).
 - [!] Update `.env.test` to point at the new branch URL + new password.
 
-Tests added: TBD · Commit: __
+Until the user takes these three steps, **no real-DB test can run**. That's the whole point of the guard. The 6 guard regression tests pass with `POSTGRES_URL='postgresql://test:test@test-host.example.com/neondb-test'` env override as proof of concept.
+
+Tests added: **6** · Merge commit: `2dea127`
 
 ---
 
