@@ -54,6 +54,28 @@ runs. Wipe it before entering real customer data.
 **Dry-run mode:** change `COMMIT;` at the end of the SQL to `ROLLBACK;`
 to see what would be deleted without persisting.
 
+### Step 1.5 — Run the v1.0.1 supplier credit migration (2 minutes)
+
+v1.0.1 added `purchases.paid_amount`, `purchases.payment_status`, and
+the `supplier_payments` audit table (Feature 6). The initDatabase()
+block in `lib/db.js` applies the same schema changes automatically on
+the next deploy, but running the manual migration first makes the
+schema state explicit and idempotent.
+
+1. Stay in the Neon SQL Editor from Step 1.
+2. In this repo, open [scripts/migrations/2026-04-15-supplier-credit.sql](../scripts/migrations/2026-04-15-supplier-credit.sql).
+3. Copy the entire file → paste into the SQL Editor → Run.
+4. Review the verification block at the bottom — it prints the new
+   columns on `purchases`, confirms `supplier_payments` exists, and
+   shows the payment_status distribution on any pre-existing rows.
+5. The script is **idempotent** — every ALTER uses `IF NOT EXISTS`
+   and every backfill checks zero-state before writing, so running
+   it twice is safe.
+
+After this step, the supplier-credit UI on `/purchases` is fully
+operational (paid amount field on the form, status column on the
+list, and the 💰 دفع button on partial/pending rows).
+
 ### Step 2 — Admin password rotation (5 minutes)
 
 The default `admin / admin123` must be rotated before exposing the
