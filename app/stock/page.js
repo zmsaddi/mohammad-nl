@@ -324,7 +324,8 @@ function StockContent() {
                 <thead>
                   <tr>
                     <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>المنتج{getSortIndicator('name')}</th>
+                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>المنتج (لاتيني){getSortIndicator('name')}</th>
+                    <th onClick={() => requestSort('description_ar')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description_ar')}>الوصف (عربي){getSortIndicator('description_ar')}</th>
                     <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
                     {canSeeCosts && <th onClick={() => requestSort('buy_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('buy_price')}>سعر الشراء{getSortIndicator('buy_price')}</th>}
                     <th onClick={() => requestSort('sell_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('sell_price')}>سعر البيع{getSortIndicator('sell_price')}</th>
@@ -345,6 +346,33 @@ function StockContent() {
                       <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
                         <td>{p.id}</td>
                         <td style={{ fontWeight: 600 }}>{p.name}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {isAdmin ? (
+                            <input
+                              type="text"
+                              defaultValue={p.description_ar || ''}
+                              placeholder="الوصف بالعربي"
+                              style={{ width: '120px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif" }}
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim();
+                                if (val !== (p.description_ar || '')) {
+                                  try {
+                                    await fetch('/api/products', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ id: p.id, description_ar: val }),
+                                      cache: 'no-store',
+                                    });
+                                    addToast('تم تحديث الوصف العربي');
+                                    fetchData();
+                                  } catch { addToast('خطأ في التحديث', 'error'); }
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span style={{ color: '#64748b' }}>{p.description_ar || '—'}</span>
+                          )}
+                        </td>
                         <td>{p.category || '-'}</td>
                         {canSeeCosts && <td className="number-cell">{formatNumber(p.buy_price)}</td>}
                         <td className="number-cell">

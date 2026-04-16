@@ -40,7 +40,8 @@ function PurchasesContent() {
     date: getTodayDate(),
     supplier: '',
     item: '',
-    category: '', // DONE: Step 3 — required category for new purchases
+    descriptionAr: '',
+    category: '',
     quantity: '',
     unitPrice: '',
     sellPrice: '',
@@ -134,6 +135,7 @@ function PurchasesContent() {
       date: row.date || getTodayDate(),
       supplier: row.supplier || '',
       item: row.item || '',
+      descriptionAr: row.description_ar || '',
       category: row.category || '',
       quantity: String(row.quantity ?? ''),
       unitPrice: String(row.unit_price ?? ''),
@@ -147,7 +149,7 @@ function PurchasesContent() {
   const cancelEdit = () => {
     setEditPurchase(null);
     setShowForm(false); // PA-01: close form on cancel
-    setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
+    setForm({ date: getTodayDate(), supplier: '', item: '', descriptionAr: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
   };
 
   const handleSubmit = async (e) => {
@@ -205,7 +207,7 @@ function PurchasesContent() {
         await fetch('/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: form.item, category: form.category }),
+          body: JSON.stringify({ name: form.item, descriptionAr: form.descriptionAr || '', category: form.category }),
           cache: 'no-store',
         });
       }
@@ -241,7 +243,7 @@ function PurchasesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
-        setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
+        setForm({ date: getTodayDate(), supplier: '', item: '', descriptionAr: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
         setShowForm(false); // PA-01: close form after successful add
         fetchData();
       } else {
@@ -373,7 +375,10 @@ function PurchasesContent() {
                 required
               />
             </div>
-            {/* DONE: Step 3C — category select right after the product field */}
+            <div className="form-group">
+              <label htmlFor="pur-desc-ar">وصف المنتج بالعربي (داخلي)</label>
+              <input id="pur-desc-ar" type="text" value={form.descriptionAr} onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })} placeholder="مثال: في 8 الترا ماكس - أسود" />
+            </div>
             <div className="form-group">
               <label htmlFor="pur-category">فئة المنتج *</label>
               <select

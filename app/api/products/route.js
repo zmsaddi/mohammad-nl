@@ -92,6 +92,7 @@ export async function PUT(request) {
     await sql`
       UPDATE products SET
         sell_price          = COALESCE(${data.sell_price ?? null},          sell_price),
+        description_ar      = COALESCE(${data.description_ar ?? null},      description_ar),
         category            = COALESCE(${data.category ?? null},            category),
         unit                = COALESCE(${data.unit ?? null},                unit),
         notes               = COALESCE(${data.notes ?? null},               notes),
