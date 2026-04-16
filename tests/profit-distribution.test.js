@@ -17,7 +17,7 @@ import {
 } from '../lib/db.js';
 
 const TRUNCATE_TABLES = [
-  'profit_distributions',
+  'profit_distribution_groups', 'profit_distributions',
   'cancellations', 'settlements', 'bonuses', 'payments',
   'invoices', 'deliveries', 'sales', 'purchases',
   'supplier_payments', 'expenses', 'clients', 'products',

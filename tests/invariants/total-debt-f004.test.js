@@ -31,7 +31,7 @@ import { sql } from '@vercel/postgres';
 import { initDatabase, getSummaryData } from '../../lib/db.js';
 
 const TRUNCATE_TABLES = [
-  'profit_distributions', 'cancellations',
+  'profit_distribution_groups', 'profit_distributions', 'cancellations',
   'sales', 'purchases', 'deliveries', 'invoices', 'bonuses',
   'settlements', 'payments', 'expenses', 'clients', 'products',
   'suppliers',
