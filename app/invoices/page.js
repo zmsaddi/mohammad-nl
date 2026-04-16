@@ -7,6 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import DetailModal from '@/components/DetailModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import DataCardList from '@/components/DataCardList';
 
 function InvoicesContent() {
   const { data: session } = useSession();
@@ -77,7 +78,34 @@ function InvoicesContent() {
             <p>الفواتير تُنشأ تلقائياً عند تأكيد التوصيل</p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+          {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
+          <DataCardList
+            rows={sortedRows}
+            fields={[
+              { key: 'ref_code', label: 'رقم الفاتورة' },
+              { key: 'date', label: 'التاريخ' },
+              { key: 'client_name', label: 'العميل' },
+              { key: 'item', label: 'المنتج' },
+              { key: 'total', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
+              { key: 'payment_type', label: 'الدفع' },
+              { key: 'vin', label: 'VIN' },
+            ]}
+            actions={(row) => (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => setSelectedInvoice(row)}>تفاصيل</button>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
+                  onClick={() => window.open(`/api/invoices/${row.ref_code}/pdf`, '_blank')}
+                >
+                  PDF
+                </button>
+              </>
+            )}
+            emptyMessage="لا توجد فواتير"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -131,6 +159,7 @@ function InvoicesContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

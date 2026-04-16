@@ -24,6 +24,9 @@ function SummaryContent() {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // v1.1 F-022 — track fetch errors separately from empty-data so the UI
+  // can show a retry button instead of silently rendering the empty state.
+  const [fetchError, setFetchError] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [voiceResult, setVoiceResult] = useState(null);
@@ -33,6 +36,7 @@ function SummaryContent() {
 
   const fetchData = async (from, to) => {
     setLoading(true);
+    setFetchError(false);
     try {
       let url = '/api/summary';
       const params = new URLSearchParams();
@@ -45,12 +49,16 @@ function SummaryContent() {
         fetch(url, { cache: 'no-store' }),
         fetch('/api/products', { cache: 'no-store' }),
       ]);
+      if (!summaryRes.ok) throw new Error(`summary API ${summaryRes.status}`);
       const result = await summaryRes.json();
       const products = await productsRes.json();
       setData(result);
       setProductList(Array.isArray(products) ? products : []);
-    } catch {
-      addToast('خطأ في جلب البيانات', 'error');
+    } catch (err) {
+      // v1.1 F-022 — set fetchError so the render shows a retry button
+      // instead of silently rendering the empty state.
+      setFetchError(true);
+      addToast('خطأ في جلب البيانات — اضغط "إعادة المحاولة" أدناه', 'error');
     } finally {
       setLoading(false);
     }
@@ -132,9 +140,15 @@ function SummaryContent() {
       from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
       to = now.toISOString().split('T')[0];
     } else if (preset === 'lastMonth') {
+      // v1.1 F-019 — fixed January edge case. Pre-v1.1 the `to` formula
+      // used `now.getMonth()` as the month number — but getMonth() returns
+      // 0-based (0=Jan), so in January it produced "YYYY-00-DD" which is
+      // an invalid date. Now computed via `last` (the first day of the
+      // previous month) + getDaysInMonth pattern.
       const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const daysInLastMonth = new Date(last.getFullYear(), last.getMonth() + 1, 0).getDate();
       from = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-01`;
-      to = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth(), 0).getDate()}`;
+      to = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${daysInLastMonth}`;
     } else if (preset === 'thisYear') {
       from = `${now.getFullYear()}-01-01`;
       to = now.toISOString().split('T')[0];
@@ -755,9 +769,22 @@ function SummaryContent() {
             </div>
           )}
         </>
+      ) : fetchError ? (
+        /* v1.1 F-022 — explicit error state with retry button instead of
+           silently rendering the empty state on API failure */
+        <div className="empty-state">
+          <h3 style={{ color: '#dc2626' }}>خطأ في جلب البيانات</h3>
+          <p style={{ color: '#64748b', margin: '8px 0 16px' }}>
+            تعذّر الاتصال بالخادم. تحقق من الشبكة وأعد المحاولة.
+          </p>
+          <button className="btn btn-primary" onClick={() => fetchData(dateFrom, dateTo)}>
+            🔄 إعادة المحاولة
+          </button>
+        </div>
       ) : (
         <div className="empty-state">
           <h3>لا توجد بيانات</h3>
+          <p style={{ color: '#64748b', marginTop: '8px' }}>أضف عمليات بيع وشراء لعرض الملخص المالي</p>
         </div>
       )}
     </AppLayout>

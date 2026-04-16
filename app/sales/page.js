@@ -11,6 +11,7 @@ import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import DataCardList from '@/components/DataCardList';
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -611,7 +612,31 @@ function SalesContent() {
             <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر'}</p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+          {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
+          <DataCardList
+            rows={sortedRows}
+            fields={[
+              { key: 'ref_code', label: 'الكود' },
+              { key: 'date', label: 'التاريخ' },
+              { key: 'client_name', label: 'العميل' },
+              { key: 'item', label: 'المنتج' },
+              { key: 'quantity', label: 'الكمية' },
+              { key: 'total', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
+              { key: 'payment_type', label: 'الدفع' },
+            ]}
+            statusField="status"
+            statusColors={{
+              'مؤكد': '#16a34a',
+              'محجوز': '#f59e0b',
+              'ملغي': '#dc2626',
+            }}
+            actions={(row) => (
+              <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+            )}
+            emptyMessage="لا توجد مبيعات"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -707,6 +732,7 @@ function SalesContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
