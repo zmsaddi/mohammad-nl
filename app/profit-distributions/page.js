@@ -106,28 +106,46 @@ function ProfitDistributionsContent() {
   const canSubmit = !submitting && pctOk && baseAmountNum > 0 &&
                     form.recipients.every((r) => r.username && parseFloat(r.percentage) > 0);
 
-  // v1.2 — auto-populate recipients from pre-configured shares
+  // v1.2 — auto-populate recipients from pre-configured shares.
+  // Filters out users whose profit_share_start is AFTER the distribution
+  // period end (they weren't part of the team during this period).
   const loadFromConfig = () => {
     if (shareConfig.length === 0) {
       addToast('لم يتم إعداد نسب الأرباح بعد — أعد النسب أولاً', 'error');
       return;
     }
-    setForm((prev) => ({
-      ...prev,
-      recipients: shareConfig.map(u => ({
-        username: u.username,
-        percentage: String(parseFloat(u.profit_share_pct)),
-      })),
-    }));
+    setForm((prev) => {
+      const periodEnd = prev.periodEnd || null;
+      const eligible = shareConfig.filter(u => {
+        // No start date = always eligible (original team member)
+        if (!u.profit_share_start) return true;
+        // No period end = all-time distribution, everyone eligible
+        if (!periodEnd) return true;
+        // User joined AFTER the period ends = excluded
+        if (u.profit_share_start > periodEnd) return false;
+        return true;
+      });
+      if (eligible.length === 0) {
+        addToast('لا يوجد مستلمين مؤهلين لهذه الفترة', 'error');
+        return prev;
+      }
+      return {
+        ...prev,
+        recipients: eligible.map(u => ({
+          username: u.username,
+          percentage: String(parseFloat(u.profit_share_pct)),
+        })),
+      };
+    });
   };
 
-  // v1.2 — save share config for a single user
-  const saveSharePct = async (username, pct) => {
+  // v1.2 — save share config for a single user (percentage + start date)
+  const saveSharePct = async (username, pct, startDate) => {
     try {
       const res = await fetch('/api/profit-distributions/share-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, percentage: pct }),
+        body: JSON.stringify({ username, percentage: pct, startDate: startDate || null }),
         cache: 'no-store',
       });
       if (res.ok) {
@@ -250,6 +268,11 @@ function ProfitDistributionsContent() {
             {shareConfig.map(u => (
               <div key={u.username} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.85rem' }}>
                 <strong>{u.name || u.username}</strong> — {parseFloat(u.profit_share_pct)}%
+                {u.profit_share_start && (
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', marginRight: '6px' }}>
+                    (من {u.profit_share_start})
+                  </span>
+                )}
               </div>
             ))}
             {(() => {
@@ -267,24 +290,35 @@ function ProfitDistributionsContent() {
         {showShareConfig && (
           <div>
             <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
-              حدد نسبة كل مدير/مشرف. عند إنشاء توزيع جديد، النسب تُعبَّأ تلقائياً.
+              حدد نسبة كل مدير/مشرف وتاريخ بداية مشاركته. عند التوزيع، يشارك فقط من كان موجوداً خلال الفترة.
             </p>
-            {eligibleUsers.map(u => (
-              <div key={u.username} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <span style={{ minWidth: '140px', fontWeight: 600, fontSize: '0.88rem' }}>{u.name || u.username}</span>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', minWidth: '50px' }}>({u.role === 'admin' ? 'مدير' : 'مشرف'})</span>
-                <input
-                  type="number" min="0" max="100" step="any"
-                  defaultValue={(() => {
-                    const found = shareConfig.find(s => s.username === u.username);
-                    return found ? parseFloat(found.profit_share_pct) : 0;
-                  })()}
-                  onBlur={(e) => saveSharePct(u.username, e.target.value)}
-                  style={{ width: '80px', padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', textAlign: 'center' }}
-                />
-                <span style={{ fontSize: '0.85rem' }}>%</span>
-              </div>
-            ))}
+            {eligibleUsers.map(u => {
+              const found = shareConfig.find(s => s.username === u.username);
+              return (
+                <div key={u.username} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ minWidth: '140px', fontWeight: 600, fontSize: '0.88rem' }}>{u.name || u.username}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', minWidth: '50px' }}>({u.role === 'admin' ? 'مدير' : 'مشرف'})</span>
+                  <input
+                    type="number" min="0" max="100" step="any"
+                    defaultValue={found ? parseFloat(found.profit_share_pct) : 0}
+                    onBlur={(e) => saveSharePct(u.username, e.target.value, found?.profit_share_start || null)}
+                    style={{ width: '80px', padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', textAlign: 'center' }}
+                    placeholder="النسبة"
+                  />
+                  <span style={{ fontSize: '0.85rem' }}>%</span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>من تاريخ:</span>
+                  <input
+                    type="date"
+                    defaultValue={found?.profit_share_start || ''}
+                    onBlur={(e) => {
+                      const pct = found ? parseFloat(found.profit_share_pct) : 0;
+                      saveSharePct(u.username, pct, e.target.value || null);
+                    }}
+                    style={{ padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem' }}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
