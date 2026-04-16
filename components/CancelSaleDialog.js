@@ -326,6 +326,60 @@ export default function CancelSaleDialog({
               </div>
             )}
 
+            {/* Settled bonus warning — the bonus was already paid out.
+                Cancelling the order doesn't magically return the money.
+                The admin needs to manually recover it from the employee. */}
+            {hasSellerBonus && preview.sellerBonus?.settled && (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '2px solid #dc2626',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '12px',
+                  fontSize: '0.82rem',
+                  color: '#991b1b',
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                  ⚠ تنبيه: بونص البائع مُسوَّى (مدفوع فعلاً)
+                </div>
+                <div>
+                  البائع <strong>{preview.sellerBonus.username}</strong> استلم{' '}
+                  <strong>{formatNumber(preview.sellerBonus.amount)} €</strong> كتسوية.
+                  إلغاء الطلب لا يسترد المبلغ تلقائياً.
+                </div>
+                <div style={{ marginTop: '6px', fontWeight: 600 }}>
+                  → يجب استرداد المبلغ يدوياً من البائع وتسجيل العملية في الملاحظات.
+                </div>
+              </div>
+            )}
+            {hasDriverBonus && preview.driverBonus?.settled && (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '2px solid #dc2626',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '12px',
+                  fontSize: '0.82rem',
+                  color: '#991b1b',
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                  ⚠ تنبيه: بونص السائق مُسوَّى (مدفوع فعلاً)
+                </div>
+                <div>
+                  السائق <strong>{preview.driverBonus.username}</strong> استلم{' '}
+                  <strong>{formatNumber(preview.driverBonus.amount)} €</strong> كتسوية.
+                  إلغاء الطلب لا يسترد المبلغ تلقائياً.
+                </div>
+                <div style={{ marginTop: '6px', fontWeight: 600 }}>
+                  → يجب استرداد المبلغ يدوياً من السائق وتسجيل العملية في الملاحظات.
+                </div>
+              </div>
+            )}
+
             {/* Notes textarea — optional */}
             <div style={{ marginBottom: '12px' }}>
               <label
