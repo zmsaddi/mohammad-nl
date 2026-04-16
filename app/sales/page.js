@@ -46,6 +46,7 @@ function SalesContent() {
   const [cancelSale, setCancelSale] = useState(null); // { saleId }
   const [whatsappShare, setWhatsappShare] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [editSale, setEditSale] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -177,6 +178,40 @@ function SalesContent() {
     new Set(rows.map((r) => r.created_by).filter(Boolean))
   );
 
+  const startEditSale = (row) => {
+    setEditSale(row);
+    setDownPaymentTouched(true); // prevent reactive default from clobbering
+    setForm({
+      date: row.date || getTodayDate(),
+      clientName: row.client_name || '',
+      clientPhone: '',
+      clientEmail: '',
+      clientAddress: '',
+      item: row.item || '',
+      quantity: String(row.quantity ?? ''),
+      unitPrice: String(row.unit_price ?? ''),
+      paymentType: row.payment_type || 'كاش',
+      downPaymentExpected: String(row.down_payment_expected ?? ''),
+      notes: row.notes || '',
+    });
+    // Fill client details from the clients list
+    const client = clients.find((c) => c.name === row.client_name);
+    if (client) {
+      setForm((prev) => ({
+        ...prev,
+        clientPhone: client.phone || '',
+        clientEmail: client.email || '',
+        clientAddress: client.address || '',
+      }));
+    }
+  };
+
+  const cancelEditSale = () => {
+    setEditSale(null);
+    setDownPaymentTouched(false);
+    setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', downPaymentExpected: '', notes: '' });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.date || !form.clientName || !form.item || !form.quantity || !form.unitPrice) {
@@ -208,6 +243,35 @@ function SalesContent() {
     }
     setSubmitting(true);
     try {
+      // --- EDIT mode: PUT existing sale ---
+      if (editSale) {
+        const res = await fetch('/api/sales', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editSale.id,
+            clientName: form.clientName,
+            item: form.item,
+            quantity: form.quantity,
+            unitPrice: form.unitPrice,
+            notes: form.notes,
+            downPaymentExpected: form.downPaymentExpected,
+          }),
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          addToast('تم تعديل الطلب بنجاح');
+          cancelEditSale();
+          fetchData();
+        } else {
+          const err = await res.json();
+          addToast(err.error || 'خطأ في تعديل البيانات', 'error');
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      // --- ADD mode: POST new sale ---
       // Auto-create client if new
       const clientExists = clients.some((c) => c.name === form.clientName);
       if (!clientExists) {
@@ -295,7 +359,7 @@ function SalesContent() {
       {/* Add Form */}
       <div className="card" style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-          تسجيل عملية بيع جديدة
+          {editSale ? 'تعديل طلب' : 'تسجيل عملية بيع جديدة'}
         </h3>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -552,13 +616,20 @@ function SalesContent() {
               <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={submitting || !!priceFloorError}
-          >
-            {submitting ? 'جاري التسجيل...' : 'تسجيل عملية بيع'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting || !!priceFloorError}
+            >
+              {submitting ? (editSale ? 'جاري التعديل...' : 'جاري التسجيل...') : (editSale ? 'حفظ التعديلات' : 'تسجيل عملية بيع')}
+            </button>
+            {editSale && (
+              <button type="button" className="btn btn-outline" onClick={cancelEditSale}>
+                إلغاء التعديل
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -708,6 +779,14 @@ function SalesContent() {
                         >
                           <svg viewBox="0 0 24 24" width="14" height="14" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.737.813.813-2.737-.149-.252A8 8 0 1112 20z"/></svg>
                         </button>
+                        {/* Edit button: admin can edit all non-cancelled; seller/manager only reserved */}
+                        {(row.status || 'محجوز') !== 'ملغي' && (
+                          isAdmin || ((!isAdmin) && (role === 'seller' || role === 'manager') && (row.status || 'محجوز') === 'محجوز')
+                        ) && (
+                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditSale(row); }}>
+                            تعديل
+                          </button>
+                        )}
                         {/* v1 pre-delivery — locked cancel rule wired via canCancelSale.
                             Admin gets the full CancelSaleDialog (can cancel reserved + confirmed,
                             handles bonuses/refunds). Manager + seller reach this branch only for

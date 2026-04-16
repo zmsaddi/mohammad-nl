@@ -91,13 +91,17 @@ export async function PUT(request) {
     const { sql: sqlQ } = await import('@vercel/postgres');
     const { rows } = await sqlQ`SELECT status, created_by FROM sales WHERE id = ${parsed.data.id}`;
     if (!rows.length) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
-    if (rows[0].status !== 'محجوز') {
-      return NextResponse.json({ error: 'لا يمكن تعديل طلب بعد التوصيل أو الإلغاء' }, { status: 403 });
+    if (rows[0].status === 'ملغي') {
+      return NextResponse.json({ error: 'لا يمكن تعديل طلب ملغي' }, { status: 403 });
     }
-    if (token.role === 'seller' && rows[0].created_by !== token.username) {
+    // v1.2 — admin can edit confirmed sales (discount, price correction)
+    if (rows[0].status === 'مؤكد' && token.role !== 'admin') {
+      return NextResponse.json({ error: 'تعديل الطلب المؤكد يتطلب صلاحية المدير' }, { status: 403 });
+    }
+    if (rows[0].status === 'محجوز' && token.role === 'seller' && rows[0].created_by !== token.username) {
       return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
     }
-    await updateSale(parsed.data);
+    await updateSale({ ...parsed.data, adminOverride: token.role === 'admin', updatedBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'sales PUT');
