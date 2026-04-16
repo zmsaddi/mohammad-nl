@@ -43,6 +43,7 @@ export async function PUT(request) {
     if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
     const { token } = auth;
     await updatePurchase({ ...parsed.data, updatedBy: token.username });
+    invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'purchases PUT');
