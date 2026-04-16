@@ -34,7 +34,8 @@ export async function PUT(request) {
   try {
     const data = await request.json();
     if (data.void) {
-      await voidInvoice(data.id);
+      const { token } = auth;
+      await voidInvoice(data.id, { cancelledBy: token.username });
       return NextResponse.json({ success: true, message: 'تم إلغاء الفاتورة' });
     }
     return NextResponse.json({ error: 'عملية غير معروفة' }, { status: 400 });
