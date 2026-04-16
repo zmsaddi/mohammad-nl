@@ -24,22 +24,28 @@ function UsersContent() {
   const [editUser, setEditUser] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   // v1.1 F-017 — confirmation gates for destructive one-click actions
-  const [toggleTarget, setToggleTarget] = useState(null); // user id to toggle
+  const [toggleTarget, setToggleTarget] = useState(null);
   const [confirmSettings, setConfirmSettings] = useState(false);
+  // v1.1 F-007 — per-user bonus rate overrides
+  const [bonusRates, setBonusRates] = useState([]);
+  const [rateForm, setRateForm] = useState({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
+  const [editingRate, setEditingRate] = useState(null);
 
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'seller' });
   const [settingsForm, setSettingsForm] = useState({ seller_bonus_fixed: '10', seller_bonus_percentage: '50', driver_bonus_fixed: '5' });
 
   const fetchData = async () => {
     try {
-      const [usersRes, settingsRes] = await Promise.all([
+      const [usersRes, settingsRes, ratesRes] = await Promise.all([
         fetch('/api/users', { cache: 'no-store' }),
         fetch('/api/settings', { cache: 'no-store' }),
+        fetch('/api/users/bonus-rates', { cache: 'no-store' }),
       ]);
       setUsers(await usersRes.json());
       const s = await settingsRes.json();
       setSettings(s);
       setSettingsForm({ seller_bonus_fixed: s.seller_bonus_fixed || '10', seller_bonus_percentage: s.seller_bonus_percentage || '50', driver_bonus_fixed: s.driver_bonus_fixed || '5' });
+      if (ratesRes.ok) setBonusRates(await ratesRes.json());
     } catch { addToast('خطأ في جلب البيانات', 'error'); }
     finally { setLoading(false); }
   };
@@ -82,6 +88,53 @@ function UsersContent() {
     await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settingsForm), cache: 'no-store' });
     addToast('تم حفظ الإعدادات'); setConfirmSettings(false); fetchData();
   };
+
+  // v1.1 F-007 — per-user bonus rate override handlers
+  const handleSaveRate = async () => {
+    if (!rateForm.username) { addToast('اختر مستخدم', 'error'); return; }
+    try {
+      const res = await fetch('/api/users/bonus-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rateForm),
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        addToast('تم حفظ معدلات البونص المخصصة');
+        setRateForm({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
+        setEditingRate(null);
+        fetchData();
+      } else {
+        const d = await res.json();
+        addToast(d.error || 'خطأ', 'error');
+      }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+  const handleDeleteRate = async (username) => {
+    try {
+      const res = await fetch(`/api/users/bonus-rates?username=${encodeURIComponent(username)}`, { method: 'DELETE', cache: 'no-store' });
+      if (res.ok) { addToast('تم حذف المعدل المخصص — يستخدم الإعدادات العامة الآن'); fetchData(); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ', 'error'); }
+  };
+  const startEditRate = (r) => {
+    setEditingRate(r.username);
+    setRateForm({
+      username: r.username,
+      seller_fixed: r.seller_fixed != null ? String(parseFloat(r.seller_fixed)) : '',
+      seller_percentage: r.seller_percentage != null ? String(parseFloat(r.seller_percentage)) : '',
+      driver_fixed: r.driver_fixed != null ? String(parseFloat(r.driver_fixed)) : '',
+    });
+  };
+
+  // Users eligible for per-user overrides: sellers + drivers (admin/manager
+  // don't earn bonuses per the locked business rule)
+  const overridableUsers = (Array.isArray(users) ? users : []).filter(
+    (u) => (u.role === 'seller' || u.role === 'driver') && u.active
+  );
+  // Users that DON'T have an override yet — available for the "add" dropdown
+  const rateUsernames = new Set((bonusRates || []).map((r) => r.username));
+  const usersWithoutRate = overridableUsers.filter((u) => !rateUsernames.has(u.username));
 
   const startEdit = (u) => { setEditUser(u); setForm({ username: u.username, password: '', name: u.name, role: u.role }); setShowForm(true); };
 
@@ -184,6 +237,105 @@ function UsersContent() {
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
+      </div>
+
+      {/* v1.1 F-007 — per-user bonus rate overrides. Shows existing
+          overrides in a table, with an "add override" form below. Users
+          without an override use the global settings above. */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>
+          معدلات بونص مخصصة لكل مستخدم
+        </h3>
+        <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
+          المستخدمون بدون معدل مخصص يستخدمون الإعدادات العامة أعلاه.
+          أضف معدل مخصص لتجاوز القيم العامة لبائع أو سائق محدد.
+        </p>
+
+        {/* Existing overrides table */}
+        {Array.isArray(bonusRates) && bonusRates.length > 0 && (
+          <div className="table-container" style={{ marginBottom: '16px' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>المستخدم</th>
+                  <th>بونص البائع الثابت</th>
+                  <th>نسبة البائع %</th>
+                  <th>بونص السائق الثابت</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bonusRates.map((r) => {
+                  const user = (Array.isArray(users) ? users : []).find((u) => u.username === r.username);
+                  return (
+                    <tr key={r.username}>
+                      <td style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
+                      <td className="number-cell">{r.seller_fixed != null ? parseFloat(r.seller_fixed) : '—'}</td>
+                      <td className="number-cell">{r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—'}</td>
+                      <td className="number-cell">{r.driver_fixed != null ? parseFloat(r.driver_fixed) : '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-outline btn-sm" onClick={() => startEditRate(r)}>تعديل</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteRate(r.username)}>حذف</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Add/edit override form */}
+        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '14px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '10px' }}>
+            {editingRate ? `تعديل معدل: ${editingRate}` : 'إضافة معدل مخصص جديد'}
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>المستخدم</label>
+              {editingRate ? (
+                <input type="text" value={editingRate} disabled style={{ background: '#e2e8f0' }} />
+              ) : (
+                <select value={rateForm.username} onChange={(e) => setRateForm({ ...rateForm, username: e.target.value })}>
+                  <option value="">-- اختر --</option>
+                  {usersWithoutRate.map((u) => (
+                    <option key={u.username} value={u.username}>
+                      {u.name || u.username} ({u.role === 'seller' ? 'بائع' : 'سائق'})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="form-group">
+              <label>بونص البائع الثابت (€)</label>
+              <input type="number" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
+                value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>نسبة البائع من فرق السعر (%)</label>
+              <input type="number" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
+                value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>بونص السائق الثابت (€)</label>
+              <input type="number" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
+                value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-primary btn-sm" onClick={handleSaveRate}>
+              {editingRate ? 'تحديث' : 'إضافة'}
+            </button>
+            {editingRate && (
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                setEditingRate(null);
+                setRateForm({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
+              }}>إلغاء</button>
+            )}
+          </div>
+        </div>
       </div>
 
       <ConfirmModal isOpen={!!deleteId} title="حذف مستخدم" message="هل أنت متأكد؟ لا يمكن التراجع." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
