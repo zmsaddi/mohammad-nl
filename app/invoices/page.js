@@ -65,7 +65,7 @@ function InvoicesContent() {
             placeholder="بحث بالاسم أو الكود أو VIN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', minWidth: '200px' }}
+            style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', width: '100%' }}
           />
         </div>
 

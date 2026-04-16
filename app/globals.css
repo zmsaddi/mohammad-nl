@@ -33,6 +33,12 @@ body {
   direction: rtl;
 }
 
+/* v1.1 F-033 — safety net: prevent rogue inline minWidth styles from
+   making the whole page horizontally scrollable on narrow phones. */
+html, body {
+  overflow-x: hidden;
+}
+
 /* Sidebar */
 .sidebar {
   position: fixed;
@@ -649,11 +655,13 @@ body {
   color: #1e293b;
 }
 
+/* v1.1 — bumped padding from 4px (~28px) to 12px (~44px) so the
+   close button meets the touch target on phones. */
 .detail-modal-close {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: 12px;
   color: #94a3b8;
   border-radius: 8px;
 }
@@ -987,9 +995,14 @@ body {
     white-space: nowrap;
   }
 
+  /* v1.1 F-028 — bumped from 4px/8px (~24px tall) to meet the 44px
+     iOS/Android touch target minimum. Pre-v1.1 every in-table action
+     button (cancel, WhatsApp, تسليم, PDF) was too small to tap
+     reliably on phones. */
   .data-table .btn-sm {
-    padding: 4px 8px;
-    font-size: 0.7rem;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    min-height: 40px;
   }
 
   /* Charts */
