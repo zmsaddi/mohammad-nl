@@ -909,20 +909,75 @@ html, body {
   color: #64748b;
 }
 
-/* Mobile Sidebar Toggle */
-.mobile-toggle {
+/* Mobile/Tablet Top Bar — replaces the old floating hamburger button.
+   Contains: hamburger + app name + user info + signout.
+   Hidden on desktop (>1024px), visible below. */
+.mobile-topbar {
   display: none;
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 52px;
   z-index: 60;
-  padding: 10px;
-  border-radius: 10px;
   background: #1e40af;
   color: white;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.mobile-topbar-menu {
+  background: none;
   border: none;
+  color: white;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  padding: 8px;
+  border-radius: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-topbar-menu:active {
+  background: rgba(255,255,255,0.15);
+}
+.mobile-topbar-title {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+}
+.mobile-topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mobile-topbar-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+.mobile-topbar-signout {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-topbar-signout:active {
+  background: rgba(255,255,255,0.3);
+}
+
+/* Legacy floating toggle — replaced by mobile-topbar but kept for fallback */
+.mobile-toggle {
+  display: none;
 }
 
 /* Mobile overlay when sidebar open */
@@ -936,13 +991,30 @@ html, body {
 
 /* ===== TABLET (768px - 1024px) ===== */
 @media (max-width: 1024px) {
+  /* Show the top bar on tablets too */
+  .mobile-topbar {
+    display: flex;
+  }
+
   .sidebar {
-    width: 220px;
+    width: 280px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar.open + .sidebar-overlay,
+  .sidebar-overlay.open {
+    display: block;
   }
 
   .main-content {
-    margin-right: 220px;
+    margin-right: 0;
     padding: 20px;
+    padding-top: 64px;
   }
 
   .charts-grid {
@@ -990,11 +1062,15 @@ html, body {
   .main-content {
     margin-right: 0;
     padding: 12px;
-    padding-top: 56px;
+    padding-top: 60px;
   }
 
-  .mobile-toggle {
-    display: block;
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .mobile-topbar-name {
+    display: none; /* hide name on very small screens, keep signout icon */
   }
 
   /* Page header */

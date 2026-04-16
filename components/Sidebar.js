@@ -158,17 +158,31 @@ export default function Sidebar() {
 
   return (
     <>
-      <button className="mobile-toggle" onClick={() => setIsOpen(!isOpen)} aria-label="القائمة">
-        {isOpen ? (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="24" height="24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="24" height="24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-        )}
-      </button>
+      {/* Mobile/tablet top bar — always visible below 1024px, hidden on desktop.
+          Contains: hamburger (right) + app name (center) + user + signout (left).
+          Replaces the old floating hamburger button that users couldn't find. */}
+      <div className="mobile-topbar">
+        <button className="mobile-topbar-menu" onClick={() => setIsOpen(!isOpen)} aria-label="القائمة">
+          {isOpen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="22" height="22">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="22" height="22">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          )}
+        </button>
+        <span className="mobile-topbar-title">Vitesse Eco</span>
+        <div className="mobile-topbar-user">
+          <span className="mobile-topbar-name">{userName}</span>
+          <button className="mobile-topbar-signout" onClick={() => signOut({ callbackUrl: '/login' })} aria-label="تسجيل الخروج">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="18" height="18">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* Overlay to close sidebar on mobile */}
       {isOpen && <div className="sidebar-overlay open" onClick={() => setIsOpen(false)} />}
