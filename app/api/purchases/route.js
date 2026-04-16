@@ -39,7 +39,8 @@ export async function PUT(request) {
   if (auth.error) return auth.error;
   try {
     const data = await request.json();
-    await updatePurchase(data);
+    const { token } = auth;
+    await updatePurchase({ ...data, updatedBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'purchases PUT');

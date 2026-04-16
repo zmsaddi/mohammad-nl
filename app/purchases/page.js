@@ -22,6 +22,7 @@ function PurchasesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [editPurchase, setEditPurchase] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -87,6 +88,27 @@ function PurchasesContent() {
     { key: 'date', direction: 'desc' }
   );
 
+  const startEditPurchase = (row) => {
+    setEditPurchase(row);
+    setForm({
+      date: row.date || getTodayDate(),
+      supplier: row.supplier || '',
+      item: row.item || '',
+      category: row.category || '',
+      quantity: String(row.quantity ?? ''),
+      unitPrice: String(row.unit_price ?? ''),
+      sellPrice: String(row.sell_price ?? ''),
+      paymentType: row.payment_type || 'كاش',
+      notes: row.notes || '',
+      paidAmount: String(row.paid_amount ?? ''),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditPurchase(null);
+    setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.date || !form.supplier || !form.item || !form.quantity || !form.unitPrice) {
@@ -106,6 +128,35 @@ function PurchasesContent() {
     }
     setSubmitting(true);
     try {
+      // --- EDIT mode: PUT existing purchase ---
+      if (editPurchase) {
+        const res = await fetch('/api/purchases', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editPurchase.id,
+            supplier: form.supplier,
+            item: form.item,
+            quantity: form.quantity,
+            unitPrice: form.unitPrice,
+            paymentType: form.paymentType,
+            paidAmount: form.paidAmount,
+            notes: form.notes,
+          }),
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          addToast('تم تعديل عملية الشراء بنجاح');
+          cancelEdit();
+          fetchData();
+        } else {
+          const err = await res.json();
+          addToast(err.error || 'خطأ في تعديل البيانات', 'error');
+        }
+        return;
+      }
+
+      // --- ADD mode: POST new purchase ---
       // Auto-create product if new — DONE: Step 3E pass category through
       const productExists = products.some((p) => p.name === form.item);
       if (!productExists && form.item) {
@@ -136,10 +187,6 @@ function PurchasesContent() {
         const supData = await supRes.json().catch(() => ({}));
         if (supData?.ambiguous) {
           addToast(supData.message || 'يوجد مورد بنفس الاسم — أضف رقم هاتف للتمييز', 'error');
-          // BUG-4 cleanup 2026-04-14: removed redundant manual
-          // setSubmitting(false) here — the outer finally block already
-          // handles it. Keeping the return so the rest of the purchase
-          // flow is skipped.
           return;
         }
       }
@@ -192,7 +239,7 @@ function PurchasesContent() {
       {/* Add Form */}
       <div className="card" style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-          إضافة عملية شراء جديدة
+          {editPurchase ? 'تعديل عملية شراء' : 'إضافة عملية شراء جديدة'}
         </h3>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -331,9 +378,16 @@ function PurchasesContent() {
               <input id="pur-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting || !!sellPriceError}>
-            {submitting ? 'جاري الإضافة...' : 'إضافة عملية شراء'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="submit" className="btn btn-primary" disabled={submitting || !!sellPriceError}>
+              {submitting ? (editPurchase ? 'جاري التعديل...' : 'جاري الإضافة...') : (editPurchase ? 'حفظ التعديلات' : 'إضافة عملية شراء')}
+            </button>
+            {editPurchase && (
+              <button type="button" className="btn btn-outline" onClick={cancelEdit}>
+                إلغاء التعديل
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -435,6 +489,11 @@ function PurchasesContent() {
                             })}
                           >
                             💰 دفع
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditPurchase(row); }}>
+                            تعديل
                           </button>
                         )}
                         {isAdmin && (

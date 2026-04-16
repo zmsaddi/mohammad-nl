@@ -19,6 +19,7 @@ function ExpensesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [editExpense, setEditExpense] = useState(null);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -50,6 +51,23 @@ function ExpensesContent() {
     { key: 'date', direction: 'desc' }
   );
 
+  const startEditExpense = (row) => {
+    setEditExpense(row);
+    setForm({
+      date: row.date || getTodayDate(),
+      category: row.category || '',
+      description: row.description || '',
+      amount: String(row.amount ?? ''),
+      paymentType: row.payment_type || 'كاش',
+      notes: row.notes || '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditExpense(null);
+    setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'كاش', notes: '' });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.date || !form.category || !form.description || !form.amount) {
@@ -58,18 +76,43 @@ function ExpensesContent() {
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        addToast('تم إضافة المصروف بنجاح');
-        setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'كاش', notes: '' });
-        fetchData();
+      if (editExpense) {
+        // --- EDIT mode: PUT existing expense ---
+        const res = await fetch('/api/expenses', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editExpense.id,
+            category: form.category,
+            description: form.description,
+            amount: form.amount,
+            notes: form.notes,
+          }),
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          addToast('تم تعديل المصروف بنجاح');
+          cancelEdit();
+          fetchData();
+        } else {
+          const err = await res.json();
+          addToast(err.error || 'خطأ في تعديل البيانات', 'error');
+        }
       } else {
-        addToast('خطأ في إضافة البيانات', 'error');
+        // --- ADD mode: POST new expense ---
+        const res = await fetch('/api/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          addToast('تم إضافة المصروف بنجاح');
+          setForm({ date: getTodayDate(), category: '', description: '', amount: '', paymentType: 'كاش', notes: '' });
+          fetchData();
+        } else {
+          addToast('خطأ في إضافة البيانات', 'error');
+        }
       }
     } catch {
       addToast('خطأ في الاتصال', 'error');
@@ -107,7 +150,7 @@ function ExpensesContent() {
       {/* Add Form */}
       <div className="card" style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-          إضافة مصروف جديد
+          {editExpense ? 'تعديل مصروف' : 'إضافة مصروف جديد'}
         </h3>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -148,9 +191,16 @@ function ExpensesContent() {
               <input id="exp-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'جاري الإضافة...' : 'إضافة مصروف'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? (editExpense ? 'جاري التعديل...' : 'جاري الإضافة...') : (editExpense ? 'حفظ التعديلات' : 'إضافة مصروف')}
+            </button>
+            {editExpense && (
+              <button type="button" className="btn btn-outline" onClick={cancelEdit}>
+                إلغاء التعديل
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -196,9 +246,14 @@ function ExpensesContent() {
                     <td>{row.notes}</td>
                     {isAdmin && (
                       <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                          حذف
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditExpense(row); }}>
+                            تعديل
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
+                            حذف
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
