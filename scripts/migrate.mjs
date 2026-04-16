@@ -74,7 +74,11 @@ function getMigrationFiles(dir) {
 }
 
 function checksum(content) {
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  // Normalize line endings before hashing so CRLF ↔ LF differences
+  // (common when git auto-normalizes on Windows) don't produce
+  // false checksum mismatches.
+  const normalized = content.replace(/\r\n/g, '\n');
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
 
 async function run() {
