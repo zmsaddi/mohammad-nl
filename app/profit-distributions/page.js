@@ -89,13 +89,14 @@ function ProfitDistributionsContent() {
       .then((d) => {
         if (!d) { setPool(null); return; }
         setPool({
-          collected: parseFloat(d.total_collected) || 0,
-          cogs: parseFloat(d.cogs) || 0,
-          expenses: parseFloat(d.expenses) || 0,
-          bonus_paid: parseFloat(d.bonus_paid) || 0,
-          net_profit: parseFloat(d.net_profit) || 0,
+          net_profit: parseFloat(d.net_profit_cash_basis) || 0,
           already_distributed: parseFloat(d.already_distributed) || 0,
           remaining: parseFloat(d.remaining) || 0,
+          // Breakdown
+          collected: parseFloat(d.collected) || 0,
+          cogs: parseFloat(d.cogs) || 0,
+          expenses: parseFloat(d.expenses) || 0,
+          gross_profit: parseFloat(d.gross_profit) || 0,
         });
       })
       .catch(() => setPool(null));
@@ -390,14 +391,12 @@ function ProfitDistributionsContent() {
                     color: exceedsPool ? '#991b1b' : '#1e40af',
                   }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
-                      <span>💰 محصّلات: <strong>{formatNumber(pool.collected)} €</strong></span>
-                      <span>📦 تكلفة بضاعة: <strong>-{formatNumber(pool.cogs)} €</strong></span>
-                      <span>💸 مصروفات: <strong>-{formatNumber(pool.expenses)} €</strong></span>
-                      <span>🎁 بونصات: <strong>-{formatNumber(pool.bonus_paid)} €</strong></span>
-                      <span style={{ fontWeight: 700, borderTop: '1px solid currentColor', paddingTop: '4px' }}>
-                        📊 صافي الربح: <strong>{formatNumber(pool.net_profit)} €</strong>
+                      <span style={{ fontWeight: 700 }}>
+                        📊 صافي الربح (محصّل): <strong>{formatNumber(pool.net_profit)} €</strong>
                       </span>
-                      <span>📉 موزع سابقاً: <strong>-{formatNumber(pool.already_distributed)} €</strong></span>
+                      {pool.already_distributed > 0 && (
+                        <span>📉 موزع سابقاً: <strong>-{formatNumber(pool.already_distributed)} €</strong></span>
+                      )}
                       <span style={{ fontWeight: 700, color: pool.remaining > 0 ? '#16a34a' : '#dc2626' }}>
                         ✅ المتاح للتوزيع: <strong>{formatNumber(pool.remaining)} €</strong>
                       </span>
