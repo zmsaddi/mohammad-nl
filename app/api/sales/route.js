@@ -1,32 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getSales, addSale, deleteSale, updateSale } from '@/lib/db';
 import { SaleSchema, SaleUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
 import { canCancelSale, CANCEL_DENIED_ERROR } from '@/lib/cancel-rule';
-
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const { searchParams } = new URL(request.url);
     let rows = await getSales(searchParams.get('client'));
     if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
     return NextResponse.json(rows);
   } catch (err) {
-    console.error('[sales] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'sales GET');
   }
 }
 
 export async function POST(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const body = await request.json();
     const parsed = SaleSchema.safeParse(body);
@@ -78,24 +75,14 @@ export async function POST(request) {
     invalidateCache(); // client may have been auto-created
     return NextResponse.json({ success: true, id: saleId, deliveryId, refCode });
   } catch (error) {
-    console.error('[sales] POST:', error);
-    const safe = isSafeError(error) ? error.message : 'خطأ في إضافة البيانات';
-    return NextResponse.json({ error: safe }, { status: 400 });
+    return apiError(error, 'خطأ في إضافة البيانات', 400, 'sales POST');
   }
-}
-
-// Validation errors thrown by lib/db.js are user-facing Arabic strings — safe to return.
-function isSafeError(error) {
-  if (!error || !error.message) return false;
-  return /^[\u0600-\u06FF]/.test(error.message);
 }
 
 export async function PUT(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin', 'manager', 'seller'].includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const body = await request.json();
     const parsed = SaleUpdateSchema.safeParse(body);
@@ -113,20 +100,14 @@ export async function PUT(request) {
     await updateSale(parsed.data);
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[sales] PUT:', err);
-    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في تحديث البيانات', 500, 'sales PUT');
   }
 }
 
 export async function DELETE(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  // Session 9 locked cancel rule — driver blocked at the outer gate.
-  // admin + manager + seller may reach here, and the shared helper
-  // below enforces the role × status matrix exactly.
-  if (!['admin', 'manager', 'seller'].includes(token.role)) {
-    return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -144,7 +125,6 @@ export async function DELETE(request) {
     await deleteSale(id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[sales] DELETE:', err);
-    return NextResponse.json({ error: 'خطأ في حذف البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في حذف البيانات', 500, 'sales DELETE');
   }
 }

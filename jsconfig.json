@@ -2,6 +2,14 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./*"]
-    }
-  }
+    },
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": false
+  },
+  "include": ["lib/**/*.js", "app/**/*.js", "components/**/*.js"],
+  "exclude": ["node_modules", ".next", "scripts"]
 }

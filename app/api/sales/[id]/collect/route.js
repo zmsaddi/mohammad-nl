@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { applyCollection } from '@/lib/db';
+import { requireAuth } from '@/lib/api-auth';
 
 /**
  * FEAT-04: POST /api/sales/[id]/collect
@@ -22,13 +22,9 @@ import { applyCollection } from '@/lib/db';
  *   - Unexpected → 500
  */
 export async function POST(request, { params }) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  }
-  if (!['admin', 'manager', 'seller'].includes(token.role)) {
-    return NextResponse.json({ error: 'صلاحياتك لا تسمح بتسجيل دفعات' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   const { id } = await params;
   const saleId = parseInt(id, 10);

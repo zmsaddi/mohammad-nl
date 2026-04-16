@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getSummaryData } from '@/lib/db';
 import { sql } from '@vercel/postgres';
-
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   // DONE: Fix 3 — sellers get a lightweight personal-stats payload only.
   // No P&L, no costs, no other sellers' data — strictly their own sales + bonuses.
@@ -82,8 +80,7 @@ export async function GET(request) {
         totalBonusOwed:   myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
       });
     } catch (err) {
-      console.error('[summary] GET:', err);
-      return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+      return apiError(err, 'خطأ في جلب البيانات', 500, 'summary GET (seller)');
     }
   }
 
@@ -93,7 +90,6 @@ export async function GET(request) {
     const data = await getSummaryData(searchParams.get('from'), searchParams.get('to'));
     return NextResponse.json(data);
   } catch (err) {
-    console.error('[summary] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'summary GET');
   }
 }

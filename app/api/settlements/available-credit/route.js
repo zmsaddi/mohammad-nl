@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getAvailableCredit } from '@/lib/db';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 // v1.0.1 Feature 1 — live available-credit probe used by the settlement
 // form UI to render a green/red indicator under the amount field and to
 // disable the submit button when requested > available.
 
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
-
 export async function GET(request) {
-  const token = await checkAuth(request);
-  if (!token || token.role !== 'admin') {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username') || '';
@@ -29,7 +24,6 @@ export async function GET(request) {
     const available = await getAvailableCredit(username, type);
     return NextResponse.json({ available });
   } catch (err) {
-    console.error('[settlements/available-credit] GET:', err);
-    return NextResponse.json({ error: 'خطأ في حساب الرصيد' }, { status: 500 });
+    return apiError(err, 'خطأ في حساب الرصيد', 500, 'settlements/available-credit GET');
   }
 }

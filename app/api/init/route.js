@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { initDatabase, resetDatabase } from '@/lib/db';
 import { sql } from '@vercel/postgres';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET → idempotent init only (safe). POST → mutating operations (clean / reset).
 export async function GET(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token || token.role !== 'admin') {
-    return NextResponse.json({ error: 'غير مصرح - سجل دخول كمدير أولاً' }, { status: 401 });
-  }
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     await initDatabase();
     return NextResponse.json({ success: true, message: 'تم تهيئة قاعدة البيانات بنجاح' });
@@ -19,10 +17,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token || token.role !== 'admin') {
-    return NextResponse.json({ error: 'غير مصرح - سجل دخول كمدير أولاً' }, { status: 401 });
-  }
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
 
   let body = {};
   try { body = await request.json(); } catch (err) { console.error('[init] POST body parse:', err); }

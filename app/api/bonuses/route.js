@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getBonuses } from '@/lib/db';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   try {
     // BUG 6B — managers also need full bonus visibility for payroll oversight.
@@ -16,7 +18,6 @@ export async function GET(request) {
     const rows = await getBonuses(token.username);
     return NextResponse.json(rows);
   } catch (err) {
-    console.error('[bonuses] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'bonuses GET');
   }
 }
