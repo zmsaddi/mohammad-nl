@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { paySupplier, getSupplierPayments } from '@/lib/db';
 import { SupplierPaymentSchema, zodArabicError } from '@/lib/schemas';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 // v1.0.1 Feature 6 — supplier partial payment endpoint.
 //
@@ -12,10 +13,6 @@ import { SupplierPaymentSchema, zodArabicError } from '@/lib/schemas';
 // inserts a supplier_payments audit row. Rejects overpayment with
 // an Arabic error.
 
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
-
 function parsePurchaseId(idStr) {
   const id = parseInt(idStr, 10);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -23,11 +20,9 @@ function parsePurchaseId(idStr) {
 }
 
 export async function POST(request, { params }) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin', 'manager'].includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   const { id: idStr } = await params;
   const purchaseId = parsePurchaseId(idStr);
@@ -57,20 +52,13 @@ export async function POST(request, { params }) {
     });
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
-    console.error('[purchases/[id]/pay] POST:', err);
-    const safe = /^[\u0600-\u06FF]/.test(err?.message || '')
-      ? err.message
-      : 'خطأ في تسجيل الدفعة';
-    return NextResponse.json({ error: safe }, { status: 400 });
+    return apiError(err, 'خطأ في تسجيل الدفعة', 400, 'purchases/[id]/pay POST');
   }
 }
 
 export async function GET(request, { params }) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin', 'manager'].includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager']);
+  if (auth.error) return auth.error;
 
   const { id: idStr } = await params;
   const purchaseId = parsePurchaseId(idStr);
@@ -82,7 +70,6 @@ export async function GET(request, { params }) {
     const payments = await getSupplierPayments(purchaseId);
     return NextResponse.json(payments);
   } catch (err) {
-    console.error('[purchases/[id]/pay] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب الدفعات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب الدفعات', 500, 'purchases/[id]/pay GET');
   }
 }

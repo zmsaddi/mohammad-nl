@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getUsers, addUser, updateUser, toggleUserActive, deleteUser } from '@/lib/db';
 import { UserSchema, UserUpdateSchema, zodArabicError } from '@/lib/schemas';
-
-async function checkAdmin(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token || token.role !== 'admin') return null;
-  return token;
-}
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const rows = await getUsers();
     return NextResponse.json(rows);
   } catch (err) {
-    console.error('[users] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'users GET');
   }
 }
 
 export async function POST(request) {
-  if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const body = await request.json();
     const parsed = UserSchema.safeParse(body);
@@ -42,7 +38,8 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
-  if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const body = await request.json();
     const parsed = UserUpdateSchema.safeParse(body);
@@ -55,19 +52,18 @@ export async function PUT(request) {
     }
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[users] PUT:', err);
-    return NextResponse.json({ error: 'خطأ في تحديث المستخدم' }, { status: 500 });
+    return apiError(err, 'خطأ في تحديث المستخدم', 500, 'users PUT');
   }
 }
 
 export async function DELETE(request) {
-  if (!await checkAdmin(request)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const { searchParams } = new URL(request.url);
     await deleteUser(searchParams.get('id'));
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[users] DELETE:', err);
-    return NextResponse.json({ error: 'خطأ في حذف المستخدم' }, { status: 500 });
+    return apiError(err, 'خطأ في حذف المستخدم', 500, 'users DELETE');
   }
 }

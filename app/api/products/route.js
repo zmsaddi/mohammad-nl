@@ -1,31 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getProducts, addProduct, deleteProduct } from '@/lib/db';
 import { ProductSchema, ProductUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
-
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     let rows = await getProducts();
     // Strip buy_price at the server — sellers must never receive cost data
     if (token.role === 'seller') rows = rows.map(({ buy_price, ...rest }) => rest);
     return NextResponse.json(rows);
   } catch (err) {
-    console.error('[products] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'products GET');
   }
 }
 
 export async function POST(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin','manager','seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const body = await request.json();
     const parsed = ProductSchema.safeParse(body);
@@ -46,8 +43,7 @@ export async function POST(request) {
     invalidateCache(); // product list changed — rebuild entity-resolver index
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
-    console.error('[products] POST:', err);
-    return NextResponse.json({ error: 'خطأ في إضافة البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في إضافة البيانات', 500, 'products POST');
   }
 }
 
@@ -59,9 +55,8 @@ export async function POST(request) {
 // When the caller omits a field it stays unchanged, so legacy callers that send only
 // { id, sell_price } don't accidentally wipe the other columns.
 export async function PUT(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const body = await request.json();
     const parsed = ProductUpdateSchema.safeParse(body);
@@ -106,23 +101,19 @@ export async function PUT(request) {
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[products] PUT:', err);
-    return NextResponse.json({ error: 'خطأ في تحديث البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في تحديث البيانات', 500, 'products PUT');
   }
 }
 
 export async function DELETE(request) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (token.role !== 'admin') return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const { searchParams } = new URL(request.url);
     await deleteProduct(searchParams.get('id'));
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[products] DELETE:', error);
-    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في حذف البيانات';
-    return NextResponse.json({ error: safe }, { status: 400 });
+    return apiError(error, 'خطأ في حذف البيانات', 400, 'products DELETE');
   }
 }

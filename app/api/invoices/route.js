@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getInvoices, voidInvoice } from '@/lib/db';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   try {
     if (['admin', 'manager'].includes(token.role)) {
@@ -22,14 +24,13 @@ export async function GET(request) {
     }
     return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   } catch (err) {
-    console.error('[invoices] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'invoices GET');
   }
 }
 
 export async function PUT(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token || token.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const data = await request.json();
     if (data.void) {
@@ -38,8 +39,6 @@ export async function PUT(request) {
     }
     return NextResponse.json({ error: 'عملية غير معروفة' }, { status: 400 });
   } catch (error) {
-    console.error('[invoices] PUT:', error);
-    const safe = error?.message && /^[\u0600-\u06FF]/.test(error.message) ? error.message : 'خطأ في تنفيذ العملية';
-    return NextResponse.json({ error: safe }, { status: 400 });
+    return apiError(error, 'خطأ في تنفيذ العملية', 400, 'invoices PUT');
   }
 }

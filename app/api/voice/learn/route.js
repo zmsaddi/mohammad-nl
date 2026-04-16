@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { saveAICorrection } from '@/lib/db';
 // DONE: Step 4B — needed for the zero-correction frequency-bump path
 import { sql } from '@vercel/postgres';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function POST(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   try {
     const { transcript, aiData, userData, actionType } = await request.json();
@@ -97,7 +99,6 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, corrections: corrections.length });
   } catch (err) {
-    console.error('[voice/learn] POST:', err);
-    return NextResponse.json({ error: 'خطأ في حفظ التعلم' }, { status: 500 });
+    return apiError(err, 'خطأ في حفظ التعلم', 500, 'voice/learn POST');
   }
 }

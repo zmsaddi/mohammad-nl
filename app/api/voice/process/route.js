@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 // DONE: Step 3A — Gemini import + client removed; Groq is the only LLM provider now
 import Groq from 'groq-sdk';
 import { sql } from '@vercel/postgres';
@@ -15,6 +14,7 @@ import { isBlacklisted, isSuspiciouslyLongWithoutAction } from '@/lib/voice-blac
 // Rule-based action classifier (sale/purchase/expense) — used as post-LLM
 // override so explicit verbs always win over Llama's classification.
 import { classifyAction } from '@/lib/voice-action-classifier';
+import { requireAuth } from '@/lib/api-auth';
 
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
@@ -42,9 +42,9 @@ function checkRateLimit(username) {
 // FIXED: 4 — CATEGORY_MAP / PAYMENT_MAP moved to lib/utils.js (now imported above)
 
 export async function POST(request) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin', 'manager', 'seller'].includes(token.role)) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   if (!checkRateLimit(token.username)) {
     return NextResponse.json({ error: 'تجاوزت الحد المسموح (10 طلبات/دقيقة) — انتظر قليلاً ثم أعد المحاولة' }, { status: 429 });

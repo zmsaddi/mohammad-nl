@@ -1,31 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { getSettlements, addSettlement } from '@/lib/db';
 import { SettlementSchema, zodArabicError } from '@/lib/schemas';
-
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const token = await checkAuth(request);
-  if (!token || token.role !== 'admin') {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
   try {
     const rows = await getSettlements();
     return NextResponse.json(rows);
   } catch (err) {
-    console.error('[settlements] GET:', err);
-    return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 });
+    return apiError(err, 'خطأ في جلب البيانات', 500, 'settlements GET');
   }
 }
 
 export async function POST(request) {
-  const token = await checkAuth(request);
-  if (!token || token.role !== 'admin') {
-    return NextResponse.json({ error: 'غير مصرح - المدير فقط' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
   try {
     const body = await request.json();
     const parsed = SettlementSchema.safeParse(body);
@@ -34,9 +27,6 @@ export async function POST(request) {
     const id = await addSettlement({ ...parsed.data, settledBy: token.username });
     return NextResponse.json({ success: true, id });
   } catch (error) {
-    console.error('[settlements] POST:', error);
-    // Arabic messages from db.js are safe user-facing validations; hide everything else
-    const safe = /^[\u0600-\u06FF]/.test(error?.message || '') ? error.message : 'خطأ في تسجيل التسوية';
-    return NextResponse.json({ error: safe }, { status: 400 });
+    return apiError(error, 'خطأ في تسجيل التسوية', 400, 'settlements POST');
   }
 }

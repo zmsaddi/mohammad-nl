@@ -5,21 +5,15 @@
 //        driver → invoices for deliveries they personally completed.
 
 import { NextResponse } from 'next/server';
-import { getToken }     from 'next-auth/jwt';
 import { sql }          from '@vercel/postgres';
 import { getSettings }  from '@/lib/db';
 import { generateInvoiceBody } from '@/lib/invoice-modes';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(request, { params }) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  }
-
-  const allowed = ['admin', 'manager', 'seller', 'driver'];
-  if (!allowed.includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller', 'driver']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   try {
     // Next.js 16: params is a Promise

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import { previewCancelSale, commitCancelSale } from '@/lib/db';
 import { canCancelSale, CANCEL_DENIED_ERROR } from '@/lib/cancel-rule';
 import { sql } from '@vercel/postgres';
+import { requireAuth } from '@/lib/api-auth';
+import { apiError } from '@/lib/api-errors';
 
 /**
  * FEAT-05: cancellation preview + commit endpoints.
@@ -26,10 +27,6 @@ import { sql } from '@vercel/postgres';
  * Auth: admin + manager only. Sellers and drivers cannot cancel.
  */
 
-async function checkAuth(request) {
-  return await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-}
-
 function parseId(params) {
   const { id } = params;
   const saleId = parseInt(id, 10);
@@ -38,11 +35,9 @@ function parseId(params) {
 }
 
 export async function GET(request, { params }) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  if (!['admin', 'manager'].includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   const saleId = parseId(await params);
   if (!saleId) return NextResponse.json({ error: 'معرّف الطلب غير صحيح' }, { status: 400 });
@@ -51,23 +46,14 @@ export async function GET(request, { params }) {
     const { refundAmount, preview } = await previewCancelSale(saleId, token.username);
     return NextResponse.json({ refundAmount, preview });
   } catch (err) {
-    console.error('[sales/cancel] GET:', err);
-    // User-facing Arabic errors are safe to surface as-is
-    const safe = err?.message && /^[\u0600-\u06FF]/.test(err.message) ? err.message : 'خطأ في جلب معاينة الإلغاء';
-    const status = err?.message === 'الطلب غير موجود' ? 404 : 400;
-    return NextResponse.json({ error: safe }, { status });
+    return apiError(err, 'خطأ في جلب معاينة الإلغاء', 400, 'sales/cancel GET');
   }
 }
 
 export async function POST(request, { params }) {
-  const token = await checkAuth(request);
-  if (!token) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  // Session 9 locked cancel rule — admin + manager reach the route layer;
-  // sellers use the DELETE /api/sales route for their own reserved path.
-  // Drivers are blocked at the outer gate.
-  if (!['admin', 'manager'].includes(token.role)) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const auth = await requireAuth(request, ['admin', 'manager']);
+  if (auth.error) return auth.error;
+  const { token } = auth;
 
   const saleId = parseId(await params);
   if (!saleId) return NextResponse.json({ error: 'معرّف الطلب غير صحيح' }, { status: 400 });
@@ -140,8 +126,6 @@ export async function POST(request, { params }) {
       );
     }
 
-    const safe = err?.message && /^[\u0600-\u06FF]/.test(err.message) ? err.message : 'خطأ في تنفيذ الإلغاء';
-    const status = err?.message === 'الطلب غير موجود' ? 404 : 400;
-    return NextResponse.json({ error: safe }, { status });
+    return apiError(err, 'خطأ في تنفيذ الإلغاء', 400, 'sales/cancel POST');
   }
 }
