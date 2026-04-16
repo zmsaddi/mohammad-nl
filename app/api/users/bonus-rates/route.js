@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserBonusRates, setUserBonusRate, deleteUserBonusRate } from '@/lib/db';
+import { BonusRateUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
@@ -25,10 +26,9 @@ export async function PUT(request) {
   const { token } = auth;
   try {
     const body = await request.json();
-    if (!body.username) {
-      return NextResponse.json({ error: 'اسم المستخدم مطلوب' }, { status: 400 });
-    }
-    await setUserBonusRate({ ...body, updatedBy: token.username });
+    const parsed = BonusRateUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+    await setUserBonusRate({ ...parsed.data, updatedBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في حفظ البيانات', 400, 'users/bonus-rates PUT');

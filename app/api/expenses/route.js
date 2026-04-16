@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getExpenses, addExpense, deleteExpense, updateExpense } from '@/lib/db';
-import { ExpenseSchema, zodArabicError } from '@/lib/schemas';
+import { ExpenseSchema, ExpenseUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
@@ -35,8 +35,11 @@ export async function PUT(request) {
   const auth = await requireAuth(request, ['admin']);
   if (auth.error) return auth.error;
   try {
-    const data = await request.json();
-    await updateExpense(data);
+    const body = await request.json();
+    const parsed = ExpenseUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+    const { token } = auth;
+    await updateExpense({ ...parsed.data, updatedBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'expenses PUT');

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPurchases, addPurchase, deletePurchase, updatePurchase } from '@/lib/db';
-import { PurchaseSchema, zodArabicError } from '@/lib/schemas';
+import { PurchaseSchema, PurchaseUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { invalidateCache } from '@/lib/entity-resolver';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
@@ -38,9 +38,11 @@ export async function PUT(request) {
   const auth = await requireAuth(request, ['admin']);
   if (auth.error) return auth.error;
   try {
-    const data = await request.json();
+    const body = await request.json();
+    const parsed = PurchaseUpdateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
     const { token } = auth;
-    await updatePurchase({ ...data, updatedBy: token.username });
+    await updatePurchase({ ...parsed.data, updatedBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'purchases PUT');

@@ -48,24 +48,20 @@ export async function POST(request) {
         return NextResponse.json({ error: 'تأكيد مفقود - مطلوب confirm بالعبارة الصحيحة' }, { status: 400 });
       }
       const keepLearning = body.keepLearning === true;
-      await sql`DELETE FROM purchases`;
-      await sql`DELETE FROM sales`;
-      await sql`DELETE FROM expenses`;
-      await sql`DELETE FROM deliveries`;
-      await sql`DELETE FROM payments`;
-      await sql`DELETE FROM products`;
-      await sql`DELETE FROM suppliers`;
-      await sql`DELETE FROM clients`;
-      await sql`DELETE FROM bonuses`;
-      await sql`DELETE FROM settlements`;
-      await sql`DELETE FROM invoices`.catch((err) => console.error('[init] clean invoices:', err));
-      await sql`DELETE FROM price_history`.catch((err) => console.error('[init] clean price_history:', err));
-      await sql`DELETE FROM voice_logs`.catch((err) => console.error('[init] clean voice_logs:', err));
+      // SP-009: wrap in a single TRUNCATE for atomicity (all or nothing)
+      const tables = [
+        'profit_distribution_groups', 'profit_distributions', 'cancellations',
+        'supplier_payments', 'bonuses', 'settlements', 'payments',
+        'invoices', 'deliveries', 'sales', 'purchases', 'expenses',
+        'price_history', 'voice_logs', 'clients', 'products', 'suppliers',
+      ];
       if (!keepLearning) {
-        await sql`DELETE FROM ai_corrections`.catch((err) => console.error('[init] clean ai_corrections:', err));
-        await sql`DELETE FROM ai_patterns`.catch((err) => console.error('[init] clean ai_patterns:', err));
-        await sql`DELETE FROM entity_aliases`.catch((err) => console.error('[init] clean entity_aliases:', err));
+        tables.push('ai_corrections', 'ai_patterns', 'entity_aliases');
       }
+      const list = tables.map(t => `"${t}"`).join(', ');
+      await sql.query(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+      // Also clear invoice sequence
+      await sql`DELETE FROM invoice_sequence`.catch(() => {});
       return NextResponse.json({
         success: true,
         message: keepLearning
