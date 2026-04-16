@@ -8,6 +8,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import PageSkeleton from '@/components/PageSkeleton';
 
 function ClientsContent() {
   const { data: session } = useSession();
@@ -108,7 +109,7 @@ function ClientsContent() {
   });
 
   // Item 3 — click-to-sort, default to name ascending
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'name', direction: 'asc' }
   );
@@ -225,7 +226,7 @@ function ClientsContent() {
         </div>
 
         {loading ? (
-          <div className="loading-overlay"><div className="spinner"></div></div>
+          <PageSkeleton rows={5} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <h3>{search ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}</h3>
@@ -236,12 +237,12 @@ function ClientsContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>اسم العميل{getSortIndicator('name')}</th>
-                  <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }}>رقم الهاتف{getSortIndicator('phone')}</th>
-                  <th onClick={() => requestSort('totalSales')} style={{ cursor: 'pointer' }}>إجمالي المشتريات{getSortIndicator('totalSales')}</th>
-                  <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }}>المدفوع{getSortIndicator('totalPaid')}</th>
-                  <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>اسم العميل{getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('phone')}>رقم الهاتف{getSortIndicator('phone')}</th>
+                  <th onClick={() => requestSort('totalSales')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalSales')}>إجمالي المشتريات{getSortIndicator('totalSales')}</th>
+                  <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPaid')}>المدفوع{getSortIndicator('totalPaid')}</th>
+                  <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remainingDebt')}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>

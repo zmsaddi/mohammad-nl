@@ -86,7 +86,7 @@ function SettlementsContent() {
                         amountNum > availableCredit + 0.01;
 
   // Item 3 — click-to-sort on the settlements history table, default newest first
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     Array.isArray(settlements) ? settlements : [],
     { key: 'date', direction: 'desc' }
   );
@@ -344,13 +344,13 @@ function SettlementsContent() {
             <div className="table-container">
               <table className="data-table">
                 <thead><tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }}>النوع{getSortIndicator('type')}</th>
-                  <th onClick={() => requestSort('username')} style={{ cursor: 'pointer' }}>المستخدم{getSortIndicator('username')}</th>
-                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>الوصف{getSortIndicator('description')}</th>
-                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('amount')}</th>
-                  <th onClick={() => requestSort('settled_by')} style={{ cursor: 'pointer' }}>بواسطة{getSortIndicator('settled_by')}</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('type')}>النوع{getSortIndicator('type')}</th>
+                  <th onClick={() => requestSort('username')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('username')}>المستخدم{getSortIndicator('username')}</th>
+                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description')}>الوصف{getSortIndicator('description')}</th>
+                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('amount')}>المبلغ{getSortIndicator('amount')}</th>
+                  <th onClick={() => requestSort('settled_by')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('settled_by')}>بواسطة{getSortIndicator('settled_by')}</th>
                   <th>ملاحظات</th>
                   <th>التفاصيل</th>
                 </tr></thead>

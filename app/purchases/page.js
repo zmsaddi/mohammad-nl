@@ -82,7 +82,7 @@ function PurchasesContent() {
   useEffect(() => { fetchData(); }, []);
 
   // Item 3 — click-to-sort, default newest first
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     rows,
     { key: 'date', direction: 'desc' }
   );
@@ -357,18 +357,18 @@ function PurchasesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>الكود{getSortIndicator('ref_code')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('supplier')} style={{ cursor: 'pointer' }}>المورد{getSortIndicator('supplier')}</th>
-                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }}>المنتج{getSortIndicator('item')}</th>
-                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
-                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('quantity')}</th>
-                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{getSortIndicator('unit_price')}</th>
-                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{getSortIndicator('total')}</th>
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('ref_code')}>الكود{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('supplier')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('supplier')}>المورد{getSortIndicator('supplier')}</th>
+                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('item')}>المنتج{getSortIndicator('item')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
+                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
+                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('unit_price')}>سعر الوحدة{getSortIndicator('unit_price')}</th>
+                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total')}>الإجمالي{getSortIndicator('total')}</th>
                   {/* v1.0.1 Feature 6 — supplier credit columns */}
-                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }}>المدفوع{getSortIndicator('paid_amount')}</th>
-                  <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }}>الحالة{getSortIndicator('payment_status')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>طريقة الدفع{getSortIndicator('payment_type')}</th>
+                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('paid_amount')}>المدفوع{getSortIndicator('paid_amount')}</th>
+                  <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_status')}>الحالة{getSortIndicator('payment_status')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>طريقة الدفع{getSortIndicator('payment_type')}</th>
                   <th>ملاحظات</th>
                   <th>إجراءات</th>
                 </tr>

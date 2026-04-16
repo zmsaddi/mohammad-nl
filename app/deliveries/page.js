@@ -10,6 +10,7 @@ import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import DataCardList from '@/components/DataCardList';
+import PageSkeleton from '@/components/PageSkeleton';
 
 const DELIVERY_STATUSES = [
   { value: 'قيد الانتظار', label: 'قيد الانتظار', color: '#f59e0b', bg: '#fef3c7' },
@@ -224,7 +225,7 @@ function DeliveriesContent() {
     return true;
   });
   // Item 3 — click-to-sort, default to newest first
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'date', direction: 'desc' }
   );
@@ -400,7 +401,7 @@ function DeliveriesContent() {
         </div>
 
         {loading ? (
-          <div className="loading-overlay"><div className="spinner"></div></div>
+          <PageSkeleton rows={6} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />
@@ -444,15 +445,15 @@ function DeliveriesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }}>الكود{getSortIndicator('ref_code')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }}>العميل{getSortIndicator('client_name')}</th>
-                  <th onClick={() => requestSort('client_phone')} style={{ cursor: 'pointer' }}>الهاتف{getSortIndicator('client_phone')}</th>
-                  <th onClick={() => requestSort('address')} style={{ cursor: 'pointer' }}>العنوان{getSortIndicator('address')}</th>
-                  <th onClick={() => requestSort('items')} style={{ cursor: 'pointer' }}>الأصناف{getSortIndicator('items')}</th>
-                  <th onClick={() => requestSort('total_amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('total_amount')}</th>
-                  <th onClick={() => requestSort('assigned_driver')} style={{ cursor: 'pointer' }}>السائق{getSortIndicator('assigned_driver')}</th>
-                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>الحالة{getSortIndicator('status')}</th>
+                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('ref_code')}>الكود{getSortIndicator('ref_code')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('client_name')}>العميل{getSortIndicator('client_name')}</th>
+                  <th onClick={() => requestSort('client_phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('client_phone')}>الهاتف{getSortIndicator('client_phone')}</th>
+                  <th onClick={() => requestSort('address')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('address')}>العنوان{getSortIndicator('address')}</th>
+                  <th onClick={() => requestSort('items')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('items')}>الأصناف{getSortIndicator('items')}</th>
+                  <th onClick={() => requestSort('total_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total_amount')}>المبلغ{getSortIndicator('total_amount')}</th>
+                  <th onClick={() => requestSort('assigned_driver')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('assigned_driver')}>السائق{getSortIndicator('assigned_driver')}</th>
+                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('status')}>الحالة{getSortIndicator('status')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
