@@ -23,16 +23,7 @@ export async function GET(request) {
     const start = searchParams.get('start') || null;
     const end = searchParams.get('end') || null;
     const pool = await getDistributablePoolForPeriod(start, end);
-    // v1.2 — return full breakdown (net profit, not raw collected)
-    return NextResponse.json({
-      total_collected: pool.collected,
-      cogs: pool.cogs,
-      expenses: pool.expenses,
-      bonus_paid: pool.bonus_paid,
-      net_profit: pool.net_profit,
-      already_distributed: pool.already_distributed,
-      remaining: pool.remaining,
-    });
+    return NextResponse.json(pool);
   } catch (err) {
     return apiError(err, 'خطأ في حساب المُحصَّل', 500, 'profit-distributions/collected-revenue GET');
   }
