@@ -39,6 +39,61 @@ html, body {
   overflow-x: hidden;
 }
 
+/* v1.1 S3.2 — DataCardList: mobile card-fallback. Cards hidden by
+   default (desktop shows tables). The 768px media query below shows
+   cards and hides tables that opt in via .has-card-fallback. */
+.data-card-list {
+  display: none;
+}
+.data-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.data-card-status {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.data-card-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+.data-card-field {
+  display: flex;
+  flex-direction: column;
+}
+.data-card-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.data-card-value {
+  font-size: 0.85rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+.data-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+.data-card-actions .btn {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
 /* Sidebar */
 .sidebar {
   position: fixed;
@@ -976,8 +1031,16 @@ html, body {
     font-size: 1.2rem;
   }
 
-  /* Tables: scroll horizontally */
-  .table-container {
+  /* v1.1 S3.2 — card fallback: hide tables, show cards on mobile */
+  .table-container.has-card-fallback {
+    display: none;
+  }
+  .data-card-list {
+    display: block;
+  }
+
+  /* Tables without card fallback: keep the old scroll behavior */
+  .table-container:not(.has-card-fallback) {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin: 0 -16px;

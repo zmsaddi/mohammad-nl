@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import DataCardList from '@/components/DataCardList';
 
 const DELIVERY_STATUSES = [
   { value: 'قيد الانتظار', label: 'قيد الانتظار', color: '#f59e0b', bg: '#fef3c7' },
@@ -407,7 +408,39 @@ function DeliveriesContent() {
             <p>{rows.length === 0 ? 'أضف أول توصيلة بالضغط على الزر أعلاه' : 'جرّب تعديل الفلاتر'}</p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+          {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
+          <DataCardList
+            rows={sortedRows}
+            fields={[
+              { key: 'ref_code', label: 'الكود', format: (v, r) => v || `DL-${r.id}` },
+              { key: 'date', label: 'التاريخ' },
+              { key: 'client_name', label: 'العميل' },
+              { key: 'client_phone', label: 'الهاتف' },
+              { key: 'address', label: 'العنوان' },
+              { key: 'items', label: 'الأصناف' },
+              { key: 'total_amount', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
+              { key: 'assigned_driver', label: 'السائق', format: (v) => v || '—' },
+            ]}
+            statusField="status"
+            statusColors={{
+              'قيد الانتظار': '#f59e0b',
+              'جاري التوصيل': '#3b82f6',
+              'تم التوصيل': '#16a34a',
+              'ملغي': '#dc2626',
+            }}
+            actions={(row) => (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+                {isAdmin && row.status !== 'ملغي' && row.sale_id && (
+                  <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' })}>إلغاء</button>
+                )}
+              </>
+            )}
+            emptyMessage="لا توجد توصيلات"
+          />
+          {/* Desktop table: hidden below 768px when card fallback is active */}
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -479,6 +512,7 @@ function DeliveriesContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
