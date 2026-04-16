@@ -180,6 +180,7 @@ function PurchasesContent() {
             item: form.item,
             quantity: form.quantity,
             unitPrice: form.unitPrice,
+            sellPrice: form.sellPrice,
             paymentType: form.paymentType,
             paidAmount: form.paidAmount,
             notes: form.notes,
