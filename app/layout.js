@@ -7,11 +7,12 @@ export const metadata = {
 };
 
 // Next.js 16 requires viewport to be its own export.
+// v1.1 F-029 — removed maximumScale:1 + userScalable:false. Pre-v1.1
+// these locked the viewport to prevent zoom, which broke WCAG 1.4.4
+// (users could not pinch-zoom to read small table text on mobile).
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

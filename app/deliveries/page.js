@@ -431,7 +431,7 @@ function DeliveriesContent() {
                     <td style={{ fontWeight: 600 }}>{row.client_name}</td>
                     <td style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
                     <td>{row.address}</td>
-                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.items}</td>
+                    <td>{row.items}</td>
                     <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
                     <td>{row.driver_name || '-'}</td>
                     <td>
