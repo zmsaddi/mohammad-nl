@@ -88,10 +88,12 @@ describe('F-065 regression — POST /api/settlements admin-only gate', () => {
     expect(addSettlementMock).not.toHaveBeenCalled();
   });
 
-  it('unauthenticated caller is rejected 403', async () => {
+  // v1.1 S4.7 — requireAuth returns 401 for unauthenticated (no token),
+  // 403 for wrong role. Pre-S4.7 the route returned 403 for both.
+  it('unauthenticated caller is rejected 401', async () => {
     getTokenMock.mockResolvedValueOnce(null);
     const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(addSettlementMock).not.toHaveBeenCalled();
   });
 });

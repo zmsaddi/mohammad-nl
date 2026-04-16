@@ -5,6 +5,55 @@ All notable changes to Vitesse Eco are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v1.1.0] — 2026-04-16
+
+Comprehensive correctness + safety release triggered by the v1.0.3
+profit-distribution incident (5,700€ distributed against 2,850€ collected).
+Full 5-sprint rebuild: 34 findings closed, 90 new tests, 58 commits.
+
+Study: `docs/v1-1-comprehensive-study.md` (1,379-line audit across 5 domains).
+
+### Critical accounting fixes
+- **F-001** profit distribution solvency cap (advisory lock + decrement check)
+- **F-002** netProfit subtracts profit_distributions from both P&L views
+- **F-004** totalDebt reads sales.remaining directly (Bug-3 pattern eliminated)
+- **F-005** settlement enum collapsed to single profit-distribution path
+- **F-006** cash-basis P&L excludes phantom bonus cost from unpaid credit sales
+- **F-007** per-user bonus rate overrides (table + lookup + admin UI)
+- **F-008** updated_by + updated_at audit columns on 11 business tables
+- **F-011/F-012** TVA from settings.vat_rate (3 callsites, zero `/6` remaining)
+
+### Safety + infrastructure
+- **F-009** .env.test hard guard (refuses production URLs)
+- **F-053** strict DDL catch (syntax errors crash loudly, not silently)
+- **F-069** GitHub Actions CI: lint + build + test-mock + test-real-db
+- **F-064** /api/health endpoint (DB latency probe)
+- **F-048** lib/db.js split Phase 1 (4741→3930 lines)
+- **F-057/F-068** unified api-auth + api-errors (28 routes migrated)
+- **F-077** checkJs enabled for VS Code IntelliSense
+
+### Mobile + responsive
+- **F-026/F-027** DataCardList card-fallback on 3 pages (deliveries, sales, invoices)
+- **F-028/F-029** touch targets + pinch-zoom restored
+- **F-031** CancelSaleDialog mobile UX (stacked radio pills)
+- **F-032/F-033** items un-truncated + overflow safety net
+- PageSkeleton shimmer loaders on 5 data-heavy pages
+- aria-sort on 10 pages (~82 sortable headers)
+
+### UI/UX
+- **F-015** /profit-distributions: corrected labels + pool breakdown widget
+- **F-016** /clients/[id] TVA preview reads settings.vat_rate
+- **F-017** /users confirmation gates on bonus settings + active toggle
+- **F-018** WhatsApp share payment label fix
+- **F-019** /summary lastMonth January edge case
+- **F-022** /summary explicit error state with retry button
+
+### Testing
+- 436 → ~526 tests (+90)
+- 11 global cross-table invariant assertions
+- Neon test-sandbox branch with dedicated database
+- CI pipeline green on every push
+
 ## [v1.0.0] — 2026-04-15
 
 First production release. Delivered after 10 sessions of work covering
