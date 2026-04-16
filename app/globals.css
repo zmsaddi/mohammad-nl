@@ -1114,6 +1114,40 @@ html, body {
     border-radius: 14px;
   }
 
+  /* v1.1 S3.3 — CancelSaleDialog mobile UX (F-031).
+     At < 768px the dialog's bonus radio labels stack vertically
+     with bigger tap targets, the textarea gets 3 rows, and the
+     action buttons go full-width. */
+  .cancel-sale-dialog {
+    max-width: 100% !important;
+  }
+  .cancel-dialog-bonus-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cancel-dialog-radio {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    background: white;
+    border: 1.5px solid #fbbf24;
+    border-radius: 8px;
+    font-size: 0.88rem !important;
+    margin-inline-end: 0 !important;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  .cancel-dialog-radio input[type="radio"] {
+    margin-inline-end: 8px;
+    width: 18px;
+    height: 18px;
+  }
+  .cancel-dialog-reason {
+    rows: 3;
+    min-height: 80px;
+  }
+
   /* Client info */
   .client-info-card {
     grid-template-columns: repeat(2, 1fr);
