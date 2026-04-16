@@ -790,7 +790,7 @@ function SalesContent() {
 *المنتج:* ${s.item}
 *الكمية:* ${s.quantity}
 *المبلغ:* ${s.total}
-*الدفع:* ${s.paymentMethod === 'نقدي' ? 'مدفوع' : 'آجل'}
+*الدفع:* ${s.paymentMethod === 'كاش' || s.paymentMethod === 'بنك' ? 'مدفوع' : 'آجل'}
 ━━━━━━━━━━━━━━━━━
 *التوصيل إلى:* ${s.address || '-'}
 

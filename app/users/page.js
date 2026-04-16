@@ -23,6 +23,9 @@ function UsersContent() {
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  // v1.1 F-017 — confirmation gates for destructive one-click actions
+  const [toggleTarget, setToggleTarget] = useState(null); // user id to toggle
+  const [confirmSettings, setConfirmSettings] = useState(false);
 
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'seller' });
   const [settingsForm, setSettingsForm] = useState({ seller_bonus_fixed: '10', seller_bonus_percentage: '50', driver_bonus_fixed: '5' });
@@ -62,9 +65,10 @@ function UsersContent() {
     } catch { addToast('خطأ', 'error'); }
   };
 
+  // v1.1 F-017 — gated through ConfirmModal (pre-v1.1 this fired on one click)
   const handleToggle = async (id) => {
     await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, toggleActive: true }), cache: 'no-store' });
-    addToast('تم تحديث الحالة'); fetchData();
+    addToast('تم تحديث الحالة'); setToggleTarget(null); fetchData();
   };
 
   const handleDelete = async () => {
@@ -73,9 +77,10 @@ function UsersContent() {
     addToast('تم حذف المستخدم'); setDeleteId(null); fetchData();
   };
 
+  // v1.1 F-017 — gated through ConfirmModal
   const handleSaveSettings = async () => {
     await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settingsForm), cache: 'no-store' });
-    addToast('تم حفظ الإعدادات'); fetchData();
+    addToast('تم حفظ الإعدادات'); setConfirmSettings(false); fetchData();
   };
 
   const startEdit = (u) => { setEditUser(u); setForm({ username: u.username, password: '', name: u.name, role: u.role }); setShowForm(true); };
@@ -142,7 +147,7 @@ function UsersContent() {
                       <td>{u.name}</td>
                       <td><span className="status-badge" style={{ background: r?.bg, color: r?.color }}>{r?.label || u.role}</span></td>
                       <td>
-                        <button className="btn btn-sm" onClick={() => handleToggle(u.id)} style={{ background: u.active ? '#dcfce7' : '#fee2e2', color: u.active ? '#16a34a' : '#dc2626', border: 'none', cursor: 'pointer' }}>
+                        <button className="btn btn-sm" onClick={() => setToggleTarget(u.id)} style={{ background: u.active ? '#dcfce7' : '#fee2e2', color: u.active ? '#16a34a' : '#dc2626', border: 'none', cursor: 'pointer' }}>
                           {u.active ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
@@ -178,10 +183,25 @@ function UsersContent() {
             <input type="number" min="0" step="any" value={settingsForm.driver_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, driver_bonus_fixed: e.target.value })} />
           </div>
         </div>
-        <button className="btn btn-primary" onClick={handleSaveSettings} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
+        <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
       </div>
 
       <ConfirmModal isOpen={!!deleteId} title="حذف مستخدم" message="هل أنت متأكد؟ لا يمكن التراجع." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+      {/* v1.1 F-017 — confirmation gates for previously one-click destructive actions */}
+      <ConfirmModal
+        isOpen={!!toggleTarget}
+        title="تغيير حالة المستخدم"
+        message="هل أنت متأكد من تغيير حالة هذا المستخدم (تفعيل / تعطيل)؟"
+        onConfirm={() => handleToggle(toggleTarget)}
+        onCancel={() => setToggleTarget(null)}
+      />
+      <ConfirmModal
+        isOpen={confirmSettings}
+        title="حفظ إعدادات البونص"
+        message="سيتم تحديث إعدادات البونص لجميع المبيعات المستقبلية. هل أنت متأكد؟"
+        onConfirm={handleSaveSettings}
+        onCancel={() => setConfirmSettings(false)}
+      />
     </AppLayout>
   );
 }
