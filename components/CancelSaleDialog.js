@@ -138,6 +138,7 @@ export default function CancelSaleDialog({
       <div
         className="modal"
         onClick={(e) => e.stopPropagation()}
+        className="cancel-sale-dialog"
         style={{ maxWidth: '520px' }}
       >
         <h3 style={{ marginBottom: '12px' }}>{title}</h3>
@@ -209,6 +210,7 @@ export default function CancelSaleDialog({
                 سبب الإلغاء *
               </label>
               <textarea
+                className="cancel-dialog-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="اكتب سبب إلغاء الطلب..."
@@ -248,12 +250,12 @@ export default function CancelSaleDialog({
                 </div>
 
                 {hasSellerBonus && (
-                  <div style={{ marginBottom: '8px' }}>
+                  <div className="cancel-dialog-bonus-row" style={{ marginBottom: '8px' }}>
                     <div style={{ fontSize: '0.78rem', color: '#78350f', marginBottom: '4px' }}>
                       مكافأة البائع ({preview.sellerBonus.username},{' '}
                       {formatNumber(preview.sellerBonus.amount)} €)
                     </div>
-                    <label style={{ marginInlineEnd: '14px', fontSize: '0.82rem' }}>
+                    <label className="cancel-dialog-radio" style={{ marginInlineEnd: '14px', fontSize: '0.82rem' }}>
                       <input
                         type="radio"
                         name="sellerChoice"
@@ -263,7 +265,7 @@ export default function CancelSaleDialog({
                       />
                       إبقاء
                     </label>
-                    <label style={{ fontSize: '0.82rem' }}>
+                    <label className="cancel-dialog-radio" style={{ fontSize: '0.82rem' }}>
                       <input
                         type="radio"
                         name="sellerChoice"
@@ -277,12 +279,12 @@ export default function CancelSaleDialog({
                 )}
 
                 {hasDriverBonus && (
-                  <div>
+                  <div className="cancel-dialog-bonus-row">
                     <div style={{ fontSize: '0.78rem', color: '#78350f', marginBottom: '4px' }}>
                       مكافأة السائق ({preview.driverBonus.username},{' '}
                       {formatNumber(preview.driverBonus.amount)} €)
                     </div>
-                    <label style={{ marginInlineEnd: '14px', fontSize: '0.82rem' }}>
+                    <label className="cancel-dialog-radio" style={{ marginInlineEnd: '14px', fontSize: '0.82rem' }}>
                       <input
                         type="radio"
                         name="driverChoice"
@@ -292,7 +294,7 @@ export default function CancelSaleDialog({
                       />
                       إبقاء
                     </label>
-                    <label style={{ fontSize: '0.82rem' }}>
+                    <label className="cancel-dialog-radio" style={{ fontSize: '0.82rem' }}>
                       <input
                         type="radio"
                         name="driverChoice"
