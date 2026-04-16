@@ -50,7 +50,9 @@ function DeliveriesContent() {
 
   const [rows, setRows] = useState([]);
   const [clients, setClients] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const canAssignDriver = ['admin', 'manager'].includes(userRole);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -78,14 +80,54 @@ function DeliveriesContent() {
     notes: '',
   });
 
+  // Assign driver to a delivery (admin/manager only)
+  const handleAssignDriver = async (deliveryId, driverUsername) => {
+    try {
+      // Read the current delivery row to build a complete PUT body
+      const current = rows.find(r => r.id === deliveryId);
+      if (!current) return;
+      const res = await fetch('/api/deliveries', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deliveryId,
+          date: current.date?.slice?.(0, 10) || current.date,
+          clientName: current.client_name,
+          clientPhone: current.client_phone || '',
+          address: current.address || '',
+          items: current.items,
+          totalAmount: current.total_amount || 0,
+          status: current.status,
+          driverName: driverUsername,
+          assignedDriver: driverUsername,
+          notes: current.notes || '',
+          vin: current.vin || '',
+        }),
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        addToast(driverUsername ? `تم تعيين السائق: ${driverUsername}` : 'تم إلغاء تعيين السائق');
+        fetchData();
+      } else {
+        const d = await res.json();
+        addToast(d.error || 'خطأ في تعيين السائق', 'error');
+      }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+
   const fetchData = async () => {
     try {
-      const [deliveriesRes, clientsRes] = await Promise.all([
+      const [deliveriesRes, clientsRes, usersRes] = await Promise.all([
         fetch('/api/deliveries', { cache: 'no-store' }),
         fetch('/api/clients', { cache: 'no-store' }),
+        fetch('/api/users', { cache: 'no-store' }).catch(() => ({ ok: false })),
       ]);
       const deliveriesData = await deliveriesRes.json();
       const clientsData = await clientsRes.json();
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        setDrivers((Array.isArray(usersData) ? usersData : []).filter(u => u.role === 'driver' && u.active));
+      }
       setRows(Array.isArray(deliveriesData) ? deliveriesData.reverse() : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
     } catch {
@@ -432,6 +474,19 @@ function DeliveriesContent() {
             }}
             actions={(row) => (
               <>
+                {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' && (
+                  <select
+                    value={row.assigned_driver || ''}
+                    onChange={(e) => handleAssignDriver(row.id, e.target.value)}
+                    className="btn btn-outline btn-sm"
+                    style={{ flex: 2, fontFamily: "'Cairo', sans-serif", fontSize: '0.82rem' }}
+                  >
+                    <option value="">تعيين سائق...</option>
+                    {drivers.map(d => (
+                      <option key={d.username} value={d.username}>{d.name || d.username}</option>
+                    ))}
+                  </select>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
                 {isAdmin && row.status !== 'ملغي' && row.sale_id && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' })}>إلغاء</button>
@@ -467,7 +522,31 @@ function DeliveriesContent() {
                     <td>{row.address}</td>
                     <td>{row.items}</td>
                     <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
-                    <td>{row.driver_name || '-'}</td>
+                    <td>
+                      {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' ? (
+                        <select
+                          value={row.assigned_driver || ''}
+                          onChange={(e) => handleAssignDriver(row.id, e.target.value)}
+                          style={{
+                            padding: '4px 8px',
+                            border: '1.5px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            fontFamily: "'Cairo', sans-serif",
+                            background: row.assigned_driver ? '#dcfce7' : '#fef3c7',
+                            cursor: 'pointer',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="">-- غير معيّن --</option>
+                          {drivers.map(d => (
+                            <option key={d.username} value={d.username}>{d.name || d.username}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        row.assigned_driver || row.driver_name || '-'
+                      )}
+                    </td>
                     <td>
                       {canChangeStatus ? (
                       <select
