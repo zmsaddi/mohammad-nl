@@ -117,14 +117,19 @@ function DeliveriesContent() {
 
   const fetchData = async () => {
     try {
-      const [deliveriesRes, clientsRes, usersRes] = await Promise.all([
+      // Only admin/manager need the users list (for driver-assignment dropdown).
+      // Drivers don't see the dropdown so skip the fetch to avoid a 403 console error.
+      const fetches = [
         fetch('/api/deliveries', { cache: 'no-store' }),
         fetch('/api/clients', { cache: 'no-store' }),
-        fetch('/api/users', { cache: 'no-store' }).catch(() => ({ ok: false })),
-      ]);
+      ];
+      if (canAssignDriver) {
+        fetches.push(fetch('/api/users', { cache: 'no-store' }).catch(() => ({ ok: false })));
+      }
+      const [deliveriesRes, clientsRes, usersRes] = await Promise.all(fetches);
       const deliveriesData = await deliveriesRes.json();
       const clientsData = await clientsRes.json();
-      if (usersRes.ok) {
+      if (usersRes?.ok) {
         const usersData = await usersRes.json();
         setDrivers((Array.isArray(usersData) ? usersData : []).filter(u => u.role === 'driver' && u.active));
       }
