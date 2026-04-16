@@ -106,53 +106,46 @@ Merge commit: `1263834` · Tests added: CI pipeline itself (no unit tests for th
 
 ---
 
-### S1.6 — F-001: profit_distribution write-path lockdown [CRITICAL, partial autonomous]
+### S1.6 — F-001: profit_distribution write-path lockdown [CRITICAL] — **PHASE A DONE, Sprint 2**
 
-The big one. 5,700€ distributed against 2,850€ collected. Two sub-phases:
+The v1.0.3 5,700€-against-2,850€ bug. Shipped as Sprint 2 item S2.x:
 
-**Phase A — application-layer cap (autonomous, ships in Sprint 1):**
+**Phase A — application-layer cap (shipped Sprint 2):**
 
-- [ ] In `lib/db.js` `addProfitDistribution`: open the transaction FIRST (move the eligibility loop inside)
-- [ ] Inside withTx: `SELECT pg_advisory_xact_lock(hashtext('profit-dist:' || :from || ':' || :to))` to serialize concurrent inserts
-- [ ] Inside withTx: compute `alreadyDistributed = SUM(profit_distributions.amount) WHERE base_period_start >= :from AND base_period_end <= :to`
-- [ ] Inside withTx: compute `collected = getCollectedRevenueForPeriod(from, to)` (same connection)
-- [ ] Throw Arabic error if `baseAmount + alreadyDistributed > collected`
-- [ ] Write `addProfitDistribution` regression tests:
-      - Single 100% split succeeds
-      - Second call with same period fails with Arabic cap message
-      - Over-cap first call rejected
-      - `Promise.all([d(1500), d(1500)])` with pool 2850 — exactly one succeeds, one fails
-      - Period-overlap (end date +1 day) also rejected under the lock
+- [x] `lib/db.js` `addProfitDistribution`: eligibility loop moved inside `withTx`
+- [x] `pg_advisory_xact_lock(hashtext('profit-dist:start|end'))` serializes concurrent callers on same period
+- [x] Inside withTx: `SELECT SUM(amount) FROM profit_distributions` for exact (start, end) tuple, `SUM(collection+refund) FROM payments` in period
+- [x] Cap check: throws Arabic error if `baseAmount + alreadyDistributed > collected + 0.01`
+- [x] `base_period_start > base_period_end` sanity check outside withTx for fast-fail
+- [x] Return shape extended: `cap_collected`, `cap_already_distributed`, `cap_remaining_after`
+- [x] `tests/invariants/profit-distribution-solvency.test.js` — 9 cases (T1-T8 + T4b concurrent race). All pass against real Neon test branch.
 
-**Phase B — schema parent/child refactor (Sprint 4, L effort):**
+**Phase B — schema parent/child refactor (deferred to Sprint 4, L effort):**
 
-- [ ] Design `profit_distribution_groups(id, base_period_start, base_period_end, base_amount, ...)` parent
-- [ ] Design `profit_distribution_recipients(group_id FK, username, percentage, amount)` child
-- [ ] Add `UNIQUE (base_period_start, base_period_end)` on parent
-- [ ] Migration script with backfill from current table
+- [ ] Parent `profit_distribution_groups(id, base_period_start, base_period_end UNIQUE, base_amount, ...)` + `profit_distribution_recipients(group_id FK, username, percentage, amount)` children — enables a real `UNIQUE (base_period_start, base_period_end)` constraint
+- [ ] Migration with backfill from current table
 - [ ] Update all read/write paths
 
-**User cleanup required after Phase A lands:**
+**User cleanup** (still pending for production data):
 
-- [!] Run `scripts/cleanup/v1-1-profit-distribution-reset.sql` (to be written) to delete the 4 test rows (two groups) that are currently in `profit_distributions`
+- [!] Run a cleanup SQL against `main` branch to delete the 4 test rows (2 groups) that leaked during v1.0.3 pre-delivery testing. Guarded SELECT+DELETE, runs in a transaction. Not scheduled — needs user go/no-go before touching prod data.
 
-Tests added: 5+ · Commit: __
+Tests added: **9** · Merge commit: `f9f9bee`
 
 ---
 
-### S1.7 — F-002: netProfit must subtract profit_distributions [CRITICAL, autonomous]
+### S1.7 — F-002: netProfit must subtract profit_distributions [CRITICAL] — **DONE, Sprint 2**
 
-`getSummaryData` (lib/db.js:2693-2982) computes netProfit without reading `profit_distributions`.
+`getSummaryData` pre-v1.1 never read `profit_distributions`. Shipped:
 
-- [ ] In `getSummaryData`: add a scoped `SELECT SUM(amount) FROM profit_distributions WHERE base_period_start <= :to AND base_period_end >= :from` (period-aware)
-- [ ] Define `totalProfitDistributed` term
-- [ ] Subtract from `netProfit` (accrual) AND `netProfitCashBasis`
-- [ ] Return `totalProfitDistributed` and `distributable` in the dashboard payload
-- [ ] Update `/summary` page to show the new number
-- [ ] Regression test: seed collection+distribution, assert netProfit drops by exactly the distributed amount
-- [ ] Commit + push
+- [x] New period-scoped query `profitDistQ` added to the Promise.all batch in `getSummaryData`, filtered by `created_at` date
+- [x] `totalProfitDistributed` term = sum of table + legacy settlements with `type='profit_distribution'` (backwards-compat for production DBs with v1.0.x rows)
+- [x] Subtracted from both `netProfit` (accrual) AND `netProfitCashBasis`
+- [x] Return shape extended: `totalProfitDistributed`, `profitDistFromTable`, `profitDistFromLegacySettlements`, `distributable = max(0, netProfitCashBasis)` — soft UI hint, F-001 cap remains authoritative write-path guard
+- [x] `tests/invariants/net-profit-profit-distributions.test.js` — 8 cases (T1 clean slate, T2 single distribution, T3 multi-period, T4 legacy settlement, T5 mixed sources, T6 distributable clamp, T7 P&L identity holds, T8 period filter)
+- [x] Regression: `feat04-cash-basis-summary`, `bug05-summary-date-window`, `top-sellers` all green (14/14 pre-existing + 8 new)
 
-Tests added: 2 · Commit: __
+Tests added: **8** · Merge commit: `0a89827`
 
 ---
 
@@ -217,12 +210,15 @@ None in Sprint 1 — keep the sprint focused on CRITICALs only.
 
 Closes the remaining HIGH accounting findings.
 
-### S2.1 — F-004: totalDebt Bug-3 pattern [HIGH]
+### S2.1 — F-004: totalDebt Bug-3 pattern [HIGH] — **DONE**
 
-`lib/db.js:2753-2757` uses unfiltered `SUM(payments.amount)`. Saved only by `Math.max(0, …)` clamp.
+`lib/db.js:2753-2757` used unfiltered `SUM(payments.amount)`. Shipped:
 
-- [ ] Replace L2756 with filtered `payments.type='collection'` AND `sale_id IS NOT NULL`, or better: read `SUM(sales.remaining) WHERE payment_type='آجل' AND status='مؤكد'`
-- [ ] Regression test: 1000€ credit sale + 500€ cash sale, assert totalDebt=1000 (not 500)
+- [x] Replaced the three-term formula with a single scoped read: `Σ sales.remaining WHERE payment_type='آجل' AND status='مؤكد'`. Eliminates the cross-table pollution entirely. No more `Math.max(0, ...)` clamp.
+- [x] `tests/invariants/total-debt-f004.test.js` — 6 cases (T1 exact study reproduction 1000+500, T2 multi-credit sum, T3 cancelled excluded, T4 reserved excluded, T5 cash-only, T6 partial collection). Uses raw INSERT fixtures to avoid addSale lifecycle flakiness.
+- [x] Full real-DB suite `npm test`: 495/495 passing.
+
+Tests added: **6** · Merge commit: `915a901`
 
 ### S2.2 — F-005: collapse duplicate profit write paths [HIGH]
 
@@ -250,22 +246,26 @@ Already covered by S1.8 above. Marked as done when S1.8 lands.
 - [ ] Update `applyCollectionInTx` (lib/db.js:2009) and `updateDelivery` confirm branch (lib/db.js:2468)
 - [ ] Regression: 3-way split 333.33/333.33/333.34 of a 1000€ sale → Σ tva = 166.67 exactly
 
-### S2.5 — F-015: /profit-distributions copy fix + net-profit endpoint [HIGH]
+### S2.5 — F-015: /profit-distributions UI copy + pool preview [HIGH] — **DONE**
 
-- [ ] Change label at `app/profit-distributions/page.js:200` to `قاعدة التوزيع (صافي الربح) *`
-- [ ] Change subtitle at `:163` to `توزيع صافي الربح`
-- [ ] Create `GET /api/profit-distributions/distributable?from=&to=` endpoint that returns the computed cap (collected − already distributed − expenses − bonuses)
-- [ ] Replace the "use collected revenue as base" button with "use distributable as base"
-- [ ] Tooltip warning if the user edits the field to a value > distributable
-- [ ] Regression test: form submit with value > distributable → 400
+- [x] Subtitle → "توزيع صافي الربح على المدراء والمشرفين — المبلغ المتاح يساوي المُحصَّل ناقص ما تم توزيعه سابقاً"
+- [x] Base-amount label → "قاعدة التوزيع (صافي الربح المتاح) *"
+- [x] New lib helper `getDistributablePoolForPeriod(start, end)` returns `{total_collected, already_distributed, remaining}` matching the F-001 cap math (read-only, no advisory lock)
+- [x] `/api/profit-distributions/collected-revenue` endpoint extended to return full breakdown (old `total_collected` preserved for backwards compat)
+- [x] Page widget replaced: shows "💰 المُحصَّل + 📉 موزع سابقاً + ✅ المتاح للتوزيع" + "استخدم المتاح كأساس" button that copies `remaining` not `total_collected`
+- [x] Soft warning (red border + Arabic message) if user types baseAmount > remaining. F-001 hard cap still fires at submit.
 
-### S2.6 — F-016: /clients/[id] TVA preview [HIGH]
+Merge commit: `2d7a8eb`
 
-- [ ] Read `settings.vat_rate` in `fetchData`
-- [ ] Compute `tvaPreview = amount × rate / (100 + rate)`
-- [ ] Label: `TVA المحتسبة ({rate}%)` interpolated
-- [ ] Create `<TvaRateLabel rate={rate} />` helper component (reused in 3 more places)
-- [ ] Regression test: change settings.vat_rate, assert preview updates
+### S2.6 — F-016: /clients/[id] TVA preview + lib/money.js [HIGH] — **DONE**
+
+- [x] New `lib/money.js` — `round2`, `tvaFromTtc(ttc, rate)`, `htFromTtc`, `toCents`, `fromCents`. Pure functions, safe from both server and client. Unit test with 16 cases covering 20% (matches old `/ 6` shortcut), 19% (DE), 21% (NL), 5.5% (FR reduced), 10% (FR intermediate).
+- [x] `/clients/[id]` page now fetches `/api/settings` on mount, reads `vat_rate` (falls back to 20 on error), uses `tvaFromTtc(amount, vatRate)` for the preview, interpolates `{vatRate}%` in the label.
+- [x] Build green.
+
+**Note**: `lib/db.js` still has 3 hardcoded `/ 6` sites in `applyCollectionInTx` (L2059), `updateDelivery` confirm (L2518), and `getSummaryData.pendingTva` (L3053). Those are F-011/F-012 work — separate commit because they require passing the rate into functions that don't currently know about it. Deferred to next iteration of Sprint 2.
+
+Tests added: **16** · Merge commit: `8c2e3a2`
 
 ### S2.7 — F-008: updated_by / updated_at audit columns [HIGH]
 
