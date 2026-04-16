@@ -45,7 +45,7 @@ function ExpensesContent() {
   useEffect(() => { fetchData(); }, []);
 
   // Item 3 — click-to-sort, default newest first
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     rows,
     { key: 'date', direction: 'desc' }
   );
@@ -174,12 +174,12 @@ function ExpensesContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
-                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }}>الوصف{getSortIndicator('description')}</th>
-                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{getSortIndicator('amount')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{getSortIndicator('payment_type')}</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
+                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description')}>الوصف{getSortIndicator('description')}</th>
+                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('amount')}>المبلغ{getSortIndicator('amount')}</th>
+                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>الدفع{getSortIndicator('payment_type')}</th>
                   <th>ملاحظات</th>
                   {isAdmin && <th>إجراءات</th>}
                 </tr>

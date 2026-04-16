@@ -181,7 +181,7 @@ function ProfitDistributionsContent() {
     }
   };
 
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     distributions,
     { key: 'created_at', direction: 'desc' }
   );
@@ -399,10 +399,10 @@ function ProfitDistributionsContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('created_at')} style={{ cursor: 'pointer' }}>التاريخ{getSortIndicator('created_at')}</th>
-                  <th onClick={() => requestSort('base_amount')} style={{ cursor: 'pointer' }}>المبلغ الأساسي{getSortIndicator('base_amount')}</th>
-                  <th onClick={() => requestSort('recipients_count')} style={{ cursor: 'pointer' }}>عدد المستلمين{getSortIndicator('recipients_count')}</th>
-                  <th onClick={() => requestSort('total_distributed')} style={{ cursor: 'pointer' }}>الموزَّع{getSortIndicator('total_distributed')}</th>
+                  <th onClick={() => requestSort('created_at')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('created_at')}>التاريخ{getSortIndicator('created_at')}</th>
+                  <th onClick={() => requestSort('base_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('base_amount')}>المبلغ الأساسي{getSortIndicator('base_amount')}</th>
+                  <th onClick={() => requestSort('recipients_count')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('recipients_count')}>عدد المستلمين{getSortIndicator('recipients_count')}</th>
+                  <th onClick={() => requestSort('total_distributed')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total_distributed')}>الموزَّع{getSortIndicator('total_distributed')}</th>
                   <th>الفترة</th>
                   <th>المستلمون</th>
                   <th>بواسطة</th>

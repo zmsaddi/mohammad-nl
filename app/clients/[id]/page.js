@@ -293,14 +293,14 @@ function ClientDetailContent({ params }) {
               <thead>
                 <tr>
                   {/* Item 3: click-to-sort on every column */}
-                  <th onClick={() => salesSort.requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{salesSort.getSortIndicator('date')}</th>
-                  <th onClick={() => salesSort.requestSort('item')} style={{ cursor: 'pointer' }}>الصنف{salesSort.getSortIndicator('item')}</th>
-                  <th onClick={() => salesSort.requestSort('quantity')} style={{ cursor: 'pointer' }}>الكمية{salesSort.getSortIndicator('quantity')}</th>
-                  <th onClick={() => salesSort.requestSort('unit_price')} style={{ cursor: 'pointer' }}>سعر الوحدة{salesSort.getSortIndicator('unit_price')}</th>
-                  <th onClick={() => salesSort.requestSort('total')} style={{ cursor: 'pointer' }}>الإجمالي{salesSort.getSortIndicator('total')}</th>
-                  <th onClick={() => salesSort.requestSort('payment_type')} style={{ cursor: 'pointer' }}>الدفع{salesSort.getSortIndicator('payment_type')}</th>
-                  <th onClick={() => salesSort.requestSort('paid_amount')} style={{ cursor: 'pointer' }}>المدفوع{salesSort.getSortIndicator('paid_amount')}</th>
-                  <th onClick={() => salesSort.requestSort('remaining')} style={{ cursor: 'pointer' }}>المتبقي{salesSort.getSortIndicator('remaining')}</th>
+                  <th onClick={() => salesSort.requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('date')}>التاريخ{salesSort.getSortIndicator('date')}</th>
+                  <th onClick={() => salesSort.requestSort('item')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('item')}>الصنف{salesSort.getSortIndicator('item')}</th>
+                  <th onClick={() => salesSort.requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('quantity')}>الكمية{salesSort.getSortIndicator('quantity')}</th>
+                  <th onClick={() => salesSort.requestSort('unit_price')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('unit_price')}>سعر الوحدة{salesSort.getSortIndicator('unit_price')}</th>
+                  <th onClick={() => salesSort.requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('total')}>الإجمالي{salesSort.getSortIndicator('total')}</th>
+                  <th onClick={() => salesSort.requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('payment_type')}>الدفع{salesSort.getSortIndicator('payment_type')}</th>
+                  <th onClick={() => salesSort.requestSort('paid_amount')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('paid_amount')}>المدفوع{salesSort.getSortIndicator('paid_amount')}</th>
+                  <th onClick={() => salesSort.requestSort('remaining')} style={{ cursor: 'pointer' }} aria-sort={salesSort.getAriaSort('remaining')}>المتبقي{salesSort.getSortIndicator('remaining')}</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
@@ -372,10 +372,10 @@ function ClientDetailContent({ params }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => paymentsSort.requestSort('date')} style={{ cursor: 'pointer' }}>التاريخ{paymentsSort.getSortIndicator('date')}</th>
-                  <th onClick={() => paymentsSort.requestSort('amount')} style={{ cursor: 'pointer' }}>المبلغ{paymentsSort.getSortIndicator('amount')}</th>
-                  <th onClick={() => paymentsSort.requestSort('payment_method')} style={{ cursor: 'pointer' }}>الطريقة{paymentsSort.getSortIndicator('payment_method')}</th>
-                  <th onClick={() => paymentsSort.requestSort('sale_id')} style={{ cursor: 'pointer' }}>طلب #{paymentsSort.getSortIndicator('sale_id')}</th>
+                  <th onClick={() => paymentsSort.requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={paymentsSort.getAriaSort('date')}>التاريخ{paymentsSort.getSortIndicator('date')}</th>
+                  <th onClick={() => paymentsSort.requestSort('amount')} style={{ cursor: 'pointer' }} aria-sort={paymentsSort.getAriaSort('amount')}>المبلغ{paymentsSort.getSortIndicator('amount')}</th>
+                  <th onClick={() => paymentsSort.requestSort('payment_method')} style={{ cursor: 'pointer' }} aria-sort={paymentsSort.getAriaSort('payment_method')}>الطريقة{paymentsSort.getSortIndicator('payment_method')}</th>
+                  <th onClick={() => paymentsSort.requestSort('sale_id')} style={{ cursor: 'pointer' }} aria-sort={paymentsSort.getAriaSort('sale_id')}>طلب #{paymentsSort.getSortIndicator('sale_id')}</th>
                   <th>ملاحظات</th>
                 </tr>
               </thead>

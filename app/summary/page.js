@@ -7,6 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
+import PageSkeleton from '@/components/PageSkeleton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -241,7 +242,7 @@ function SummaryContent() {
       )}
 
       {loading ? (
-        <div className="loading-overlay"><div className="spinner"></div></div>
+        <PageSkeleton rows={4} />
       ) : data && isSellerView ? (
         /* DONE: Fix 3 — seller-only personal dashboard */
         <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>

@@ -81,7 +81,7 @@ function StockContent() {
   }
 
   // Item 3 — click-to-sort on column headers, default name ascending
-  const { sortedRows, requestSort, getSortIndicator } = useSortedRows(
+  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'name', direction: 'asc' }
   );
@@ -251,13 +251,13 @@ function StockContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>المنتج{getSortIndicator('name')}</th>
-                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }}>الفئة{getSortIndicator('category')}</th>
-                  {canSeeCosts && <th onClick={() => requestSort('buy_price')} style={{ cursor: 'pointer' }}>سعر الشراء{getSortIndicator('buy_price')}</th>}
-                  <th onClick={() => requestSort('sell_price')} style={{ cursor: 'pointer' }}>سعر البيع{getSortIndicator('sell_price')}</th>
-                  {isAdmin && <th onClick={() => requestSort('low_stock_threshold')} style={{ cursor: 'pointer' }}>حد التنبيه{getSortIndicator('low_stock_threshold')}</th>}
-                  <th onClick={() => requestSort('stock')} style={{ cursor: 'pointer' }}>الكمية{getSortIndicator('stock')}</th>
+                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
+                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>المنتج{getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
+                  {canSeeCosts && <th onClick={() => requestSort('buy_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('buy_price')}>سعر الشراء{getSortIndicator('buy_price')}</th>}
+                  <th onClick={() => requestSort('sell_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('sell_price')}>سعر البيع{getSortIndicator('sell_price')}</th>
+                  {isAdmin && <th onClick={() => requestSort('low_stock_threshold')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('low_stock_threshold')}>حد التنبيه{getSortIndicator('low_stock_threshold')}</th>}
+                  <th onClick={() => requestSort('stock')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('stock')}>الكمية{getSortIndicator('stock')}</th>
                   {canSeeCosts && <th>قيمة المخزون</th>}
                   <th>الحالة</th>
                   {isAdmin && <th>إجراءات</th>}
