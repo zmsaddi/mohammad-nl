@@ -258,9 +258,9 @@ function UsersContent() {
               <thead>
                 <tr>
                   <th>المستخدم</th>
-                  <th>بونص البائع الثابت</th>
-                  <th>نسبة البائع %</th>
-                  <th>بونص السائق الثابت</th>
+                  <th>الدور</th>
+                  <th>البونص الثابت (لكل قطعة)</th>
+                  <th>نسبة فرق السعر %</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
@@ -270,9 +270,21 @@ function UsersContent() {
                   return (
                     <tr key={r.username}>
                       <td style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
-                      <td className="number-cell">{r.seller_fixed != null ? parseFloat(r.seller_fixed) : '—'}</td>
-                      <td className="number-cell">{r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—'}</td>
-                      <td className="number-cell">{r.driver_fixed != null ? parseFloat(r.driver_fixed) : '—'}</td>
+                      <td>{(() => {
+                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
+                        return u?.role === 'seller' ? 'بائع' : u?.role === 'driver' ? 'سائق' : u?.role || '—';
+                      })()}</td>
+                      <td className="number-cell">{(() => {
+                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
+                        if (u?.role === 'seller') return r.seller_fixed != null ? `${parseFloat(r.seller_fixed)} €` : '—';
+                        if (u?.role === 'driver') return r.driver_fixed != null ? `${parseFloat(r.driver_fixed)} €` : '—';
+                        return '—';
+                      })()}</td>
+                      <td className="number-cell">{(() => {
+                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
+                        if (u?.role === 'seller') return r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—';
+                        return '—';
+                      })()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button className="btn btn-outline btn-sm" onClick={() => startEditRate(r)}>تعديل</button>
@@ -308,21 +320,38 @@ function UsersContent() {
                 </select>
               )}
             </div>
-            <div className="form-group">
-              <label>بونص البائع الثابت (€)</label>
-              <input type="number" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
-                value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>نسبة البائع من فرق السعر (%)</label>
-              <input type="number" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
-                value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>بونص السائق الثابت (€)</label>
-              <input type="number" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
-                value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
-            </div>
+            {/* v1.2 fix — show only relevant fields per role.
+                Sellers see: seller fixed + seller percentage.
+                Drivers see: driver fixed only. */}
+            {(() => {
+              const selectedUser = [...overridableUsers, ...(Array.isArray(bonusRates) ? bonusRates : [])].find(u => u.username === (editingRate || rateForm.username));
+              const role = selectedUser?.role;
+              if (!role) return (
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>اختر مستخدم أولاً لعرض الحقول المناسبة</p>
+                </div>
+              );
+              if (role === 'seller') return (<>
+                <div className="form-group">
+                  <label>بونص البائع الثابت (€) — لكل قطعة</label>
+                  <input type="number" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
+                    value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>نسبة البائع من فرق السعر (%)</label>
+                  <input type="number" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
+                    value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
+                </div>
+              </>);
+              if (role === 'driver') return (
+                <div className="form-group">
+                  <label>بونص السائق الثابت (€) — لكل قطعة</label>
+                  <input type="number" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
+                    value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
+                </div>
+              );
+              return null;
+            })()}
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button className="btn btn-primary btn-sm" onClick={handleSaveRate}>

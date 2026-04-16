@@ -23,7 +23,7 @@ export async function PUT(request) {
   try {
     const body = await request.json();
     if (!body.username) return NextResponse.json({ error: 'اسم المستخدم مطلوب' }, { status: 400 });
-    await setProfitSharePct(body.username, body.percentage);
+    await setProfitSharePct(body.username, body.percentage, body.startDate || null);
     return NextResponse.json({ success: true });
   } catch (err) {
     const safe = /^[\u0600-\u06FF]/.test(err?.message) ? err.message : 'خطأ في حفظ البيانات';
