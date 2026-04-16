@@ -396,7 +396,7 @@ After 48 hours of clean operation, normal monitoring cadence (see
 - `/settlements` page
 - Pay accumulated bonuses to each seller/driver per business cadence
 - **v1.0 known limitation:** no upper-bound validation yet; verify
-  the amount matches the `بونص مستحق` table above the form before
+  the amount matches the `عمولات مستحقة` table above the form before
   submitting. v1.1 adds automatic validation (Tier 1, Item 5.2).
 
 ### Monthly operations

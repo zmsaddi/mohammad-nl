@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import DetailModal from '@/components/DetailModal';
@@ -9,6 +10,8 @@ import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import StatusBadge from '@/components/StatusBadge';
+import Pagination, { usePagination } from '@/components/Pagination';
 
 function InvoicesContent() {
   const { data: session } = useSession();
@@ -50,6 +53,20 @@ function InvoicesContent() {
     { key: 'date', direction: 'desc' }
   );
 
+  // PA-03 — pagination
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+
+  // UX-08 — derive payment status from payment_type when payment_status not provided by API
+  const derivePaymentStatus = (inv) => {
+    if (inv.payment_status) return inv.payment_status;
+    if (inv.payment_type === 'آجل') {
+      if (inv.remaining != null && Number(inv.remaining) <= 0) return 'مدفوع';
+      if (inv.paid_amount != null && Number(inv.paid_amount) > 0) return 'جزئي';
+      return 'معلق';
+    }
+    return 'مدفوع'; // كاش / بنك → paid
+  };
+
   return (
     <AppLayout>
       <div className="page-header">
@@ -82,7 +99,7 @@ function InvoicesContent() {
           <>
           {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
           <DataCardList
-            rows={sortedRows}
+            rows={paginatedRows}
             fields={[
               { key: 'ref_code', label: 'رقم الفاتورة' },
               { key: 'date', label: 'التاريخ' },
@@ -90,6 +107,7 @@ function InvoicesContent() {
               { key: 'item', label: 'المنتج' },
               { key: 'total', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
               { key: 'payment_type', label: 'الدفع' },
+              { key: '_payment_status', label: 'حالة الدفع', format: (_, row) => derivePaymentStatus(row) },
               { key: 'vin', label: 'VIN' },
             ]}
             actions={(row) => (
@@ -117,13 +135,14 @@ function InvoicesContent() {
                   <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
                   <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total')}>الإجمالي{getSortIndicator('total')}</th>
                   <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>الدفع{getSortIndicator('payment_type')}</th>
+                  <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_status')}>حالة الدفع{getSortIndicator('payment_status')}</th>
                   <th onClick={() => requestSort('vin')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('vin')}>VIN{getSortIndicator('vin')}</th>
                   <th onClick={() => requestSort('seller_name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('seller_name')}>البائع{getSortIndicator('seller_name')}</th>
                   <th>الفاتورة</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((inv) => (
+                {paginatedRows.map((inv) => (
                   <tr key={inv.id} className="clickable-row" onClick={() => setSelectedInvoice(inv)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{inv.ref_code}</td>
                     <td>{inv.date}</td>
@@ -131,14 +150,8 @@ function InvoicesContent() {
                     <td>{inv.item}</td>
                     <td className="number-cell">{formatNumber(inv.quantity)}</td>
                     <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(inv.total)}</td>
-                    <td>
-                      <span className="status-badge" style={{
-                        background: inv.payment_type === 'بنك' ? '#dbeafe' : inv.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
-                        color: inv.payment_type === 'بنك' ? '#1e40af' : inv.payment_type === 'آجل' ? '#d97706' : '#16a34a'
-                      }}>
-                        {inv.payment_type || 'كاش'}
-                      </span>
-                    </td>
+                    <td><StatusBadge status={inv.payment_type || 'كاش'} /></td>
+                    <td><StatusBadge status={derivePaymentStatus(inv)} /></td>
                     <td style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
                     <td>{inv.seller_name}</td>
                     {/* DONE: Step 4 — open the French invoice in a new tab; user prints with Ctrl+P */}
@@ -160,8 +173,21 @@ function InvoicesContent() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRows={totalRows}
+            perPage={perPage}
+            onPageChange={goTo}
+            onPerPageChange={setPerPage}
+          />
           </>
         )}
+      </div>
+
+      <div className="cross-nav">
+        <Link href="/sales">المبيعات &rarr;</Link>
+        <Link href="/clients">العملاء &rarr;</Link>
       </div>
 
       <DetailModal
@@ -182,7 +208,8 @@ function InvoicesContent() {
           { label: 'سعر الوحدة', type: 'money', value: selectedInvoice.unit_price },
           { label: 'الإجمالي', type: 'money', value: selectedInvoice.total },
           { type: 'divider' },
-          { label: 'طريقة الدفع', type: 'badge', value: selectedInvoice.payment_type || 'كاش', bg: selectedInvoice.payment_type === 'بنك' ? '#dbeafe' : selectedInvoice.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: selectedInvoice.payment_type === 'بنك' ? '#1e40af' : selectedInvoice.payment_type === 'آجل' ? '#d97706' : '#16a34a' },
+          { label: 'طريقة الدفع', type: 'badge', value: selectedInvoice.payment_type || 'كاش' },
+          { label: 'حالة الدفع', type: 'badge', value: derivePaymentStatus(selectedInvoice) },
           ...(selectedInvoice.vin ? [{ label: 'رقم الهيكل (VIN)', value: selectedInvoice.vin, color: '#4f46e5' }] : []),
           { type: 'divider' },
           { label: 'البائع', value: selectedInvoice.seller_name },

@@ -5,6 +5,10 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import DataCardList from '@/components/DataCardList';
+import PageSkeleton from '@/components/PageSkeleton';
+import Pagination, { usePagination } from '@/components/Pagination';
+import StatusBadge from '@/components/StatusBadge';
 
 // v1.1 S1.8 — `profit_distribution` deprecated from this form. Legacy rows
 // with this type still exist in the settlements table (pre-v1.1 data); we
@@ -12,8 +16,8 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 // FORM_TYPES (used by the new-settlement <select>) excludes it. New profit
 // splits must go through /profit-distributions.
 const TYPES = {
-  seller_payout:       { label: 'دفع بونص بائع',  color: '#16a34a', bg: '#dcfce7' },
-  driver_payout:       { label: 'دفع بونص سائق',  color: '#7c3aed', bg: '#ede9fe' },
+  seller_payout:       { label: 'دفع عمولة بائع',  color: '#16a34a', bg: '#dcfce7' },
+  driver_payout:       { label: 'دفع عمولة سائق',  color: '#7c3aed', bg: '#ede9fe' },
   profit_distribution: { label: 'توزيع أرباح (قديم — استخدم /profit-distributions)', color: '#1e40af', bg: '#dbeafe' },
 };
 const FORM_TYPES = {
@@ -90,6 +94,8 @@ function SettlementsContent() {
     Array.isArray(settlements) ? settlements : [],
     { key: 'date', direction: 'desc' }
   );
+  // PA-03: Pagination
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
 
   // Calculate unsettled bonuses per user — ARC-06: parseFloat for NUMERIC.
   const unsettledByUser = {};
@@ -208,7 +214,7 @@ function SettlementsContent() {
       {/* Unsettled Bonuses */}
       {Object.keys(unsettledByUser).length > 0 && (
         <div className="card" style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#dc2626' }}>بونص مستحق (غير مسوّى)</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#dc2626' }}>عمولات مستحقة (غير مسوّاة)</h3>
           <div className="table-container">
             <table className="data-table">
               <thead><tr><th>المستخدم</th><th>الدور</th><th>عدد العمليات</th><th>المبلغ المستحق</th><th>إجراء</th></tr></thead>
@@ -337,11 +343,28 @@ function SettlementsContent() {
             {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ تسوية جديدة</button>}
           </div>
         </div>
-        {loading ? <div className="loading-overlay"><div className="spinner"></div></div> : (
+        {loading ? <PageSkeleton rows={6} showStats={false} /> : (
           !Array.isArray(settlements) || settlements.length === 0 ? (
             <div className="empty-state"><h3>لا توجد تسويات</h3></div>
           ) : (
-            <div className="table-container">
+            <>
+            {/* PA-02: mobile card fallback */}
+            <DataCardList
+              rows={paginatedRows}
+              fields={[
+                { key: 'date', label: 'التاريخ' },
+                { key: 'type', label: 'النوع', format: (v) => TYPES[v]?.label || v },
+                { key: 'username', label: 'المستخدم' },
+                { key: 'description', label: 'الوصف' },
+                { key: 'amount', label: 'المبلغ', format: (v) => `${formatNumber(v)} €` },
+                { key: 'notes', label: 'ملاحظات' },
+              ]}
+              actions={(row) => (
+                <button className="btn btn-outline btn-sm" onClick={() => openDetails(row.id)}>تفاصيل</button>
+              )}
+            />
+            {/* Desktop table */}
+            <div className="table-container has-card-fallback">
               <table className="data-table">
                 <thead><tr>
                   <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
@@ -355,13 +378,13 @@ function SettlementsContent() {
                   <th>التفاصيل</th>
                 </tr></thead>
                 <tbody>
-                  {sortedRows.map((s) => {
+                  {paginatedRows.map((s) => {
                     const t = TYPES[s.type];
                     return (
                       <tr key={s.id}>
                         <td>{s.id}</td>
                         <td>{s.date}</td>
-                        <td><span className="status-badge" style={{ background: t?.bg, color: t?.color }}>{t?.label || s.type}</span></td>
+                        <td><StatusBadge status={t?.label || s.type} bg={t?.bg} color={t?.color} /></td>
                         <td style={{ fontWeight: 600 }}>{s.username || '-'}</td>
                         <td>{s.description}</td>
                         <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(s.amount)}</td>
@@ -372,7 +395,7 @@ function SettlementsContent() {
                             className="btn btn-outline btn-sm"
                             onClick={() => openDetails(s.id)}
                           >
-                            🔍 تفاصيل
+                            تفاصيل
                           </button>
                         </td>
                       </tr>
@@ -381,6 +404,15 @@ function SettlementsContent() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalRows={totalRows}
+              perPage={perPage}
+              onPageChange={goTo}
+              onPerPageChange={setPerPage}
+            />
+            </>
           )
         )}
       </div>
@@ -446,7 +478,7 @@ function SettlementsContent() {
                           <th>العميل</th>
                           <th>المنتج</th>
                           <th>إجمالي البيع</th>
-                          <th>البونص</th>
+                          <th>العمولة</th>
                           <th>الفاتورة</th>
                         </tr>
                       </thead>
@@ -479,7 +511,7 @@ function SettlementsContent() {
                       <tfoot>
                         <tr>
                           <td colSpan="6" style={{ textAlign: 'left', fontWeight: 700 }}>
-                            إجمالي البونصات المسواة:
+                            إجمالي العمولات المسوّاة:
                           </td>
                           <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>
                             {formatNumber(detailsState.data.linked_total || 0)}

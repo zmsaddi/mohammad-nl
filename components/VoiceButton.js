@@ -64,7 +64,12 @@ export default function VoiceButton({ onResult, onError }) {
 
     // START recording
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+          channelCount: 1, sampleRate: { ideal: 16000 },
+        },
+      });
       streamRef.current = stream;
 
       // Check if webm is supported, fallback to default
@@ -96,6 +101,8 @@ export default function VoiceButton({ onResult, onError }) {
           analyser.fftSize = 2048;
           source.connect(analyser);
           const rmsBuf = new Uint8Array(analyser.frequencyBinCount);
+          let silentTicks = 0;
+          const SILENCE_AUTO_STOP_TICKS = 25; // 2.5s at 10Hz
           rmsIntervalRef.current = setInterval(() => {
             analyser.getByteTimeDomainData(rmsBuf);
             let sumSquares = 0;
@@ -105,6 +112,14 @@ export default function VoiceButton({ onResult, onError }) {
             }
             const rms = Math.sqrt(sumSquares / rmsBuf.length);
             if (rms > maxRmsRef.current) maxRmsRef.current = rms;
+            // STT-DEFECT-009: auto-stop after 2.5s silence (only after speech detected)
+            if (rms < SILENCE_RMS_THRESHOLD) { silentTicks++; } else { silentTicks = 0; }
+            const elapsed = Date.now() - startTimeRef.current;
+            if (silentTicks >= SILENCE_AUTO_STOP_TICKS && elapsed > 2000 && maxRmsRef.current >= SILENCE_RMS_THRESHOLD) {
+              if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
+                mediaRecorder.current.stop();
+              }
+            }
           }, 100);
         }
       } catch {
@@ -113,23 +128,22 @@ export default function VoiceButton({ onResult, onError }) {
         // dependency — never let it break the recording path.
       }
 
+      // STT-DEFECT-005: preserve real MIME type for Safari/iOS compatibility
+      const actualMimeType = recorder.mimeType || 'audio/webm';
+
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
 
       recorder.onstop = async () => {
-        // Snapshot the RMS value BEFORE cleanup (which tears down the
-        // audio context and nulls the ref).
         const maxRmsAtStop = maxRmsRef.current;
         const audioCtxWasAvailable = audioCtxRef.current !== null;
         cleanup();
         const duration = Date.now() - startTimeRef.current;
-        // BUG-28: 800ms → 1500ms. Shorter clips were the single biggest
-        // hallucination vector — reflex taps on the button.
         if (duration < MIN_DURATION_MS) {
           setState('idle');
           onError?.('التسجيل قصير جداً. الرجاء التحدث لمدة ثانية ونصف على الأقل');
           return;
         }
-        const blob = new Blob(chunks.current, { type: 'audio/webm' });
+        const blob = new Blob(chunks.current, { type: actualMimeType });
         if (blob.size < 500) {
           setState('idle');
           onError?.('التسجيل فارغ. حاول مرة أخرى');
@@ -146,14 +160,15 @@ export default function VoiceButton({ onResult, onError }) {
         await processAudio(blob);
       };
 
-      recorder.start();
+      recorder.start(1000);
       setState('recording');
       setSeconds(MAX_DURATION);
 
-      // Timer
+      // Timer — shorter max when AudioContext unavailable (no silence auto-stop)
+      const effectiveMax = audioCtxRef.current ? MAX_DURATION : 15;
       const start = Date.now();
       timerRef.current = setInterval(() => {
-        const remaining = MAX_DURATION - Math.floor((Date.now() - start) / 1000);
+        const remaining = effectiveMax - Math.floor((Date.now() - start) / 1000);
         if (remaining <= 0) {
           if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
             mediaRecorder.current.stop();
@@ -173,7 +188,8 @@ export default function VoiceButton({ onResult, onError }) {
     setState('processing');
     try {
       const formData = new FormData();
-      formData.append('audio', blob, 'recording.webm');
+      const blobExt = blob.type?.includes('mp4') ? 'mp4' : blob.type?.includes('ogg') ? 'ogg' : 'webm';
+      formData.append('audio', blob, `recording.${blobExt}`);
       const res = await fetch('/api/voice/process', { method: 'POST', body: formData, cache: 'no-store' });
       if (!res.ok) {
         const e = await res.json().catch(() => ({ error: 'خطأ في السيرفر' }));

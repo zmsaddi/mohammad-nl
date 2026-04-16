@@ -1352,3 +1352,155 @@ html, body {
     padding: 6px;
   }
 }
+
+/* ============================
+   Pagination
+   ============================ */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0 8px;
+  flex-wrap: wrap;
+  font-family: 'Cairo', sans-serif;
+}
+.pagination-info {
+  font-size: 0.82rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pagination-controls .btn-sm {
+  min-width: 32px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+.pagination-ellipsis {
+  padding: 0 4px;
+  color: #94a3b8;
+}
+.pagination-per-page {
+  padding: 4px 8px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.82rem;
+  background: white;
+}
+
+/* ============================
+   Sidebar groups (PA-04)
+   ============================ */
+.sidebar-group {
+  margin-bottom: 6px;
+}
+.sidebar-group-label {
+  display: block;
+  padding: 10px 20px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  user-select: none;
+}
+
+/* ============================
+   Summary tabs (PA-06)
+   ============================ */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+.tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab:hover {
+  color: #1e40af;
+}
+.tab.active {
+  color: #1e40af;
+  border-bottom-color: #1e40af;
+}
+
+/* ============================
+   Collapsible form toggle
+   ============================ */
+.form-toggle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+}
+.form-toggle-header.open {
+  margin-bottom: 16px;
+}
+
+/* ============================
+   Cross-navigation links (PA-05)
+   ============================ */
+.cross-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.cross-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #475569;
+  text-decoration: none;
+  font-family: 'Cairo', sans-serif;
+  transition: background 0.15s;
+}
+.cross-nav a:hover {
+  background: #e2e8f0;
+  color: #1e40af;
+}
+
+/* ============================
+   Filter bar
+   ============================ */
+.filters-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filters-bar input,
+.filters-bar select {
+  padding: 8px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.85rem;
+}
+.filters-bar .filter-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+}

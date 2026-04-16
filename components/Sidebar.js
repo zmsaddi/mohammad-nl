@@ -5,10 +5,20 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 
+// Group definitions: order matters for rendering
+const navGroups = [
+  { key: null, label: null },             // ungrouped (dashboard) — rendered first, no label
+  { key: 'operations', label: 'عمليات' },
+  { key: 'financial', label: 'مالية' },
+  { key: 'data', label: 'بيانات' },
+  { key: 'system', label: 'نظام' },
+];
+
 const navLinks = [
   {
     href: '/summary',
     label: 'لوحة التحكم',
+    group: null,
     // DONE: Fix 3 — sellers see their personal dashboard (different payload from API)
     roles: ['admin', 'manager', 'seller'],
     icon: (
@@ -20,6 +30,7 @@ const navLinks = [
   {
     href: '/purchases',
     label: 'المشتريات',
+    group: 'operations',
     roles: ['admin', 'manager'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -30,6 +41,7 @@ const navLinks = [
   {
     href: '/sales',
     label: 'المبيعات',
+    group: 'operations',
     roles: ['admin', 'manager', 'seller'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -40,6 +52,7 @@ const navLinks = [
   {
     href: '/expenses',
     label: 'المصاريف',
+    group: 'operations',
     roles: ['admin', 'manager'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -50,6 +63,7 @@ const navLinks = [
   {
     href: '/stock',
     label: 'المخزون',
+    group: 'data',
     roles: ['admin', 'manager'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -60,6 +74,7 @@ const navLinks = [
   {
     href: '/deliveries',
     label: 'التوصيل',
+    group: 'operations',
     roles: ['admin', 'manager', 'seller', 'driver'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -69,7 +84,8 @@ const navLinks = [
   },
   {
     href: '/my-bonus',
-    label: 'البونص',
+    label: 'العمولة',
+    group: 'data',
     roles: ['seller', 'driver'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -80,6 +96,7 @@ const navLinks = [
   {
     href: '/invoices',
     label: 'الفواتير',
+    group: 'financial',
     // DONE: Bug 6/7 — drivers see invoices for deliveries they personally completed
     roles: ['admin', 'manager', 'seller', 'driver'],
     icon: (
@@ -91,6 +108,7 @@ const navLinks = [
   {
     href: '/clients',
     label: 'العملاء',
+    group: 'data',
     roles: ['admin', 'manager'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -101,6 +119,7 @@ const navLinks = [
   {
     href: '/settlements',
     label: 'التسويات',
+    group: 'financial',
     roles: ['admin'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -112,6 +131,7 @@ const navLinks = [
     // v1.0.2 Feature 2 — profit distribution (توزيع أرباح)
     href: '/profit-distributions',
     label: 'توزيع الأرباح',
+    group: 'financial',
     roles: ['admin', 'manager'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -123,6 +143,7 @@ const navLinks = [
     // DONE: Step 5 — invoice & shop settings (admin only)
     href: '/settings',
     label: 'الإعدادات',
+    group: 'system',
     roles: ['admin'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -134,6 +155,7 @@ const navLinks = [
   {
     href: '/users',
     label: 'المستخدمين',
+    group: 'system',
     roles: ['admin'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -194,17 +216,27 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          {visibleLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`sidebar-link ${pathname === link.href || pathname.startsWith(link.href + '/') ? 'active' : ''}`}
-              onClick={() => setIsOpen(false)}
-            >
-              {link.icon}
-              <span>{link.label}</span>
-            </Link>
-          ))}
+          {navGroups
+            .filter((g) => visibleLinks.some((link) => link.group === g.key))
+            .map((g) => {
+              const groupLinks = visibleLinks.filter((link) => link.group === g.key);
+              return (
+                <div key={g.key || '__top'} className={g.label ? 'sidebar-group' : undefined}>
+                  {g.label && <div className="sidebar-group-label">{g.label}</div>}
+                  {groupLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`sidebar-link ${pathname === link.href || pathname.startsWith(link.href + '/') ? 'active' : ''}`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {link.icon}
+                      <span>{link.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
         </nav>
 
         <div className="sidebar-footer">

@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES, PRODUCT_CATEGORIES } from '@/lib/utils';
 
-export default function VoiceConfirm({ result, onConfirm, onCancel }) {
+export default function VoiceConfirm({ result, onConfirm, onCancel, userRole }) {
   if (!result) return null;
 
-  const { action, data, warnings, transcript, question, missing_fields } = result;
+  const { action, data, warnings, transcript, question, missing_fields, voiceLogId } = result;
 
   const formAction = action === 'clarification' ? 'register_expense' : action;
   const formData = action === 'clarification' ? (data || {}) : data;
@@ -23,20 +23,32 @@ export default function VoiceConfirm({ result, onConfirm, onCancel }) {
       missingFields={missing_fields || []}
       onConfirm={onConfirm}
       onCancel={onCancel}
+      userRole={userRole}
     />
   );
 }
 
-function EditableForm({ action: initialAction, data, warnings, transcript, missingFields, onConfirm, onCancel }) {
+// DEFECT-003: role → allowed actions map
+const ACTION_ROLES = {
+  register_sale: ['admin', 'manager', 'seller'],
+  register_purchase: ['admin', 'manager'],
+  register_expense: ['admin', 'manager'],
+};
+
+function EditableForm({ action: initialAction, data, warnings, transcript, missingFields, onConfirm, onCancel, userRole }) {
   const [lastKey, setLastKey] = useState({ data, initialAction });
   const [form, setForm] = useState(() => (data ? { ...data } : {}));
   const [action, setAction] = useState(initialAction);
+  // DEFECT-005: idempotency — track whether this result was already submitted
+  const [submitted, setSubmitted] = useState(false);
   if (lastKey.data !== data || lastKey.initialAction !== initialAction) {
     setLastKey({ data, initialAction });
     setForm(data ? { ...data } : {});
     setAction(initialAction);
+    setSubmitted(false);
   }
   const [saving, setSaving] = useState(false);
+  const canUseAction = (a) => (ACTION_ROLES[a] || []).includes(userRole || 'seller');
   const [dbData, setDbData] = useState({ products: [], clients: [], suppliers: [] });
 
   useEffect(() => {
@@ -61,7 +73,8 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
   const color = actionColors[action] || '#1e40af';
 
   const handleSubmit = async () => {
-    if (saving) return;
+    if (saving || submitted) return;
+    if (!canUseAction(action)) { alert('ليس لديك صلاحية لتنفيذ هذه العملية'); return; }
 
     if (action === 'register_sale') {
       if (!form.client_name) { alert('اسم العميل مطلوب'); return; }
@@ -108,25 +121,12 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
 
     setSaving(true);
     try {
-      // BUG-10: voice learning is fire-and-forget — if it fails we still
-      // want the save to proceed. Isolated try/catch so the outer finally
-      // still resets `saving` on outer-try failures.
-      try {
-        await fetch('/api/voice/learn', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: transcript || '', aiData: data || {}, userData: form, actionType: action }),
-          cache: 'no-store',
-        });
-      } catch {} // Don't block save if learning fails
-
       const creates = [];
       if (action === 'register_sale') {
-        if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }), cache: 'no-store' }).catch(() => {}));
+        if (form.client_name) creates.push(fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.client_name, phone: form.client_phone || '', address: form.client_address || '', email: form.client_email || '' }), cache: 'no-store' }).then(r => { if (!r.ok) console.warn('[VoiceConfirm] client create:', r.status); }));
         if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item }), cache: 'no-store' }).catch(() => {}));
       } else if (action === 'register_purchase') {
-        if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }), cache: 'no-store' }).catch(() => {}));
-        // DONE: Step 7 — pass the chosen category through so the product is filed correctly on first creation
+        if (form.supplier) creates.push(fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.supplier }), cache: 'no-store' }).then(r => { if (!r.ok) console.warn('[VoiceConfirm] supplier create:', r.status); }));
         if (form.item) creates.push(fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.item, category: form.category || '' }), cache: 'no-store' }).catch(() => {}));
       }
       if (creates.length) await Promise.all(creates);
@@ -164,12 +164,31 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
         submitData.paymentType = form.payment_type || 'كاش';
       }
 
-      // BUG-4 hotfix 2026-04-14: await onConfirm so the finally block only
-      // runs AFTER the parent's async save completes. If the parent rejects
-      // or shows a toast, the finally resets `saving` so the user can retry.
-      // On success, the parent typically unmounts us via setVoiceResult(null)
-      // and the setSaving(false) is a no-op on the unmounted component.
-      await onConfirm(endpoint, submitData);
+      const actionId = await onConfirm(endpoint, submitData);
+      setSubmitted(true);
+
+      // DEFECT-002 fix: link voice_logs.action_id to the created record
+      if (voiceLogId && actionId) {
+        try {
+          await fetch('/api/voice/learn', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voiceLogId, actionId }),
+            cache: 'no-store',
+          });
+        } catch {}
+      }
+
+      // DEFECT-004 fix: learn AFTER save succeeds — prevents polluting
+      // ai_corrections/ai_patterns from failed operations.
+      try {
+        await fetch('/api/voice/learn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: transcript || '', aiData: data || {}, userData: form, actionType: action }),
+          cache: 'no-store',
+        });
+      } catch {} // learning failure must not break the success flow
     } catch (err) {
       console.error('[VoiceConfirm] submit:', err);
       alert('خطأ في الحفظ — حاول مرة أخرى');
@@ -207,7 +226,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
         <div className="detail-modal-header">
           <div>
             <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-              {Object.entries(actionLabels).map(([key, label]) => (
+              {Object.entries(actionLabels).filter(([key]) => canUseAction(key)).map(([key, label]) => (
                 <button key={key} onClick={() => setAction(key)} className="status-badge" style={{
                   background: action === key ? actionColors[key] : `${actionColors[key]}15`,
                   color: action === key ? 'white' : actionColors[key],

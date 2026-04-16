@@ -11,6 +11,7 @@ import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import Pagination, { usePagination } from '@/components/Pagination';
 
 const DELIVERY_STATUSES = [
   { value: 'قيد الانتظار', label: 'قيد الانتظار', color: '#f59e0b', bg: '#fef3c7' },
@@ -67,6 +68,7 @@ function DeliveriesContent() {
   // dropdown to 'ملغي' OR the delete button, we open the CancelSaleDialog
   // and let it drive the full cancellation flow through the new endpoints.
   const [cancelSale, setCancelSale] = useState(null); // {saleId, invoiceMode}
+  const [pendingStatus, setPendingStatus] = useState(null); // {row, newStatus}
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -206,7 +208,8 @@ function DeliveriesContent() {
       setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' });
       return;
     }
-    await doStatusChange(row, newStatus, '');
+    // Generic status changes get a confirmation modal
+    setPendingStatus({ row, newStatus });
   };
 
   const doStatusChange = async (row, newStatus, vin) => {
@@ -276,6 +279,9 @@ function DeliveriesContent() {
     filtered,
     { key: 'date', direction: 'desc' }
   );
+  // PA-03: Pagination
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+
   // Driver dropdown options derived from row data
   const driverOptions = Array.from(
     new Set(rows.map((r) => r.assigned_driver).filter(Boolean))
@@ -449,7 +455,7 @@ function DeliveriesContent() {
 
         {loading ? (
           <PageSkeleton rows={6} />
-        ) : sortedRows.length === 0 ? (
+        ) : paginatedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />
             <h3>{rows.length === 0 ? 'لا توجد توصيلات بعد' : 'لا توجد نتائج'}</h3>
@@ -459,7 +465,7 @@ function DeliveriesContent() {
           <>
           {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
           <DataCardList
-            rows={sortedRows}
+            rows={paginatedRows}
             fields={[
               { key: 'ref_code', label: 'الكود', format: (v, r) => v || `DL-${r.id}` },
               { key: 'date', label: 'التاريخ' },
@@ -518,7 +524,7 @@ function DeliveriesContent() {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
                     <td>{row.date}</td>
@@ -597,6 +603,14 @@ function DeliveriesContent() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRows={totalRows}
+            perPage={perPage}
+            onPageChange={goTo}
+            onPerPageChange={setPerPage}
+          />
           </>
         )}
       </div>
@@ -749,6 +763,22 @@ function DeliveriesContent() {
         message="هل أنت متأكد من حذف هذه التوصيلة؟"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      {/* UX-03: Confirm generic status changes (not تم التوصيل / ملغي) */}
+      <ConfirmModal
+        isOpen={!!pendingStatus}
+        title="تغيير الحالة"
+        message={pendingStatus ? `هل تريد تغيير حالة التوصيلة إلى ${pendingStatus.newStatus}؟` : ''}
+        confirmText="نعم، تغيير"
+        confirmClass="btn-primary"
+        onConfirm={async () => {
+          if (pendingStatus) {
+            await doStatusChange(pendingStatus.row, pendingStatus.newStatus, '');
+          }
+          setPendingStatus(null);
+        }}
+        onCancel={() => setPendingStatus(null)}
       />
 
       {/* FEAT-05: cancellation dialog — triggered by status→ملغي or by the

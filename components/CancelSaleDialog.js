@@ -342,7 +342,7 @@ export default function CancelSaleDialog({
                 }}
               >
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>
-                  ⚠ تنبيه: بونص البائع مُسوَّى (مدفوع فعلاً)
+                  ⚠ تنبيه: عمولة البائع مُسوَّاة (مدفوعة فعلاً)
                 </div>
                 <div>
                   البائع <strong>{preview.sellerBonus.username}</strong> استلم{' '}
@@ -367,7 +367,7 @@ export default function CancelSaleDialog({
                 }}
               >
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>
-                  ⚠ تنبيه: بونص السائق مُسوَّى (مدفوع فعلاً)
+                  ⚠ تنبيه: عمولة السائق مُسوَّاة (مدفوعة فعلاً)
                 </div>
                 <div>
                   السائق <strong>{preview.driverBonus.username}</strong> استلم{' '}

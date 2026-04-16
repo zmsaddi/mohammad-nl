@@ -5,6 +5,9 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import ConfirmModal from '@/components/ConfirmModal';
+import Pagination, { usePagination } from '@/components/Pagination';
+import PageSkeleton from '@/components/PageSkeleton';
 
 // v1.0.2 Feature 2 — profit distribution (توزيع أرباح)
 //
@@ -28,6 +31,9 @@ function ProfitDistributionsContent() {
   const [showForm, setShowForm] = useState(false);
   const [showShareConfig, setShowShareConfig] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  // UX-07: track edited share config values per user instead of onBlur save
+  const [editedShares, setEditedShares] = useState({});
 
   const [form, setForm] = useState({
     baseAmount: '',
@@ -213,9 +219,15 @@ function ProfitDistributionsContent() {
   const baseAmountNumForCheck = parseFloat(form.baseAmount) || 0;
   const exceedsPool = pool != null && baseAmountNumForCheck > (pool.remaining + 0.01);
 
-  const handleSubmit = async (e) => {
+  // UX-01: show confirm modal instead of submitting directly
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!canSubmit) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirm(false);
     setSubmitting(true);
     try {
       const res = await fetch('/api/profit-distributions', {
@@ -250,6 +262,9 @@ function ProfitDistributionsContent() {
     distributions,
     { key: 'created_at', direction: 'desc' }
   );
+
+  // PA-03: paginate the distribution history
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows, 25);
 
   return (
     <AppLayout>
@@ -299,14 +314,21 @@ function ProfitDistributionsContent() {
             </p>
             {eligibleUsers.map(u => {
               const found = shareConfig.find(s => s.username === u.username);
+              const edited = editedShares[u.username];
+              const currentPct = edited?.pct ?? (found ? String(parseFloat(found.profit_share_pct)) : '0');
+              const currentStart = edited?.startDate ?? (found?.profit_share_start || '');
+              const isDirty = edited != null;
               return (
                 <div key={u.username} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                   <span style={{ minWidth: '140px', fontWeight: 600, fontSize: '0.88rem' }}>{u.name || u.username}</span>
                   <span style={{ fontSize: '0.78rem', color: '#64748b', minWidth: '50px' }}>({u.role === 'admin' ? 'مدير' : 'مشرف'})</span>
                   <input
                     type="number" min="0" max="100" step="any"
-                    defaultValue={found ? parseFloat(found.profit_share_pct) : 0}
-                    onBlur={(e) => saveSharePct(u.username, e.target.value, found?.profit_share_start || null)}
+                    value={currentPct}
+                    onChange={(e) => setEditedShares(prev => ({
+                      ...prev,
+                      [u.username]: { pct: e.target.value, startDate: prev[u.username]?.startDate ?? (found?.profit_share_start || '') },
+                    }))}
                     style={{ width: '80px', padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', textAlign: 'center' }}
                     placeholder="النسبة"
                   />
@@ -314,13 +336,25 @@ function ProfitDistributionsContent() {
                   <span style={{ fontSize: '0.78rem', color: '#64748b' }}>من تاريخ:</span>
                   <input
                     type="date"
-                    defaultValue={found?.profit_share_start || ''}
-                    onBlur={(e) => {
-                      const pct = found ? parseFloat(found.profit_share_pct) : 0;
-                      saveSharePct(u.username, pct, e.target.value || null);
-                    }}
+                    value={currentStart}
+                    onChange={(e) => setEditedShares(prev => ({
+                      ...prev,
+                      [u.username]: { pct: prev[u.username]?.pct ?? (found ? String(parseFloat(found.profit_share_pct)) : '0'), startDate: e.target.value },
+                    }))}
                     style={{ padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem' }}
                   />
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={!isDirty}
+                    onClick={async () => {
+                      await saveSharePct(u.username, currentPct, currentStart || null);
+                      setEditedShares(prev => { const next = { ...prev }; delete next[u.username]; return next; });
+                    }}
+                    style={{ padding: '4px 12px', fontSize: '0.8rem', opacity: isDirty ? 1 : 0.5 }}
+                  >
+                    حفظ
+                  </button>
                 </div>
               );
             })}
@@ -527,13 +561,44 @@ function ProfitDistributionsContent() {
         )}
       </div>
 
+      {/* UX-01: Confirmation modal before irreversible distribution submit */}
+      <ConfirmModal
+        isOpen={showConfirm}
+        title="تأكيد توزيع الأرباح"
+        confirmText="تأكيد التوزيع"
+        confirmClass="btn-primary"
+        onConfirm={handleConfirmedSubmit}
+        onCancel={() => setShowConfirm(false)}
+      >
+        <div style={{ fontSize: '0.9rem', lineHeight: 1.7 }}>
+          <p style={{ marginBottom: '10px' }}>هل تريد تأكيد توزيع الأرباح؟ هذا الإجراء لا يمكن التراجع عنه.</p>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', marginBottom: '10px' }}>
+            <div style={{ fontWeight: 700, fontSize: '1rem', color: '#16a34a', marginBottom: '6px' }}>
+              المبلغ الأساسي: {formatNumber(baseAmountNum)} €
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#374151' }}>
+              {form.recipients.filter(r => r.username && r.percentage).map((r, i) => {
+                const pct = parseFloat(r.percentage) || 0;
+                const amt = (baseAmountNum * pct) / 100;
+                return (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                    <span>{r.username} ({pct}%)</span>
+                    <span style={{ fontWeight: 600 }}>{formatNumber(amt)} €</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </ConfirmModal>
+
       {/* History */}
       <div className="card">
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
           سجل توزيعات الأرباح
         </h3>
         {loading ? (
-          <div className="loading-overlay"><div className="spinner"></div></div>
+          <PageSkeleton rows={4} showStats={false} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>لا توجد توزيعات أرباح بعد</h3>
@@ -541,7 +606,7 @@ function ProfitDistributionsContent() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {sortedRows.map((d) => (
+            {paginatedRows.map((d) => (
               <div key={d.group_id} style={{
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
@@ -592,6 +657,16 @@ function ProfitDistributionsContent() {
               </div>
             ))}
           </div>
+        )}
+        {!loading && sortedRows.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRows={totalRows}
+            perPage={perPage}
+            onPageChange={goTo}
+            onPerPageChange={setPerPage}
+          />
         )}
       </div>
     </AppLayout>

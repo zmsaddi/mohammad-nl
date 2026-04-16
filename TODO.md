@@ -321,7 +321,7 @@ Tests added: **16** · Merge commit: `8c2e3a2`
 ### S3.5b — Per-user bonus rates admin UI — **DONE** (`ac47178`)
 
 - [x] F-007 UI: API route `/api/users/bonus-rates` (GET/PUT/DELETE, admin-only)
-- [x] /users page new card "معدلات بونص مخصصة لكل مستخدم" with override table + add/edit/delete form
+- [x] /users page new card "معدلات عمولة مخصصة لكل مستخدم" with override table + add/edit/delete form
 - [x] Only seller/driver users eligible; placeholder shows global defaults
 - [x] Completes the F-007 feature started in Sprint 2 (infrastructure was table + calculateBonusInTx lookup)
 

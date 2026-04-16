@@ -9,6 +9,10 @@ import { formatNumber, getTodayDate, PRODUCT_CATEGORIES } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import DataCardList from '@/components/DataCardList';
+import PageSkeleton from '@/components/PageSkeleton';
+import Pagination, { usePagination } from '@/components/Pagination';
+import StatusBadge from '@/components/StatusBadge';
 
 function PurchasesContent() {
   const { data: session } = useSession();
@@ -23,6 +27,14 @@ function PurchasesContent() {
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [editPurchase, setEditPurchase] = useState(null);
+  // PA-01: collapsible form
+  const [showForm, setShowForm] = useState(false);
+  // UX-05: filter state
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterSupplier, setFilterSupplier] = useState('all');
+  const [filterPayStatus, setFilterPayStatus] = useState('all');
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -82,14 +94,42 @@ function PurchasesContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
+  // UX-05: filter pipeline (client-side)
+  const filteredRows = rows.filter((r) => {
+    if (filterDateFrom && r.date < filterDateFrom) return false;
+    if (filterDateTo && r.date > filterDateTo) return false;
+    if (filterSearch && !r.supplier?.toLowerCase().includes(filterSearch.toLowerCase()) && !r.item?.toLowerCase().includes(filterSearch.toLowerCase()) && !r.ref_code?.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+    if (filterSupplier !== 'all' && r.supplier !== filterSupplier) return false;
+    if (filterPayStatus !== 'all') {
+      const ps = r.payment_status || 'paid';
+      if (ps !== filterPayStatus) return false;
+    }
+    return true;
+  });
+
   // Item 3 — click-to-sort, default newest first
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
-    rows,
+    filteredRows,
     { key: 'date', direction: 'desc' }
   );
 
+  // PA-03: Pagination
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+
+  // AC-02: supplier debt summary
+  const summaryTotalPurchases = rows.reduce((sum, r) => sum + (parseFloat(r.total) || 0), 0);
+  const summaryTotalPaid = rows.reduce((sum, r) => sum + ((parseFloat(r.paid_amount) ?? parseFloat(r.total)) || 0), 0);
+  const summaryTotalDebt = rows.reduce((sum, r) => {
+    if (r.payment_status === 'paid' || !r.payment_status) return sum;
+    return sum + Math.max(0, (parseFloat(r.total) || 0) - (parseFloat(r.paid_amount) || 0));
+  }, 0);
+
+  // Supplier list for filter dropdown
+  const supplierOptions = Array.from(new Set(rows.map((r) => r.supplier).filter(Boolean)));
+
   const startEditPurchase = (row) => {
     setEditPurchase(row);
+    setShowForm(true); // PA-01: auto-open form on edit
     setForm({
       date: row.date || getTodayDate(),
       supplier: row.supplier || '',
@@ -106,6 +146,7 @@ function PurchasesContent() {
 
   const cancelEdit = () => {
     setEditPurchase(null);
+    setShowForm(false); // PA-01: close form on cancel
     setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
   };
 
@@ -200,6 +241,7 @@ function PurchasesContent() {
       if (res.ok) {
         addToast('تم إضافة عملية الشراء بنجاح');
         setForm({ date: getTodayDate(), supplier: '', item: '', category: '', quantity: '', unitPrice: '', sellPrice: '', paymentType: 'كاش', notes: '', paidAmount: '' });
+        setShowForm(false); // PA-01: close form after successful add
         fetchData();
       } else {
         const err = await res.json();
@@ -236,11 +278,61 @@ function PurchasesContent() {
         <p>شراء الدراجات والإكسسوارات وقطع الغيار</p>
       </div>
 
-      {/* Add Form */}
+      {/* AC-02: Supplier debt summary cards */}
+      <div className="summary-cards" style={{ marginBottom: '24px' }}>
+        <div className="summary-card">
+          <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#3b82f6" width="24" height="24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+            </svg>
+          </div>
+          <div className="summary-card-content">
+            <h3>إجمالي المشتريات</h3>
+            <div className="value" style={{ color: '#3b82f6' }}>{formatNumber(summaryTotalPurchases)} &euro;</div>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="summary-card-content">
+            <h3>إجمالي المدفوع</h3>
+            <div className="value" style={{ color: '#16a34a' }}>{formatNumber(summaryTotalPaid)} &euro;</div>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="summary-card-icon" style={{ background: summaryTotalDebt > 0 ? '#fee2e2' : '#dcfce7' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={summaryTotalDebt > 0 ? '#dc2626' : '#16a34a'} width="24" height="24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="summary-card-content">
+            <h3>ديون الموردين</h3>
+            <div className="value" style={{ color: summaryTotalDebt > 0 ? '#dc2626' : '#16a34a' }}>{formatNumber(summaryTotalDebt)} &euro;</div>
+          </div>
+        </div>
+      </div>
+
+      {/* PA-01: Collapsible Add/Edit Form */}
       <div className="card" style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-          {editPurchase ? 'تعديل عملية شراء' : 'إضافة عملية شراء جديدة'}
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (showForm || editPurchase) ? '16px' : 0 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
+            {editPurchase ? 'تعديل عملية شراء' : 'إضافة عملية شراء جديدة'}
+          </h3>
+          <button
+            type="button"
+            className={(showForm || editPurchase) ? 'btn btn-outline btn-sm' : 'btn btn-primary btn-sm'}
+            onClick={() => {
+              if (showForm || editPurchase) { cancelEdit(); }
+              else { setShowForm(true); }
+            }}
+          >
+            {(showForm || editPurchase) ? '\u2715 إلغاء' : 'إضافة عملية شراء جديدة'}
+          </button>
+        </div>
+        {(showForm || editPurchase) && (
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="form-group">
@@ -389,25 +481,83 @@ function PurchasesContent() {
             )}
           </div>
         </form>
+        )}
       </div>
 
       {/* Data Table */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المشتريات ({rows.length})
+            سجل المشتريات ({sortedRows.length}/{rows.length})
           </h3>
         </div>
 
+        {/* UX-05: filter bar */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
+          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="text" placeholder="بحث مورد / منتج / كود..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <option value="all">كل الموردين</option>
+            {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <option value="all">كل حالات الدفع</option>
+            <option value="paid">مدفوع</option>
+            <option value="partial">جزئي</option>
+            <option value="pending">معلق</option>
+          </select>
+          {(filterDateFrom || filterDateTo || filterSearch || filterSupplier !== 'all' || filterPayStatus !== 'all') && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterSearch(''); setFilterSupplier('all'); setFilterPayStatus('all'); }}
+            >
+              ✕ مسح
+            </button>
+          )}
+        </div>
+
         {loading ? (
-          <div className="loading-overlay"><div className="spinner"></div></div>
-        ) : rows.length === 0 ? (
+          <PageSkeleton rows={8} />
+        ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>لا توجد مشتريات بعد</h3>
-            <p>أضف أول عملية شراء من النموذج أعلاه</p>
+            <h3>{rows.length === 0 ? 'لا توجد مشتريات بعد' : 'لا توجد نتائج'}</h3>
+            <p>{rows.length === 0 ? 'أضف أول عملية شراء من النموذج أعلاه' : 'جرّب تعديل الفلاتر'}</p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+          {/* PA-02: mobile card fallback */}
+          <DataCardList
+            rows={paginatedRows}
+            fields={[
+              { key: 'ref_code', label: 'الكود' },
+              { key: 'date', label: 'التاريخ' },
+              { key: 'supplier', label: 'المورد' },
+              { key: 'item', label: 'المنتج' },
+              { key: 'category', label: 'الفئة' },
+              { key: 'quantity', label: 'الكمية' },
+              { key: 'total', label: 'الإجمالي', format: (v) => v ? `${formatNumber(v)} \u20ac` : '\u2014' },
+              { key: 'paid_amount', label: 'المدفوع', format: (v, row) => `${formatNumber(v ?? row.total)} \u20ac` },
+              { key: 'payment_type', label: 'الدفع' },
+            ]}
+            statusField="payment_status"
+            statusColors={{
+              'paid': '#16a34a',
+              'partial': '#d97706',
+              'pending': '#dc2626',
+            }}
+            actions={(row) => (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+                {row.payment_status && row.payment_status !== 'paid' && (
+                  <button className="btn btn-sm" style={{ background: '#16a34a', color: 'white' }} onClick={() => setPaySupplierState({ purchaseId: row.id, supplier: row.supplier, total: parseFloat(row.total) || 0, currentPaid: parseFloat(row.paid_amount) || 0, amount: '', paymentMethod: 'كاش', notes: '', submitting: false })}>دفع</button>
+                )}
+              </>
+            )}
+            emptyMessage="لا توجد مشتريات"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -428,7 +578,7 @@ function PurchasesContent() {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
                     <td>{row.date}</td>
@@ -453,22 +603,15 @@ function PurchasesContent() {
                     <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
                       {formatNumber(row.paid_amount ?? row.total)}
                     </td>
+                    {/* UX-10: StatusBadge for payment status */}
                     <td>
-                      {(() => {
-                        const status = row.payment_status || 'paid';
-                        const style = status === 'paid'
-                          ? { bg: '#dcfce7', fg: '#166534', label: 'مدفوع' }
-                          : status === 'partial'
-                          ? { bg: '#ffedd5', fg: '#9a3412', label: 'جزئي' }
-                          : { bg: '#fef3c7', fg: '#92400e', label: 'معلق' };
-                        return (
-                          <span className="status-badge" style={{ background: style.bg, color: style.fg }}>
-                            {style.label}
-                          </span>
-                        );
-                      })()}
+                      <StatusBadge status={
+                        (row.payment_status || 'paid') === 'paid' ? 'مدفوع'
+                        : row.payment_status === 'partial' ? 'جزئي'
+                        : 'معلق'
+                      } />
                     </td>
-                    <td><span className="status-badge" style={{ background: row.payment_type === 'بنك' ? '#dbeafe' : '#dcfce7', color: row.payment_type === 'بنك' ? '#1e40af' : '#16a34a' }}>{row.payment_type || 'كاش'}</span></td>
+                    <td><StatusBadge status={row.payment_type || 'كاش'} /></td>
                     <td>{row.notes}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
@@ -488,7 +631,7 @@ function PurchasesContent() {
                               submitting: false,
                             })}
                           >
-                            💰 دفع
+                            دفع
                           </button>
                         )}
                         {isAdmin && (
@@ -508,7 +651,23 @@ function PurchasesContent() {
               </tbody>
             </table>
           </div>
+          {/* PA-03: Pagination */}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRows={totalRows}
+            perPage={perPage}
+            onPageChange={goTo}
+            onPerPageChange={setPerPage}
+          />
+          </>
         )}
+      </div>
+
+      {/* PA-05: Cross-navigation links */}
+      <div className="cross-nav">
+        <a href="/stock">المخزون &rarr;</a>
+        <a href="/expenses">المصاريف &rarr;</a>
       </div>
 
       <DetailModal

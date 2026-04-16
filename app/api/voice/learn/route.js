@@ -102,3 +102,18 @@ export async function POST(request) {
     return apiError(err, 'خطأ في حفظ التعلم', 500, 'voice/learn POST');
   }
 }
+
+// DEFECT-002: link voice_logs.action_id to the created record
+export async function PUT(request) {
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
+  try {
+    const { voiceLogId, actionId } = await request.json();
+    if (voiceLogId && actionId) {
+      await sql`UPDATE voice_logs SET action_id = ${actionId}, status = 'completed' WHERE id = ${voiceLogId}`;
+    }
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return apiError(err, 'خطأ في تحديث السجل', 500, 'voice/learn PUT');
+  }
+}

@@ -31,6 +31,8 @@ function SummaryContent() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [voiceResult, setVoiceResult] = useState(null);
+  // PA-06 — tab state for splitting the summary page
+  const [activeTab, setActiveTab] = useState('quick');
   // DONE: Step 8 — products fetched separately for the category breakdown card
   const [productList, setProductList] = useState([]);
   const canUseVoice = ['admin', 'manager', 'seller'].includes(session?.user?.role);
@@ -70,13 +72,13 @@ function SummaryContent() {
     if (!data) return;
     const rows = [
       ['البند', 'المبلغ'],
-      ['إيرادات مؤكدة', data.totalRevenue],
-      ['تكلفة البضاعة المباعة', data.totalCOGS],
-      ['الربح الإجمالي', data.grossProfit],
+      ['إيرادات مؤكدة (استحقاق)', data.totalRevenue],
+      ['تكلفة البضاعة المباعة (استحقاق)', data.totalCOGS],
+      ['الربح الإجمالي (استحقاق)', data.grossProfit],
       ['المصاريف التشغيلية', data.totalExpenses],
-      ['بونص مدفوع', data.totalBonusPaid],
-      ['بونص مستحق', data.totalBonusOwed],
-      ['صافي الربح', data.netProfit],
+      ['عمولات مدفوعة', data.totalBonusPaid],
+      ['عمولات مستحقة', data.totalBonusOwed],
+      ['صافي الربح (استحقاق)', data.netProfit],
       [''],
       ['إجمالي المشتريات', data.totalPurchases],
       ['قيمة المخزون', data.inventoryValue],
@@ -168,11 +170,11 @@ function SummaryContent() {
     : [];
 
   const exportData = data ? [
-    { 'البند': 'إيرادات المبيعات', 'المبلغ': data.totalRevenue },
-    { 'البند': 'تكلفة البضاعة المباعة', 'المبلغ': data.totalCOGS },
-    { 'البند': 'الربح الإجمالي', 'المبلغ': data.grossProfit },
+    { 'البند': 'إيرادات المبيعات (استحقاق)', 'المبلغ': data.totalRevenue },
+    { 'البند': 'تكلفة البضاعة المباعة (استحقاق)', 'المبلغ': data.totalCOGS },
+    { 'البند': 'الربح الإجمالي (استحقاق)', 'المبلغ': data.grossProfit },
     { 'البند': 'المصاريف التشغيلية', 'المبلغ': data.totalExpenses },
-    { 'البند': 'صافي الربح', 'المبلغ': data.netProfit },
+    { 'البند': 'صافي الربح (استحقاق)', 'المبلغ': data.netProfit },
     { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
     { 'البند': 'قيمة المخزون', 'المبلغ': data.inventoryValue },
     { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
@@ -202,12 +204,16 @@ function SummaryContent() {
       {/* Voice Confirmation Modal */}
       <VoiceConfirm
         result={voiceResult}
+        userRole={session?.user?.role}
         onConfirm={async (endpoint, submitData) => {
-          try {
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData), cache: 'no-store' });
-            if (res.ok) { addToast('تم الحفظ بنجاح!'); setVoiceResult(null); fetchData(dateFrom, dateTo); }
-            else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
-          } catch { addToast('خطأ في الاتصال', 'error'); }
+          const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData), cache: 'no-store' });
+          if (res.ok) {
+            const d = await res.json().catch(() => ({}));
+            addToast('تم الحفظ بنجاح!'); setVoiceResult(null); fetchData(dateFrom, dateTo);
+            return d.id || null;
+          }
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || 'خطأ في الحفظ');
         }}
         onCancel={() => setVoiceResult(null)}
         onRetry={() => setVoiceResult(null)}
@@ -263,34 +269,184 @@ function SummaryContent() {
               <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#d97706' }}>{formatNumber(data.reservedRevenue)}</div>
             </div>
             <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>بونص مستحق</div>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>عمولات مستحقة</div>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#15803d' }}>{formatNumber(data.totalBonusOwed)}</div>
             </div>
             <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', textAlign: 'center', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>بونص تم صرفه</div>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>عمولات تم صرفها</div>
               <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid)}</div>
             </div>
           </div>
         </div>
       ) : data ? (
         <>
+          {/* PA-06 — Tab navigation */}
+          <div className="tabs" style={{ marginBottom: '24px' }}>
+            <button className={`tab ${activeTab === 'quick' ? 'active' : ''}`} onClick={() => setActiveTab('quick')}>ملخص سريع</button>
+            <button className={`tab ${activeTab === 'pnl' ? 'active' : ''}`} onClick={() => setActiveTab('pnl')}>الأرباح والخسائر</button>
+            <button className={`tab ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>التقارير</button>
+          </div>
+
+          {/* ===== Tab 1: ملخص سريع — KPI cards & revenue breakdown ===== */}
+          {activeTab === 'quick' && (
+            <>
+              {/* Quick KPI summary from both accrual and cash bases */}
+              <div className="summary-cards">
+                <div className="summary-card">
+                  <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <div className="summary-card-content">
+                    <h3>إيرادات مؤكدة (استحقاق)</h3>
+                    <div className="value" style={{ color: '#16a34a' }}>{formatNumber(data.totalRevenue)}</div>
+                  </div>
+                </div>
+                <div className="summary-card">
+                  <div className="summary-card-icon" style={{ background: '#e0f2fe' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#0369a1" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
+                  </div>
+                  <div className="summary-card-content">
+                    <h3>صافي الربح (محصّل)</h3>
+                    <div className="value" style={{ color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>{formatNumber(data.netProfitCashBasis || 0)}</div>
+                  </div>
+                </div>
+                <div className="summary-card">
+                  <div className="summary-card-icon" style={{ background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={data.netProfit >= 0 ? '#16a34a' : '#dc2626'} width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                  </div>
+                  <div className="summary-card-content">
+                    <h3>صافي الربح (استحقاق)</h3>
+                    <div className="value" style={{ color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
+                  </div>
+                </div>
+                <div className="summary-card">
+                  <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                  </div>
+                  <div className="summary-card-content">
+                    <h3>الديون المستحقة</h3>
+                    <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reserved Orders */}
+              {(data.reservedCount > 0) && (
+                <div className="card" style={{ marginBottom: '24px', padding: '16px', borderRight: '4px solid #f59e0b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>طلبات محجوزة (بانتظار التوصيل)</h3>
+                      <span style={{ fontSize: '0.85rem', color: '#a16207' }}>{data.reservedCount} طلب بقيمة {formatNumber(data.reservedRevenue)} - ربح متوقع: {formatNumber(data.reservedProfit)}</span>
+                    </div>
+                    <span className="status-badge" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.9rem', padding: '6px 16px' }}>
+                      لم تُحسب في الأرباح
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Cash vs Bank Breakdown */}
+              <div className="card" style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                  تفصيل نقدي / بنك
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                  <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات كاش (COD)</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.salesCash || 0)}</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#2563eb', marginBottom: '4px' }}>مبيعات بنك</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1d4ed8' }}>{formatNumber(data.salesBank || 0)}</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات كاش</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.purchasesCash || 0)}</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#fdf4ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginBottom: '4px' }}>مشتريات بنك</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.purchasesBank || 0)}</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف كاش</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.expensesCash || 0)}</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#0284c7', marginBottom: '4px' }}>مصاريف بنك</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0369a1' }}>{formatNumber(data.expensesBank || 0)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Deliveries */}
+              {data.recentDeliveries?.length > 0 && (
+                <div className="card" style={{ marginBottom: '24px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="20" height="20">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                    </svg>
+                    التوصيلات المعلقة والجارية
+                  </h3>
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>التاريخ</th>
+                          <th>العميل</th>
+                          <th>العنوان</th>
+                          <th>الأصناف</th>
+                          <th>الحالة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.recentDeliveries.map((d, i) => (
+                          <tr key={i}>
+                            <td>{d.date}</td>
+                            <td style={{ fontWeight: 600 }}>{d.client_name}</td>
+                            <td>{d.address}</td>
+                            <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
+                            <td>
+                              <span style={{
+                                padding: '2px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
+                                color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
+                              }}>
+                                {d.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ===== Tab 2: الأرباح والخسائر — P&L detailed cards ===== */}
+          {activeTab === 'pnl' && (
+            <>
           {/* Accounting P&L Cards */}
           <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#1e293b' }}>
-              قائمة الأرباح والخسائر
+              قائمة الأرباح والخسائر (استحقاق)
               <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, marginRight: '8px' }}>(المبيعات المؤكدة بعد التوصيل فقط)</span>
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة ({data.confirmedCount || 0})</div>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة (استحقاق) ({data.confirmedCount || 0})</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalRevenue)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة (استحقاق)</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGS)}</div>
               </div>
               <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي</div>
+                <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي (استحقاق)</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
                 {/* DONE: Fix 6 — gross profit margin */}
                 <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '4px' }}>هامش: {grossMargin}%</div>
@@ -300,15 +456,15 @@ function SummaryContent() {
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses)}</div>
               </div>
               <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>بونص تم صرفه</div>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>عمولات تم صرفها</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center', border: (data.totalBonusOwed || 0) > 0 ? '2px solid #dc2626' : 'none' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>بونص مستحق (لازم تدفعه)</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>عمولات مستحقة (لازم تدفعها)</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalBonusOwed || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
-                <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح</div>
+                <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح (استحقاق)</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
                 {/* DONE: Fix 6 — net profit margin */}
                 <div style={{ fontSize: '0.75rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', marginTop: '4px' }}>هامش: {netMargin}%</div>
@@ -322,18 +478,18 @@ function SummaryContent() {
               both "what I booked" and "what I actually collected". */}
           <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #0ea5e9' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#0369a1' }}>
-              قائمة الأرباح والخسائر — على أساس التحصيل الفعلي
+              قائمة الأرباح والخسائر (محصّل)
             </h3>
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
               (المبيعات المحصّلة بالكامل فقط — الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 500 }}>إيرادات محصّلة ({data.paidSalesCount || 0})</div>
+                <div style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 500 }}>إيرادات محصّلة (محصّل) ({data.paidSalesCount || 0})</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#075985' }}>{formatNumber(data.totalRevenueCashBasis || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة المحصّل</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة المحصّل (محصّل)</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGSCashBasis || 0)}</div>
               </div>
               <div style={{ padding: '16px', background: '#ecfeff', borderRadius: '12px', textAlign: 'center' }}>
@@ -372,141 +528,12 @@ function SummaryContent() {
             </div>
           )}
 
-          {/* Reserved Orders */}
-          {(data.reservedCount > 0) && (
-            <div className="card" style={{ marginBottom: '24px', padding: '16px', borderRight: '4px solid #f59e0b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>طلبات محجوزة (بانتظار التوصيل)</h3>
-                  <span style={{ fontSize: '0.85rem', color: '#a16207' }}>{data.reservedCount} طلب بقيمة {formatNumber(data.reservedRevenue)} - ربح متوقع: {formatNumber(data.reservedProfit)}</span>
-                </div>
-                <span className="status-badge" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.9rem', padding: '6px 16px' }}>
-                  لم تُحسب في الأرباح
-                </span>
-              </div>
-            </div>
+            </>
           )}
 
-          {/* Assets & Liabilities */}
-          <div className="summary-cards">
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#1e40af" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>إجمالي المشتريات</h3>
-                <div className="value">{formatNumber(data.totalPurchases)}</div>
-              </div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#e0e7ff' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#4f46e5" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>قيمة المخزون</h3>
-                <div className="value" style={{ color: '#4f46e5' }}>{formatNumber(data.inventoryValue)}</div>
-              </div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>الديون المستحقة</h3>
-                <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
-              </div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-card-icon" style={{ background: '#fef3c7' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              </div>
-              <div className="summary-card-content">
-                <h3>توصيلات معلقة</h3>
-                <div className="value" style={{ color: '#f59e0b' }}>{data.pendingDeliveries || 0}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cash vs Bank Breakdown */}
-          <div className="card" style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-              تفصيل نقدي / بنك
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-              <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات كاش (COD)</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.salesCash || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '0.8rem', color: '#2563eb', marginBottom: '4px' }}>مبيعات بنك</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1d4ed8' }}>{formatNumber(data.salesBank || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات كاش</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.purchasesCash || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#fdf4ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
-                <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginBottom: '4px' }}>مشتريات بنك</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.purchasesBank || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
-                <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف كاش</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.expensesCash || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                <div style={{ fontSize: '0.8rem', color: '#0284c7', marginBottom: '4px' }}>مصاريف بنك</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0369a1' }}>{formatNumber(data.expensesBank || 0)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pending Deliveries */}
-          {data.recentDeliveries?.length > 0 && (
-            <div className="card" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="20" height="20">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-                </svg>
-                التوصيلات المعلقة والجارية
-              </h3>
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>التاريخ</th>
-                      <th>العميل</th>
-                      <th>العنوان</th>
-                      <th>الأصناف</th>
-                      <th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.recentDeliveries.map((d, i) => (
-                      <tr key={i}>
-                        <td>{d.date}</td>
-                        <td style={{ fontWeight: 600 }}>{d.client_name}</td>
-                        <td>{d.address}</td>
-                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
-                        <td>
-                          <span style={{
-                            padding: '2px 10px',
-                            borderRadius: '20px',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
-                            color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
-                          }}>
-                            {d.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
+          {/* ===== Tab 3: التقارير — charts, category/stock breakdown, tables ===== */}
+          {activeTab === 'reports' && (
+            <>
           {/* Charts */}
           <div className="charts-grid">
             {/* Bar Chart - Monthly Sales vs Purchases */}
@@ -693,7 +720,7 @@ function SummaryContent() {
                       <th>البائع</th>
                       <th>عدد المبيعات</th>
                       <th>إجمالي المبيعات</th>
-                      {canSeeCosts && <th>البونص المستحق</th>}
+                      {canSeeCosts && <th>العمولة المستحقة</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -769,6 +796,15 @@ function SummaryContent() {
               </div>
             </div>
           )}
+            </>
+          )}
+
+          {/* Cross-navigation */}
+          <div className="cross-nav" style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <a href="/sales" className="btn btn-outline btn-sm">المبيعات &rarr;</a>
+            <a href="/purchases" className="btn btn-outline btn-sm">المشتريات &rarr;</a>
+            <a href="/expenses" className="btn btn-outline btn-sm">المصاريف &rarr;</a>
+          </div>
         </>
       ) : fetchError ? (
         /* v1.1 F-022 — explicit error state with retry button instead of

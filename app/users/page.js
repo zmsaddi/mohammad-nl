@@ -5,6 +5,10 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import DataCardList from '@/components/DataCardList';
+import PageSkeleton from '@/components/PageSkeleton';
+import Pagination, { usePagination } from '@/components/Pagination';
+import StatusBadge from '@/components/StatusBadge';
 
 const ROLES = [
   { value: 'admin', label: 'مدير عام', color: '#dc2626', bg: '#fee2e2' },
@@ -17,6 +21,7 @@ function UsersContent() {
   const { data: session } = useSession();
   const addToast = useToast();
 
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -33,6 +38,9 @@ function UsersContent() {
 
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'seller' });
   const [settingsForm, setSettingsForm] = useState({ seller_bonus_fixed: '10', seller_bonus_percentage: '50', driver_bonus_fixed: '5' });
+
+  const safeUsers = Array.isArray(users) ? users : [];
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(safeUsers, 25);
 
   const fetchData = async () => {
     try {
@@ -100,7 +108,7 @@ function UsersContent() {
         cache: 'no-store',
       });
       if (res.ok) {
-        addToast('تم حفظ معدلات البونص المخصصة');
+        addToast('تم حفظ معدلات العمولة المخصصة');
         setRateForm({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
         setEditingRate(null);
         fetchData();
@@ -129,7 +137,7 @@ function UsersContent() {
 
   // Users eligible for per-user overrides: sellers + drivers (admin/manager
   // don't earn bonuses per the locked business rule)
-  const overridableUsers = (Array.isArray(users) ? users : []).filter(
+  const overridableUsers = safeUsers.filter(
     (u) => (u.role === 'seller' || u.role === 'driver') && u.active
   );
   // Users that DON'T have an override yet — available for the "add" dropdown
@@ -138,6 +146,25 @@ function UsersContent() {
 
   const startEdit = (u) => { setEditUser(u); setForm({ username: u.username, password: '', name: u.name, role: u.role }); setShowForm(true); };
 
+  const getRoleLabel = (role) => {
+    const r = ROLES.find((rl) => rl.value === role);
+    return r?.label || role;
+  };
+
+  // --- Render ---
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="page-header">
+          <h2>إدارة المستخدمين</h2>
+          <p>إضافة وإدارة حسابات المستخدمين والصلاحيات</p>
+        </div>
+        <PageSkeleton rows={6} showStats={false} />
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="page-header">
@@ -145,63 +172,75 @@ function UsersContent() {
         <p>إضافة وإدارة حسابات المستخدمين والصلاحيات</p>
       </div>
 
-      {/* Add/Edit Form */}
-      {showForm && (
-        <div className="card" style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>{editUser ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="user-username">اسم المستخدم (للدخول) *</label>
-                <input id="user-username" type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="username" disabled={!!editUser} required={!editUser} style={{ direction: 'ltr', textAlign: 'right' }} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="user-password">{editUser ? 'كلمة مرور جديدة (اتركه فارغ لعدم التغيير)' : 'كلمة المرور *'}</label>
-                <input id="user-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" required={!editUser} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="user-name">الاسم الكامل *</label>
-                <input id="user-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="user-role">الدور *</label>
-                <select id="user-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="submit" className="btn btn-primary">{editUser ? 'حفظ التعديلات' : 'إضافة مستخدم'}</button>
-              <button type="button" className="btn btn-outline" onClick={() => { setShowForm(false); setEditUser(null); setForm({ username: '', password: '', name: '', role: 'seller' }); }}>إلغاء</button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="tabs">
+        <button className={`tab ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+          المستخدمين
+        </button>
+        <button className={`tab ${activeTab === 'bonus' ? 'active' : ''}`} onClick={() => setActiveTab('bonus')}>
+          إعدادات العمولة
+        </button>
+      </div>
 
-      {/* Users Table */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>المستخدمين ({users.length || 0})</h3>
-          {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ إضافة مستخدم</button>}
-        </div>
-        {loading ? <div className="loading-overlay"><div className="spinner"></div></div> : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr><th>#</th><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>
-              </thead>
-              <tbody>
-                {(Array.isArray(users) ? users : []).map((u) => {
-                  const r = ROLES.find((rl) => rl.value === u.role);
-                  return (
+      {/* ===================== Tab 1: Users ===================== */}
+      {activeTab === 'users' && (
+        <>
+          {/* Add/Edit Form */}
+          {showForm && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>{editUser ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</h3>
+              <form onSubmit={handleSubmit}>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="user-username">اسم المستخدم (للدخول) *</label>
+                    <input id="user-username" type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="username" disabled={!!editUser} required={!editUser} style={{ direction: 'ltr', textAlign: 'right' }} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-password">{editUser ? 'كلمة مرور جديدة (اتركه فارغ لعدم التغيير)' : 'كلمة المرور *'}</label>
+                    <input id="user-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" required={!editUser} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-name">الاسم الكامل *</label>
+                    <input id="user-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" required />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-role">الدور *</label>
+                    <select id="user-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                      {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" className="btn btn-primary">{editUser ? 'حفظ التعديلات' : 'إضافة مستخدم'}</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowForm(false); setEditUser(null); setForm({ username: '', password: '', name: '', role: 'seller' }); }}>إلغاء</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Users Table */}
+          <div className="card" style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>المستخدمين ({safeUsers.length || 0})</h3>
+              {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ إضافة مستخدم</button>}
+            </div>
+
+            {/* Desktop table */}
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr><th>#</th><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>
+                </thead>
+                <tbody>
+                  {paginatedRows.map((u) => (
                     <tr key={u.id} style={{ opacity: u.active ? 1 : 0.5 }}>
                       <td>{u.id}</td>
                       <td style={{ direction: 'ltr', textAlign: 'right', fontWeight: 600 }}>{u.username}</td>
                       <td>{u.name}</td>
-                      <td><span className="status-badge" style={{ background: r?.bg, color: r?.color }}>{r?.label || u.role}</span></td>
+                      <td><StatusBadge status={getRoleLabel(u.role)} /></td>
                       <td>
-                        <button className="btn btn-sm" onClick={() => setToggleTarget(u.id)} style={{ background: u.active ? '#dcfce7' : '#fee2e2', color: u.active ? '#16a34a' : '#dc2626', border: 'none', cursor: 'pointer' }}>
-                          {u.active ? 'مفعّل' : 'معطّل'}
+                        <button className="btn btn-sm" onClick={() => setToggleTarget(u.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          <StatusBadge status={u.active ? 'مفعّل' : 'معطّل'} bg={u.active ? '#dcfce7' : '#fee2e2'} color={u.active ? '#16a34a' : '#dc2626'} />
                         </button>
                       </td>
                       <td>
@@ -211,161 +250,194 @@ function UsersContent() {
                         </div>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Bonus Settings */}
-      <div className="card">
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>إعدادات البونص</h3>
-        <div className="form-grid">
-          <div className="form-group">
-            <label>بونص ثابت للبائع (لكل توصيلة مؤكدة)</label>
-            <input type="number" min="0" step="any" value={settingsForm.seller_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_fixed: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>نسبة البائع من فرق السعر (%)</label>
-            <input type="number" min="0" max="100" value={settingsForm.seller_bonus_percentage} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_percentage: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>بونص ثابت للسائق (لكل توصيلة مؤكدة)</label>
-            <input type="number" min="0" step="any" value={settingsForm.driver_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, driver_bonus_fixed: e.target.value })} />
-          </div>
-        </div>
-        <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
-      </div>
-
-      {/* v1.1 F-007 — per-user bonus rate overrides. Shows existing
-          overrides in a table, with an "add override" form below. Users
-          without an override use the global settings above. */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>
-          معدلات بونص مخصصة لكل مستخدم
-        </h3>
-        <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
-          المستخدمون بدون معدل مخصص يستخدمون الإعدادات العامة أعلاه.
-          أضف معدل مخصص لتجاوز القيم العامة لبائع أو سائق محدد.
-        </p>
-
-        {/* Existing overrides table */}
-        {Array.isArray(bonusRates) && bonusRates.length > 0 && (
-          <div className="table-container" style={{ marginBottom: '16px' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>المستخدم</th>
-                  <th>الدور</th>
-                  <th>البونص الثابت (لكل قطعة)</th>
-                  <th>نسبة فرق السعر %</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bonusRates.map((r) => {
-                  const user = (Array.isArray(users) ? users : []).find((u) => u.username === r.username);
-                  return (
-                    <tr key={r.username}>
-                      <td style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
-                      <td>{(() => {
-                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
-                        return u?.role === 'seller' ? 'بائع' : u?.role === 'driver' ? 'سائق' : u?.role || '—';
-                      })()}</td>
-                      <td className="number-cell">{(() => {
-                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
-                        if (u?.role === 'seller') return r.seller_fixed != null ? `${parseFloat(r.seller_fixed)} €` : '—';
-                        if (u?.role === 'driver') return r.driver_fixed != null ? `${parseFloat(r.driver_fixed)} €` : '—';
-                        return '—';
-                      })()}</td>
-                      <td className="number-cell">{(() => {
-                        const u = (Array.isArray(users) ? users : []).find(u2 => u2.username === r.username);
-                        if (u?.role === 'seller') return r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—';
-                        return '—';
-                      })()}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => startEditRate(r)}>تعديل</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteRate(r.username)}>حذف</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Add/edit override form */}
-        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '14px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '10px' }}>
-            {editingRate ? `تعديل معدل: ${editingRate}` : 'إضافة معدل مخصص جديد'}
-          </div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>المستخدم</label>
-              {editingRate ? (
-                <input type="text" value={editingRate} disabled style={{ background: '#e2e8f0' }} />
-              ) : (
-                <select value={rateForm.username} onChange={(e) => setRateForm({ ...rateForm, username: e.target.value })}>
-                  <option value="">-- اختر --</option>
-                  {usersWithoutRate.map((u) => (
-                    <option key={u.username} value={u.username}>
-                      {u.name || u.username} ({u.role === 'seller' ? 'بائع' : 'سائق'})
-                    </option>
                   ))}
-                </select>
-              )}
+                </tbody>
+              </table>
             </div>
-            {/* v1.2 fix — show only relevant fields per role.
-                Sellers see: seller fixed + seller percentage.
-                Drivers see: driver fixed only. */}
-            {(() => {
-              const selectedUser = [...overridableUsers, ...(Array.isArray(bonusRates) ? bonusRates : [])].find(u => u.username === (editingRate || rateForm.username));
-              const role = selectedUser?.role;
-              if (!role) return (
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>اختر مستخدم أولاً لعرض الحقول المناسبة</p>
-                </div>
-              );
-              if (role === 'seller') return (<>
-                <div className="form-group">
-                  <label>بونص البائع الثابت (€) — لكل قطعة</label>
-                  <input type="number" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
-                    value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>نسبة البائع من فرق السعر (%)</label>
-                  <input type="number" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
-                    value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
-                </div>
-              </>);
-              if (role === 'driver') return (
-                <div className="form-group">
-                  <label>بونص السائق الثابت (€) — لكل قطعة</label>
-                  <input type="number" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
-                    value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
-                </div>
-              );
-              return null;
-            })()}
+
+            {/* Mobile card fallback */}
+            <DataCardList
+              rows={paginatedRows}
+              fields={[
+                { key: 'username', label: 'اسم المستخدم' },
+                { key: 'name', label: 'الاسم' },
+                { key: 'role', label: 'الدور', format: (v) => getRoleLabel(v) },
+                { key: 'active', label: 'الحالة', format: (v) => v ? 'مفعّل' : 'معطّل' },
+              ]}
+              actions={(u) => (
+                <>
+                  <button className="btn btn-outline btn-sm" onClick={() => startEdit(u)}>تعديل</button>
+                  <button className="btn btn-sm" onClick={() => setToggleTarget(u.id)} style={{ background: u.active ? '#dcfce7' : '#fee2e2', color: u.active ? '#16a34a' : '#dc2626', border: 'none' }}>
+                    {u.active ? 'تعطيل' : 'تفعيل'}
+                  </button>
+                  {u.username !== 'admin' && <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(u.id)}>حذف</button>}
+                </>
+              )}
+            />
+
+            {/* Pagination */}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalRows={totalRows}
+              perPage={perPage}
+              onPageChange={goTo}
+              onPerPageChange={setPerPage}
+            />
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button className="btn btn-primary btn-sm" onClick={handleSaveRate}>
-              {editingRate ? 'تحديث' : 'إضافة'}
-            </button>
-            {editingRate && (
-              <button className="btn btn-outline btn-sm" onClick={() => {
-                setEditingRate(null);
-                setRateForm({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
-              }}>إلغاء</button>
+        </>
+      )}
+
+      {/* ===================== Tab 2: Bonus Settings ===================== */}
+      {activeTab === 'bonus' && (
+        <>
+          {/* Global Bonus Settings */}
+          <div className="card">
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>إعدادات العمولة</h3>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>عمولة ثابتة للبائع (لكل توصيلة مؤكدة)</label>
+                <input type="number" min="0" step="any" value={settingsForm.seller_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_fixed: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>نسبة البائع من فرق السعر (%)</label>
+                <input type="number" min="0" max="100" value={settingsForm.seller_bonus_percentage} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_percentage: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>عمولة ثابتة للسائق (لكل توصيلة مؤكدة)</label>
+                <input type="number" min="0" step="any" value={settingsForm.driver_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, driver_bonus_fixed: e.target.value })} />
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
+          </div>
+
+          {/* v1.1 F-007 — per-user bonus rate overrides */}
+          <div className="card" style={{ marginTop: '24px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>
+              معدلات عمولة مخصصة لكل مستخدم
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
+              المستخدمون بدون معدل مخصص يستخدمون الإعدادات العامة أعلاه.
+              أضف معدل مخصص لتجاوز القيم العامة لبائع أو سائق محدد.
+            </p>
+
+            {/* Existing overrides table */}
+            {Array.isArray(bonusRates) && bonusRates.length > 0 && (
+              <div className="table-container" style={{ marginBottom: '16px' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>المستخدم</th>
+                      <th>الدور</th>
+                      <th>العمولة الثابتة (لكل قطعة)</th>
+                      <th>نسبة فرق السعر %</th>
+                      <th>إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bonusRates.map((r) => {
+                      const user = safeUsers.find((u) => u.username === r.username);
+                      return (
+                        <tr key={r.username}>
+                          <td style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
+                          <td>{(() => {
+                            const u = safeUsers.find(u2 => u2.username === r.username);
+                            return u?.role === 'seller' ? 'بائع' : u?.role === 'driver' ? 'سائق' : u?.role || '—';
+                          })()}</td>
+                          <td className="number-cell">{(() => {
+                            const u = safeUsers.find(u2 => u2.username === r.username);
+                            if (u?.role === 'seller') return r.seller_fixed != null ? `${parseFloat(r.seller_fixed)} €` : '—';
+                            if (u?.role === 'driver') return r.driver_fixed != null ? `${parseFloat(r.driver_fixed)} €` : '—';
+                            return '—';
+                          })()}</td>
+                          <td className="number-cell">{(() => {
+                            const u = safeUsers.find(u2 => u2.username === r.username);
+                            if (u?.role === 'seller') return r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—';
+                            return '—';
+                          })()}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button className="btn btn-outline btn-sm" onClick={() => startEditRate(r)}>تعديل</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteRate(r.username)}>حذف</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
+
+            {/* Add/edit override form */}
+            <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '14px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '10px' }}>
+                {editingRate ? `تعديل معدل: ${editingRate}` : 'إضافة معدل مخصص جديد'}
+              </div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>المستخدم</label>
+                  {editingRate ? (
+                    <input type="text" value={editingRate} disabled style={{ background: '#e2e8f0' }} />
+                  ) : (
+                    <select value={rateForm.username} onChange={(e) => setRateForm({ ...rateForm, username: e.target.value })}>
+                      <option value="">-- اختر --</option>
+                      {usersWithoutRate.map((u) => (
+                        <option key={u.username} value={u.username}>
+                          {u.name || u.username} ({u.role === 'seller' ? 'بائع' : 'سائق'})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {/* v1.2 fix — show only relevant fields per role.
+                    Sellers see: seller fixed + seller percentage.
+                    Drivers see: driver fixed only. */}
+                {(() => {
+                  const selectedUser = [...overridableUsers, ...(Array.isArray(bonusRates) ? bonusRates : [])].find(u => u.username === (editingRate || rateForm.username));
+                  const role = selectedUser?.role;
+                  if (!role) return (
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>اختر مستخدم أولاً لعرض الحقول المناسبة</p>
+                    </div>
+                  );
+                  if (role === 'seller') return (<>
+                    <div className="form-group">
+                      <label>عمولة البائع الثابتة (€) — لكل قطعة</label>
+                      <input type="number" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
+                        value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label>نسبة البائع من فرق السعر (%)</label>
+                      <input type="number" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
+                        value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
+                    </div>
+                  </>);
+                  if (role === 'driver') return (
+                    <div className="form-group">
+                      <label>عمولة السائق الثابتة (€) — لكل قطعة</label>
+                      <input type="number" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
+                        value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
+                    </div>
+                  );
+                  return null;
+                })()}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <button className="btn btn-primary btn-sm" onClick={handleSaveRate}>
+                  {editingRate ? 'تحديث' : 'إضافة'}
+                </button>
+                {editingRate && (
+                  <button className="btn btn-outline btn-sm" onClick={() => {
+                    setEditingRate(null);
+                    setRateForm({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
+                  }}>إلغاء</button>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <ConfirmModal isOpen={!!deleteId} title="حذف مستخدم" message="هل أنت متأكد؟ لا يمكن التراجع." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       {/* v1.1 F-017 — confirmation gates for previously one-click destructive actions */}
@@ -378,8 +450,8 @@ function UsersContent() {
       />
       <ConfirmModal
         isOpen={confirmSettings}
-        title="حفظ إعدادات البونص"
-        message="سيتم تحديث إعدادات البونص لجميع المبيعات المستقبلية. هل أنت متأكد؟"
+        title="حفظ إعدادات العمولة"
+        message="سيتم تحديث إعدادات العمولة لجميع المبيعات المستقبلية. هل أنت متأكد؟"
         onConfirm={handleSaveSettings}
         onCancel={() => setConfirmSettings(false)}
       />

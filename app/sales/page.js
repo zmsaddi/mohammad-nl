@@ -13,6 +13,7 @@ import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import Pagination, { usePagination } from '@/components/Pagination';
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -47,6 +48,7 @@ function SalesContent() {
   const [whatsappShare, setWhatsappShare] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [editSale, setEditSale] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -173,6 +175,8 @@ function SalesContent() {
     { key: 'date', direction: 'desc' }
   );
 
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows: paginationTotal } = usePagination(sortedRows);
+
   // Seller list for the filter dropdown (derived from row data)
   const sellerOptions = Array.from(
     new Set(rows.map((r) => r.created_by).filter(Boolean))
@@ -180,6 +184,7 @@ function SalesContent() {
 
   const startEditSale = (row) => {
     setEditSale(row);
+    setShowForm(true);
     setDownPaymentTouched(true); // prevent reactive default from clobbering
     setForm({
       date: row.date || getTodayDate(),
@@ -208,6 +213,7 @@ function SalesContent() {
 
   const cancelEditSale = () => {
     setEditSale(null);
+    setShowForm(false);
     setDownPaymentTouched(false);
     setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', downPaymentExpected: '', notes: '' });
   };
@@ -320,6 +326,7 @@ function SalesContent() {
 
         setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', item: '', quantity: '', unitPrice: '', paymentType: 'كاش', downPaymentExpected: '', notes: '' });
         setDownPaymentTouched(false);
+        setShowForm(false);
         fetchData();
       } else {
         const err = await res.json();
@@ -356,7 +363,14 @@ function SalesContent() {
         <p>بيع الدراجات والإكسسوارات وقطع الغيار</p>
       </div>
 
-      {/* Add Form */}
+      {/* Add Form — collapsible (PA-01) */}
+      {!showForm ? (
+        <div style={{ marginBottom: '24px' }}>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            إضافة مبيعة جديدة
+          </button>
+        </div>
+      ) : (
       <div className="card" style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
           {editSale ? 'تعديل طلب' : 'تسجيل عملية بيع جديدة'}
@@ -503,7 +517,7 @@ function SalesContent() {
               const totalBonus = fixedBonus + extraBonus;
               return (
                 <div className="form-group">
-                  <label>البونص المتوقع (بعد التوصيل)</label>
+                  <label>العمولة المتوقعة (بعد التوصيل)</label>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', fontSize: '0.82rem', marginTop: '4px' }}>
                     <span style={{ background: '#dcfce7', padding: '4px 10px', borderRadius: '8px', color: '#16a34a' }}>
                       ثابت: {formatNumber(fixedBonus)}
@@ -632,6 +646,7 @@ function SalesContent() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Data Table */}
       <div className="card">
@@ -687,7 +702,7 @@ function SalesContent() {
           <>
           {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
           <DataCardList
-            rows={sortedRows}
+            rows={paginatedRows}
             fields={[
               { key: 'ref_code', label: 'الكود' },
               { key: 'date', label: 'التاريخ' },
@@ -695,6 +710,8 @@ function SalesContent() {
               { key: 'item', label: 'المنتج' },
               { key: 'quantity', label: 'الكمية' },
               { key: 'total', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
+              { key: 'paid_amount', label: 'المدفوع', format: (v) => v ? `${formatNumber(v)} €` : '—' },
+              { key: 'remaining', label: 'المتبقي', format: (v) => v ? `${formatNumber(v)} €` : '—' },
               { key: 'payment_type', label: 'الدفع' },
             ]}
             statusField="status"
@@ -719,6 +736,8 @@ function SalesContent() {
                   <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
                   <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('unit_price')}>سعر الوحدة{getSortIndicator('unit_price')}</th>
                   <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total')}>الإجمالي{getSortIndicator('total')}</th>
+                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('paid_amount')}>المدفوع{getSortIndicator('paid_amount')}</th>
+                  <th onClick={() => requestSort('remaining')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remaining')}>المتبقي{getSortIndicator('remaining')}</th>
                   {canSeeCosts && <th onClick={() => requestSort('cost_total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('cost_total')}>التكلفة{getSortIndicator('cost_total')}</th>}
                   {canSeeCosts && <th onClick={() => requestSort('profit')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('profit')}>الربح{getSortIndicator('profit')}</th>}
                   <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('status')}>الحالة{getSortIndicator('status')}</th>
@@ -727,7 +746,7 @@ function SalesContent() {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
                     <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
                     <td>{row.date}</td>
@@ -736,6 +755,8 @@ function SalesContent() {
                     <td className="number-cell">{formatNumber(row.quantity)}</td>
                     <td className="number-cell">{formatNumber(row.unit_price)}</td>
                     <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
+                    <td className="number-cell" style={{ color: (row.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(row.remaining)}</td>
                     {canSeeCosts && <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>}
                     {canSeeCosts && <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
                       {formatNumber(row.profit)}
@@ -812,6 +833,14 @@ function SalesContent() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRows={paginationTotal}
+            perPage={perPage}
+            onPageChange={goTo}
+            onPerPageChange={setPerPage}
+          />
           </>
         )}
       </div>
@@ -903,6 +932,8 @@ function SalesContent() {
           option for bonuses and forces 'remove' (FK cascade rule). The
           actual DELETE of the sale row happens inside cancelSale's
           deleteSale wrapper. */}
+      <div className="cross-nav"><a href="/clients">العملاء &rarr;</a><a href="/deliveries">التوصيل &rarr;</a><a href="/invoices">الفواتير &rarr;</a></div>
+
       {cancelSale && (
         <CancelSaleDialog
           saleId={cancelSale.saleId}

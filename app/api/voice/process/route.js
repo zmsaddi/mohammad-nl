@@ -54,8 +54,10 @@ export async function POST(request) {
     const formData = await request.formData();
     const audioFile = formData.get('audio');
     if (!audioFile) return NextResponse.json({ error: 'لم يتم إرسال ملف صوتي' }, { status: 400 });
+    if (audioFile.type && !audioFile.type.startsWith('audio/') && audioFile.type !== 'application/octet-stream') {
+      return NextResponse.json({ error: 'الملف ليس صوتياً' }, { status: 400 });
+    }
 
-    // Reject oversized uploads before reading into memory (prevents OOM / cost abuse)
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
     if (audioFile.size > MAX_BYTES) {
       return NextResponse.json({ error: 'حجم الملف كبير جداً (الحد الأقصى 10MB)' }, { status: 413 });
@@ -63,7 +65,10 @@ export async function POST(request) {
 
     // === PARALLEL: Whisper transcription + ALL DB queries at same time ===
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
-    const file = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' });
+    // STT-DEFECT-003 fix: preserve real MIME type from browser (Safari sends mp4/aac)
+    const realType = audioFile.type || 'audio/webm';
+    const ext = realType.includes('mp4') ? 'mp4' : realType.includes('ogg') ? 'ogg' : 'webm';
+    const file = new File([audioBuffer], `audio.${ext}`, { type: realType });
 
     const [transcriptResult, dbResult] = await Promise.all([
       // 1. Whisper transcription
@@ -105,27 +110,32 @@ export async function POST(request) {
           terms.push(t);
         };
 
+        // Order matters: Whisper truncates at ~224 tokens (~150 chars).
+        // Products and aliases are far more important than client/supplier
+        // names for transcript accuracy (client names are common Arabic
+        // words Whisper already knows; product names are domain-specific).
         PRIORITY_TERMS.forEach(addTerm);
         topEntities.aliases.forEach(addTerm);   // learned spoken aliases
         topEntities.products.forEach(addTerm);  // most-sold products
-        topEntities.clients.forEach(addTerm);   // user's frequent clients
-        topEntities.suppliers.forEach(addTerm); // frequent suppliers
         products.forEach((p) => addTerm(p.name));   // full product catalog
-        clients.forEach((c) => addTerm(c.name));    // full client list
-        suppliers.forEach((s) => addTerm(s.name));  // full supplier list
+        topEntities.clients.forEach(addTerm);   // top clients only (not full list)
+        topEntities.suppliers.forEach(addTerm); // top suppliers only
 
-        // Truncate to ~1450 chars (Whisper prompt limit ≈ 224 tokens)
+        // Whisper prompt limit ≈ 224 tokens. Arabic chars average ~2-3
+        // tokens each. 150 chars ≈ 100-150 tokens (safe within limit).
+        // Priority terms (verbs + payment) consume ~80 chars, leaving
+        // ~70 chars for the most important product/client names.
         let vocab = '';
         for (const term of terms) {
           const candidate = vocab ? vocab + ',' + term : term;
-          if (candidate.length > 1450) break;
+          if (candidate.length > 150) break;
           vocab = candidate;
         }
 
         const transcription = await groqClient.audio.transcriptions.create({
           file, model: 'whisper-large-v3', language: 'ar', prompt: vocab,
         });
-        return { raw: transcription.text || '', normalized: normalizeArabicText(transcription.text || '') };
+        return { raw: transcription.text || '', normalized: normalizeArabicText(transcription.text || ''), vocabLength: vocab.length };
       })(),
 
       // 2. All DB context (parallel with transcription)
@@ -160,7 +170,7 @@ export async function POST(request) {
       })(),
     ]);
 
-    const { raw, normalized } = transcriptResult;
+    const { raw, normalized, vocabLength } = transcriptResult;
     if (!normalized || normalized.length < 3) {
       return NextResponse.json({ action: 'register_expense', data: {}, warnings: ['لم أسمع شيء واضح'], transcript: raw });
     }
@@ -231,7 +241,7 @@ export async function POST(request) {
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user',   content: normalized },
+          { role: 'user',   content: raw },
         ],
         temperature: 0.1,
         max_tokens: 400,
@@ -374,51 +384,23 @@ export async function POST(request) {
 
     if (action === 'register_expense' && parsed.category && !EXPENSE_CATEGORIES.includes(parsed.category)) parsed.category = 'أخرى';
 
-    // DONE: Step 3D — background reinforcement learning from successfully resolved entities.
-    // Runs as a fire-and-forget IIFE so it never blocks the response. The aliases
-    // created here strengthen the matches the resolver just made; if the user later
-    // corrects them in VoiceConfirm, saveAICorrection will overwrite with the right
-    // values and the wrong ones will rank lower over time.
-    (async () => {
-      try {
-        if (action === 'register_sale' && parsed.client_name && !parsed.isNewClient) {
-          const { rows: cl } = await sql`SELECT id FROM clients WHERE name = ${parsed.client_name} LIMIT 1`;
-          if (cl.length) {
-            const { addAlias } = await import('@/lib/db');
-            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
-            await addAlias('client', cl[0].id, parsed.client_name, normalizeForMatching(parsed.client_name), 'confirmed_action');
-          }
-        }
-        if ((action === 'register_sale' || action === 'register_purchase') && parsed.item && !parsed.isNewProduct) {
-          const baseName = parsed.item.split(' - ')[0];
-          const { rows: prod } = await sql`
-            SELECT id FROM products
-            WHERE name = ${parsed.item} OR name LIKE ${baseName + '%'}
-            LIMIT 1
-          `;
-          if (prod.length) {
-            const { addAlias } = await import('@/lib/db');
-            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
-            await addAlias('product', prod[0].id, parsed.item, normalizeForMatching(parsed.item), 'confirmed_action');
-          }
-        }
-        if (action === 'register_purchase' && parsed.supplier && !parsed.isNewSupplier) {
-          const { rows: sup } = await sql`SELECT id FROM suppliers WHERE name = ${parsed.supplier} LIMIT 1`;
-          if (sup.length) {
-            const { addAlias } = await import('@/lib/db');
-            const { normalizeForMatching } = await import('@/lib/voice-normalizer');
-            await addAlias('supplier', sup[0].id, parsed.supplier, normalizeForMatching(parsed.supplier), 'confirmed_action');
-          }
-        }
-      } catch (err) {
-        console.error('[voice/process] alias learning:', err);
-      }
-    })();
+    // DEFECT-006 fix: removed fire-and-forget alias writes. Writing aliases
+    // before user confirmation caused permanent entity_aliases pollution when
+    // the auto-resolution was wrong. Alias learning now happens exclusively
+    // in /api/voice/learn (saveAICorrection) AFTER the user confirms.
 
-    // Log
+    // Log — return id so VoiceConfirm can link action_id after save
+    let voiceLogId = null;
     try {
       const today = new Date().toISOString().split('T')[0];
-      await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel})`;
+      const debugJson = JSON.stringify({
+        raw, normalized, parsed, warnings,
+        vocabLength: vocabLength || 0,
+        model: usedModel,
+        ruleAction,
+      });
+      const { rows: logRows } = await sql`INSERT INTO voice_logs (date, username, transcript, normalized_text, action_type, status, debug_json) VALUES (${today}, ${token.username}, ${raw}, ${normalized}, ${action}, ${usedModel}, ${debugJson}::jsonb) RETURNING id`;
+      voiceLogId = logRows[0]?.id || null;
     } catch (err) {
       console.error('[voice/process] voice_logs insert:', err);
     }
@@ -470,7 +452,7 @@ export async function POST(request) {
     // FIXED: 2 — surface "add new product?" suggestion to the UI.
     // _schema: bump when the extraction output shape changes so v1.1
     // frontends can gate on it instead of breaking silently.
-    const responseBody = { _schema: 1, action, data: parsed, warnings, transcript: raw, normalized, missing_fields };
+    const responseBody = { _schema: 1, action, data: parsed, warnings, transcript: raw, normalized, missing_fields, voiceLogId };
     if (parsed.isNewProduct === true) {
       warnings.push('المنتج غير موجود في القاعدة — هل تريد إضافته؟');
       responseBody.suggestAddProduct = true;

@@ -1,13 +1,34 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { formatNumber } from '@/lib/utils';
 
 export default function DetailModal({ isOpen, onClose, title, fields, actions }) {
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const modal = modalRef.current;
+    if (!modal) return;
+    const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+    const trap = (e) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last?.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first?.focus(); } }
+    };
+    modal.addEventListener('keydown', trap);
+    return () => modal.removeEventListener('keydown', trap);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !fields) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="detail-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="detail-modal" onClick={(e) => e.stopPropagation()} ref={modalRef}>
         <div className="detail-modal-header">
           <h3>{title || 'التفاصيل'}</h3>
           <button className="detail-modal-close" onClick={onClose}>

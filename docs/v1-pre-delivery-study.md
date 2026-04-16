@@ -263,8 +263,8 @@ both benefits in a single edit pass).
 
 ```js
 const TYPES = {
-  seller_payout: { label: 'دفع بونص بائع', color: '#16a34a', bg: '#dcfce7' },
-  driver_payout: { label: 'دفع بونص سائق', color: '#7c3aed', bg: '#ede9fe' },
+  seller_payout: { label: 'دفع عمولة بائع', color: '#16a34a', bg: '#dcfce7' },
+  driver_payout: { label: 'دفع عمولة سائق', color: '#7c3aed', bg: '#ede9fe' },
   profit_distribution: { label: 'توزيع أرباح', color: '#1e40af', bg: '#dbeafe' },
 };
 ```
