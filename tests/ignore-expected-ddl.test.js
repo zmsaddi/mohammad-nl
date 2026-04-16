@@ -29,7 +29,8 @@ function ignoreExpectedDdl(err) {
     /duplicate key/i.test(msg) ||
     /does not exist/i.test(msg) ||
     /multiple primary keys/i.test(msg) ||
-    /relation .* already exists/i.test(msg)
+    /relation .* already exists/i.test(msg) ||
+    /deadlock detected/i.test(msg)
   ) {
     return;
   }
