@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addProfitDistribution, getProfitDistributions } from '@/lib/db';
+import { ProfitDistributionSchema, zodArabicError } from '@/lib/schemas';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
@@ -31,13 +32,17 @@ export async function POST(request) {
     return NextResponse.json({ error: 'جسم الطلب غير صالح' }, { status: 400 });
   }
 
+  // v1.2 audit BUG-004 — validate body with Zod before passing to addProfitDistribution
+  const parsed = ProfitDistributionSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
+
   try {
     const result = await addProfitDistribution({
-      baseAmount:      body.baseAmount,
-      recipients:      body.recipients,
-      basePeriodStart: body.basePeriodStart || null,
-      basePeriodEnd:   body.basePeriodEnd   || null,
-      notes:           body.notes           || null,
+      baseAmount:      parsed.data.baseAmount,
+      recipients:      parsed.data.recipients,
+      basePeriodStart: parsed.data.basePeriodStart || null,
+      basePeriodEnd:   parsed.data.basePeriodEnd   || null,
+      notes:           parsed.data.notes           || null,
       createdBy:       token.username,
     });
     return NextResponse.json({ success: true, ...result });
