@@ -126,7 +126,7 @@ export async function DELETE(request) {
     if (!canCancelSale(rows[0], { role: token.role, username: token.username })) {
       return NextResponse.json({ error: CANCEL_DENIED_ERROR }, { status: 403 });
     }
-    await deleteSale(id);
+    await deleteSale(id, { cancelledBy: token.username });
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في حذف البيانات', 500, 'sales DELETE');

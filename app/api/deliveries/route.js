@@ -120,7 +120,8 @@ export async function PUT(request) {
       }
     }
 
-    await updateDelivery(parsed.data);
+    // SP-011: pass cancelledBy for audit trail on delivery cancel path
+    await updateDelivery({ ...parsed.data, cancelledBy: token.username });
     return NextResponse.json({ success: true });
   } catch (error) {
     // v1.2 — surface the real error message to help debug confirm-flow
