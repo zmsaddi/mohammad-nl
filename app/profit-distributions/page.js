@@ -23,8 +23,10 @@ function ProfitDistributionsContent() {
   const addToast = useToast();
   const [distributions, setDistributions] = useState([]);
   const [eligibleUsers, setEligibleUsers] = useState([]);
+  const [shareConfig, setShareConfig] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showShareConfig, setShowShareConfig] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -32,7 +34,7 @@ function ProfitDistributionsContent() {
     periodStart: '',
     periodEnd: '',
     notes: '',
-    recipients: [{ username: '', percentage: '' }],
+    recipients: [],
   });
   // v1.1 F-015 — pool holds {total_collected, already_distributed,
   // remaining} matching the F-001 cap math. Pre-v1.1 we only had
@@ -42,14 +44,20 @@ function ProfitDistributionsContent() {
 
   const fetchData = async () => {
     try {
-      const [dRes, uRes] = await Promise.all([
+      const [dRes, uRes, scRes] = await Promise.all([
         fetch('/api/profit-distributions', { cache: 'no-store' }),
         fetch('/api/profit-distributions/eligible-users', { cache: 'no-store' }),
+        fetch('/api/profit-distributions/share-config', { cache: 'no-store' }).catch(() => ({ ok: false })),
       ]);
       const dData = await dRes.json();
       const uData = await uRes.json();
       setDistributions(Array.isArray(dData) ? dData : []);
       setEligibleUsers(Array.isArray(uData) ? uData : []);
+      if (scRes?.ok) {
+        const scData = await scRes.json();
+        const config = (Array.isArray(scData) ? scData : []).filter(u => parseFloat(u.profit_share_pct) > 0);
+        setShareConfig(config);
+      }
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
@@ -97,6 +105,40 @@ function ProfitDistributionsContent() {
   const pctOk = Math.abs(totalPercentage - 100) < 0.01;
   const canSubmit = !submitting && pctOk && baseAmountNum > 0 &&
                     form.recipients.every((r) => r.username && parseFloat(r.percentage) > 0);
+
+  // v1.2 — auto-populate recipients from pre-configured shares
+  const loadFromConfig = () => {
+    if (shareConfig.length === 0) {
+      addToast('لم يتم إعداد نسب الأرباح بعد — أعد النسب أولاً', 'error');
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      recipients: shareConfig.map(u => ({
+        username: u.username,
+        percentage: String(parseFloat(u.profit_share_pct)),
+      })),
+    }));
+  };
+
+  // v1.2 — save share config for a single user
+  const saveSharePct = async (username, pct) => {
+    try {
+      const res = await fetch('/api/profit-distributions/share-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, percentage: pct }),
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        addToast('تم حفظ النسبة');
+        fetchData();
+      } else {
+        const d = await res.json();
+        addToast(d.error || 'خطأ', 'error');
+      }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
 
   const addRecipient = () => {
     setForm((prev) => ({
@@ -193,6 +235,60 @@ function ProfitDistributionsContent() {
         <p>توزيع صافي الربح على المدراء والمشرفين — المبلغ المتاح يساوي المُحصَّل ناقص ما تم توزيعه سابقاً</p>
       </div>
 
+      {/* v1.2 — Share Config: pre-set profit share percentages */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showShareConfig ? '16px' : 0 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
+            ⚙ إعداد نسب الأرباح
+          </h3>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowShareConfig(!showShareConfig)}>
+            {showShareConfig ? '✕ إغلاق' : 'تعديل النسب'}
+          </button>
+        </div>
+        {!showShareConfig && shareConfig.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '8px' }}>
+            {shareConfig.map(u => (
+              <div key={u.username} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                <strong>{u.name || u.username}</strong> — {parseFloat(u.profit_share_pct)}%
+              </div>
+            ))}
+            {(() => {
+              const totalPct = shareConfig.reduce((s, u) => s + parseFloat(u.profit_share_pct || 0), 0);
+              return totalPct !== 100 ? (
+                <div style={{ color: '#dc2626', fontSize: '0.82rem', alignSelf: 'center' }}>
+                  ⚠ المجموع: {totalPct}% (يجب أن يساوي 100%)
+                </div>
+              ) : (
+                <div style={{ color: '#16a34a', fontSize: '0.82rem', alignSelf: 'center' }}>✓ المجموع: 100%</div>
+              );
+            })()}
+          </div>
+        )}
+        {showShareConfig && (
+          <div>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
+              حدد نسبة كل مدير/مشرف. عند إنشاء توزيع جديد، النسب تُعبَّأ تلقائياً.
+            </p>
+            {eligibleUsers.map(u => (
+              <div key={u.username} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{ minWidth: '140px', fontWeight: 600, fontSize: '0.88rem' }}>{u.name || u.username}</span>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', minWidth: '50px' }}>({u.role === 'admin' ? 'مدير' : 'مشرف'})</span>
+                <input
+                  type="number" min="0" max="100" step="any"
+                  defaultValue={(() => {
+                    const found = shareConfig.find(s => s.username === u.username);
+                    return found ? parseFloat(found.profit_share_pct) : 0;
+                  })()}
+                  onBlur={(e) => saveSharePct(u.username, e.target.value)}
+                  style={{ width: '80px', padding: '6px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', textAlign: 'center' }}
+                />
+                <span style={{ fontSize: '0.85rem' }}>%</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="card" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showForm ? '16px' : 0 }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
@@ -201,7 +297,11 @@ function ProfitDistributionsContent() {
           <button
             type="button"
             className={showForm ? 'btn btn-outline btn-sm' : 'btn btn-primary btn-sm'}
-            onClick={() => { if (showForm) resetForm(); setShowForm(!showForm); }}
+            onClick={() => {
+              if (showForm) { resetForm(); }
+              else { loadFromConfig(); } // v1.2 — auto-load shares when opening
+              setShowForm(!showForm);
+            }}
           >
             {showForm ? '✕ إلغاء' : '➕ توزيع جديد'}
           </button>
@@ -395,49 +495,57 @@ function ProfitDistributionsContent() {
             <p>أنشئ أول توزيع من النموذج أعلاه</p>
           </div>
         ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('created_at')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('created_at')}>التاريخ{getSortIndicator('created_at')}</th>
-                  <th onClick={() => requestSort('base_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('base_amount')}>المبلغ الأساسي{getSortIndicator('base_amount')}</th>
-                  <th onClick={() => requestSort('recipients_count')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('recipients_count')}>عدد المستلمين{getSortIndicator('recipients_count')}</th>
-                  <th onClick={() => requestSort('total_distributed')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total_distributed')}>الموزَّع{getSortIndicator('total_distributed')}</th>
-                  <th>الفترة</th>
-                  <th>المستلمون</th>
-                  <th>بواسطة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((d) => (
-                  <tr key={d.group_id}>
-                    <td>{d.created_at ? new Date(d.created_at).toISOString().slice(0, 10) : '—'}</td>
-                    <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(d.base_amount)} €</td>
-                    <td className="number-cell">{d.recipients_count}</td>
-                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(d.total_distributed)} €</td>
-                    <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                      {d.base_period_start || d.base_period_end
-                        ? `${d.base_period_start || '...'} → ${d.base_period_end || '...'}`
-                        : '—'}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.78rem' }}>
-                        {d.recipients.map((r, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'baseline' }}>
-                            <strong style={{ color: '#1a3a2a' }}>{r.username}</strong>
-                            <span style={{ color: '#64748b' }}>({r.percentage}%)</span>
-                            <span style={{ color: '#16a34a', marginRight: 'auto' }}>
-                              {formatNumber(r.amount)} €
-                            </span>
-                          </div>
-                        ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {sortedRows.map((d) => (
+              <div key={d.group_id} style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px',
+              }}>
+                {/* Header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#16a34a' }}>
+                      {formatNumber(d.base_amount)} €
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {d.created_at ? new Date(d.created_at).toISOString().slice(0, 10) : '—'}
+                      {(d.base_period_start || d.base_period_end) && (
+                        <span> — فترة: {d.base_period_start || '...'} → {d.base_period_end || '...'}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>بواسطة: {d.created_by}</div>
+                </div>
+                {/* Recipients detail */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                  {d.recipients.map((r, i) => (
+                    <div key={i} style={{
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '4px' }}>
+                        {r.username}
                       </div>
-                    </td>
-                    <td style={{ fontSize: '0.78rem', color: '#64748b' }}>{d.created_by}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                        <span style={{ color: '#64748b' }}>{r.percentage}%</span>
+                        <span style={{ color: '#16a34a', fontWeight: 700 }}>
+                          {formatNumber(r.amount)} €
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {d.notes && (
+                  <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#64748b' }}>
+                    ملاحظات: {d.notes}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
