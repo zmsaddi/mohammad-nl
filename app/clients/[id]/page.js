@@ -9,6 +9,9 @@ import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+// v1.1 F-016 — read settings.vat_rate and compute TVA via the
+// centralized helper instead of hardcoding `/ 6`. See lib/money.js.
+import { tvaFromTtc } from '@/lib/money';
 
 function ClientDetailContent({ params }) {
   const { id } = use(params);
@@ -24,6 +27,10 @@ function ClientDetailContent({ params }) {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // v1.1 F-016 — VAT rate from settings. Defaults to 20 so the
+  // first render before settings fetch resolves still produces a
+  // sensible preview. Updated by fetchData().
+  const [vatRate, setVatRate] = useState(20);
   // Item 5b: shares state with the admin-side CancelSaleDialog. When set,
   // the dialog opens and drives the /api/sales/[id]/cancel flow.
   const [cancelSaleState, setCancelSaleState] = useState(null);
@@ -41,12 +48,22 @@ function ClientDetailContent({ params }) {
 
   const fetchData = async () => {
     try {
-      const clientsRes = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
+      // v1.1 F-016 — also fetch settings to read vat_rate
+      const [clientsRes, settingsRes] = await Promise.all([
+        fetch('/api/clients?withDebt=true', { cache: 'no-store' }),
+        fetch('/api/settings', { cache: 'no-store' }),
+      ]);
       const clientsData = await clientsRes.json();
       // Bug 1: use(params).id is always a string in Next.js 16, but the
       // JSON response returns c.id as a number. Strict equality needs a
       // coerce or the .find() never matches and the page 404s.
       const found = clientsData.find((c) => c.id === Number(id));
+      // Settings may return 500 or an error object — fall back to 20%.
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json();
+        const r = parseFloat(settings?.vat_rate);
+        if (Number.isFinite(r) && r > 0) setVatRate(r);
+      }
 
       if (found) {
         setClient(found);
@@ -116,7 +133,11 @@ function ClientDetailContent({ params }) {
     parseFloat(s.remaining) > 0.005 &&
     s.payment_status !== 'paid'
   );
-  const tvaPreview = (parseFloat(paymentForm.amount) || 0) / 6;
+  // v1.1 F-016 — read vat_rate from settings (fetched into state)
+  // and compute TVA via the centralized helper. Pre-v1.1 this
+  // hardcoded `/ 6` (the 20% shortcut) which silently broke when
+  // the admin changed the VAT rate in /settings.
+  const tvaPreview = tvaFromTtc(paymentForm.amount, vatRate);
 
   // Item 3 — click-to-sort on both tables. Default sort: newest first.
   const salesSort = useSortedRows(sales, { key: 'date', direction: 'desc' });
@@ -248,7 +269,7 @@ function ClientDetailContent({ params }) {
               </div>
             </div>
             <div style={{ fontSize: '0.8rem', color: '#64748b', margin: '8px 0 12px' }}>
-              TVA المحتسبة (20%): <strong>{formatNumber(tvaPreview)}</strong> €
+              TVA المحتسبة ({vatRate}%): <strong>{formatNumber(tvaPreview)}</strong> €
             </div>
             <button type="submit" className="btn btn-success" disabled={submitting}>
               {submitting ? 'جاري التسجيل...' : 'تسجيل الدفعة'}
