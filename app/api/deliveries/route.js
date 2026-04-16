@@ -123,6 +123,10 @@ export async function PUT(request) {
     await updateDelivery(parsed.data);
     return NextResponse.json({ success: true });
   } catch (error) {
+    // v1.2 — surface the real error message to help debug confirm-flow
+    // failures. The generic fallback hides the actual SQL/business error.
+    // eslint-disable-next-line no-console
+    console.error('[deliveries PUT] full error:', error?.message, error?.stack?.slice(0, 300));
     return apiError(error, 'خطأ في تحديث البيانات', 400, 'deliveries PUT');
   }
 }

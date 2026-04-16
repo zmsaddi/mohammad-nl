@@ -6,7 +6,10 @@ import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const auth = await requireAuth(request, ['admin', 'manager']);
+  // v1.2 fix — any authenticated user can read clients. Sellers need
+  // client names for the sales form, drivers see them on deliveries.
+  // Pre-S4.7 this was open to all auth; the migration over-restricted it.
+  const auth = await requireAuth(request);
   if (auth.error) return auth.error;
   const { token } = auth;
   try {
