@@ -287,8 +287,8 @@ describe('BUG-01c: positive paths still work (letters in standalone position)', 
     expect(out).not.toContain('خمCن');
   });
 
-  it('"دوبل باتري" → "Double Batterie" (multi-word product word still matches)', () => {
-    expect(normalizeArabicText('دوبل باتري')).toContain('Double Batterie');
+  it('"دوبل باتري" → "Double Battery" (multi-word product word still matches)', () => {
+    expect(normalizeArabicText('دوبل باتري')).toContain('Double Battery');
   });
 });
 
