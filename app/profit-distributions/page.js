@@ -34,7 +34,11 @@ function ProfitDistributionsContent() {
     notes: '',
     recipients: [{ username: '', percentage: '' }],
   });
-  const [collectedRevenue, setCollectedRevenue] = useState(null);
+  // v1.1 F-015 — pool holds {total_collected, already_distributed,
+  // remaining} matching the F-001 cap math. Pre-v1.1 we only had
+  // `collectedRevenue` which was misleading because it didn't account
+  // for prior distributions in the same period.
+  const [pool, setPool] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -56,21 +60,33 @@ function ProfitDistributionsContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-fetch collected revenue whenever the period bounds change.
-  // Blank bounds → all-time total. The endpoint accepts optional
-  // query params so either dimension can be missing.
+  // Auto-fetch the full distributable-pool breakdown whenever the
+  // period bounds change. Blank bounds → all-time. The endpoint
+  // accepts optional query params so either dimension can be missing.
+  //
+  // v1.1 F-015 — now fetches {total_collected, already_distributed,
+  // remaining} so the widget below can show the user all three
+  // numbers AND use `remaining` (not total_collected) as the
+  // auto-fill source.
   useEffect(() => {
     if (!form.periodStart && !form.periodEnd) {
-      setCollectedRevenue(null);
+      setPool(null);
       return;
     }
     const url = new URL('/api/profit-distributions/collected-revenue', window.location.origin);
     if (form.periodStart) url.searchParams.set('start', form.periodStart);
     if (form.periodEnd)   url.searchParams.set('end',   form.periodEnd);
     fetch(url.toString(), { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d) => setCollectedRevenue(parseFloat(d.total_collected) || 0))
-      .catch(() => setCollectedRevenue(null));
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d) { setPool(null); return; }
+        setPool({
+          total_collected: parseFloat(d.total_collected) || 0,
+          already_distributed: parseFloat(d.already_distributed) || 0,
+          remaining: parseFloat(d.remaining) || 0,
+        });
+      })
+      .catch(() => setPool(null));
   }, [form.periodStart, form.periodEnd]);
 
   const totalPercentage = form.recipients.reduce(
@@ -101,9 +117,16 @@ function ProfitDistributionsContent() {
       return { ...prev, recipients: next };
     });
   };
-  const useCollectedAsBase = () => {
-    if (collectedRevenue != null) {
-      setForm((prev) => ({ ...prev, baseAmount: collectedRevenue.toFixed(2) }));
+  // v1.1 F-015 — auto-fill now uses `remaining` (the distributable
+  // pool after prior distributions in the period). Pre-v1.1 this
+  // copied `total_collected` which produced the v1.0.3 bug: an admin
+  // who clicked "use as base" twice for the same period got the full
+  // collected amount both times and the second submission created a
+  // 100% over-distribution. `remaining` is what the F-001 cap will
+  // accept at submit time, so what you see is what you get.
+  const useRemainingAsBase = () => {
+    if (pool != null && pool.remaining > 0) {
+      setForm((prev) => ({ ...prev, baseAmount: pool.remaining.toFixed(2) }));
     }
   };
 
@@ -115,8 +138,15 @@ function ProfitDistributionsContent() {
       notes: '',
       recipients: [{ username: '', percentage: '' }],
     });
-    setCollectedRevenue(null);
+    setPool(null);
   };
+
+  // v1.1 F-015 — soft warning if the user types a baseAmount greater
+  // than the remaining pool. The F-001 cap at the write path will
+  // reject the submit, but surfacing the warning at input time saves
+  // a round trip and is less confusing than a 400 Arabic error.
+  const baseAmountNumForCheck = parseFloat(form.baseAmount) || 0;
+  const exceedsPool = pool != null && baseAmountNumForCheck > (pool.remaining + 0.01);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -160,7 +190,7 @@ function ProfitDistributionsContent() {
     <AppLayout>
       <div className="page-header">
         <h2>توزيع الأرباح</h2>
-        <p>توزيع الإيرادات المُحصَّلة على المدراء والمشرفين بالنسبة المئوية</p>
+        <p>توزيع صافي الربح على المدراء والمشرفين — المبلغ المتاح يساوي المُحصَّل ناقص ما تم توزيعه سابقاً</p>
       </div>
 
       <div className="card" style={{ marginBottom: '24px' }}>
@@ -197,7 +227,7 @@ function ProfitDistributionsContent() {
                 />
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label>المبلغ الإجمالي للتوزيع *</label>
+                <label>قاعدة التوزيع (صافي الربح المتاح) *</label>
                 <input
                   type="number"
                   min="0"
@@ -206,29 +236,42 @@ function ProfitDistributionsContent() {
                   onChange={(e) => setForm({ ...form, baseAmount: e.target.value })}
                   placeholder="0"
                   required
+                  style={exceedsPool ? { borderColor: '#dc2626' } : undefined}
                 />
-                {collectedRevenue != null && (
+                {/* v1.1 F-015 — the widget now shows the full pool
+                    breakdown (collected + already distributed + remaining)
+                    instead of just collected. Auto-fill uses `remaining`. */}
+                {pool != null && (
                   <div style={{
                     marginTop: '6px',
-                    padding: '8px 12px',
-                    background: '#dbeafe',
+                    padding: '10px 12px',
+                    background: exceedsPool ? '#fef2f2' : '#dbeafe',
+                    border: exceedsPool ? '1px solid #dc2626' : 'none',
                     borderRadius: '6px',
                     fontSize: '0.8rem',
-                    color: '#1e40af',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    flexWrap: 'wrap',
+                    color: exceedsPool ? '#991b1b' : '#1e40af',
                   }}>
-                    <span>💰 المُحصَّل في هذه الفترة: <strong>{formatNumber(collectedRevenue)} €</strong></span>
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={useCollectedAsBase}
-                      style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                    >
-                      استخدم كأساس
-                    </button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
+                      <span>💰 المُحصَّل في الفترة: <strong>{formatNumber(pool.total_collected)} €</strong></span>
+                      <span>📉 موزع سابقاً: <strong>{formatNumber(pool.already_distributed)} €</strong></span>
+                      <span>✅ المتاح للتوزيع: <strong>{formatNumber(pool.remaining)} €</strong></span>
+                      {pool.remaining > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={useRemainingAsBase}
+                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                        >
+                          استخدم المتاح كأساس
+                        </button>
+                      )}
+                    </div>
+                    {exceedsPool && (
+                      <div style={{ marginTop: '6px', fontWeight: 600 }}>
+                        ⚠ المبلغ المطلوب يتجاوز المتاح للتوزيع لهذه الفترة —
+                        الحد الأقصى: {formatNumber(pool.remaining)} €
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
