@@ -137,7 +137,6 @@ function InvoicesContent() {
                   <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>الدفع{getSortIndicator('payment_type')}</th>
                   <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_status')}>حالة الدفع{getSortIndicator('payment_status')}</th>
                   <th onClick={() => requestSort('vin')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('vin')}>VIN{getSortIndicator('vin')}</th>
-                  <th onClick={() => requestSort('seller_name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('seller_name')}>البائع{getSortIndicator('seller_name')}</th>
                   <th>الفاتورة</th>
                 </tr>
               </thead>
@@ -153,7 +152,6 @@ function InvoicesContent() {
                     <td><StatusBadge status={inv.payment_type || 'كاش'} /></td>
                     <td><StatusBadge status={derivePaymentStatus(inv)} /></td>
                     <td style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
-                    <td>{inv.seller_name}</td>
                     {/* DONE: Step 4 — open the French invoice in a new tab; user prints with Ctrl+P */}
                     <td>
                       <button

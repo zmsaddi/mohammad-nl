@@ -25,6 +25,7 @@ function ClientsContent() {
 
   const [form, setForm] = useState({
     name: '',
+    descriptionAr: '',
     phone: '',
     email: '',
     address: '',
@@ -101,7 +102,7 @@ function ClientsContent() {
   };
 
   const filtered = clients.filter((c) => {
-    if (search && !(c.name?.includes(search) || c.phone?.includes(search))) return false;
+    if (search && !(c.name?.includes(search) || c.description_ar?.includes(search) || c.phone?.includes(search))) return false;
     const debt = parseFloat(c.remainingDebt) || 0;
     if (hasDebtFilter === 'debt' && debt <= 0.005) return false;
     if (hasDebtFilter === 'clear' && debt > 0.005) return false;
@@ -158,12 +159,17 @@ function ClientsContent() {
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="client-name">اسم العميل *</label>
-                <input id="client-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ahmad Ali" required />
-                {/* BUG-5 hotfix: Latin-only hint for French invoice compliance.
-                    Arabic input is still accepted — the backend auto-transliterates. */}
+                <label htmlFor="client-name">اسم العميل (لاتيني — للفاتورة) *</label>
+                <input id="client-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ahmad Ali" required style={{ direction: 'ltr', textAlign: 'right' }} />
                 <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-                  ℹ️ اسم العميل يجب أن يكون بالأحرف اللاتينية للفواتير (مثال: Ahmad, Samir)
+                  يظهر في الفاتورة — يجب أن يكون بالأحرف اللاتينية (مثال: Ahmad, Samir)
+                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="client-desc-ar">الاسم بالعربي (داخلي)</label>
+                <input id="client-desc-ar" type="text" value={form.descriptionAr} onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })} placeholder="أحمد علي" />
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                  للاستخدام الداخلي فقط — لا يظهر في الفاتورة
                 </div>
               </div>
               <div className="form-group">
@@ -238,7 +244,8 @@ function ClientsContent() {
               <thead>
                 <tr>
                   <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>اسم العميل{getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>الاسم (لاتيني){getSortIndicator('name')}</th>
+                  <th onClick={() => requestSort('description_ar')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description_ar')}>الاسم (عربي){getSortIndicator('description_ar')}</th>
                   <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('phone')}>رقم الهاتف{getSortIndicator('phone')}</th>
                   <th onClick={() => requestSort('totalSales')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalSales')}>إجمالي المشتريات{getSortIndicator('totalSales')}</th>
                   <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPaid')}>المدفوع{getSortIndicator('totalPaid')}</th>
@@ -276,6 +283,7 @@ function ClientsContent() {
                         </span>
                       )}
                     </td>
+                    <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{client.description_ar || '—'}</td>
                     <td>{client.phone}</td>
                     <td className="number-cell">{formatNumber(client.totalSales)}</td>
                     <td className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>
