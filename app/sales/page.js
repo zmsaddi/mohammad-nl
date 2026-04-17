@@ -726,7 +726,54 @@ function SalesContent() {
               'ملغي': '#dc2626',
             }}
             actions={(row) => (
-              <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+              <>
+                {/* v1.2 — mobile card parity with desktop table actions.
+                    Pre-v1.2 only the "تفاصيل" button was on mobile, leaving
+                    WhatsApp share, edit, and cancel/delete all desktop-
+                    exclusive. Same permission gates as desktop. */}
+                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: '#25d366', color: 'white' }}
+                  onClick={() => {
+                    const client = clients.find((c) => c.name === row.client_name);
+                    const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, '');
+                    if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
+                    const msg = encodeURIComponent(
+`*Vitesse Eco*
+*الكود:* ${row.ref_code || row.id}
+*المنتج:* ${row.item}
+*الكمية:* ${row.quantity}
+*المبلغ:* ${row.total}
+*الحالة:* ${row.status || 'محجوز'}`
+                    );
+                    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                  }}
+                  title="مشاركة عبر واتساب"
+                >
+                  واتساب
+                </button>
+                {(row.status || 'محجوز') !== 'ملغي' && (
+                  isAdmin || ((!isAdmin) && (role === 'seller' || role === 'manager') && (row.status || 'محجوز') === 'محجوز')
+                ) && (
+                  <button className="btn btn-outline btn-sm" onClick={() => startEditSale(row)}>
+                    تعديل
+                  </button>
+                )}
+                {canCancelSale(row, currentUser) && isAdmin && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
+                  >
+                    حذف
+                  </button>
+                )}
+                {canCancelSale(row, currentUser) && !isAdmin && (
+                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
+                    حذف
+                  </button>
+                )}
+              </>
             )}
             emptyMessage="لا توجد مبيعات"
           />

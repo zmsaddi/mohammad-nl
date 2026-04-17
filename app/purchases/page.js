@@ -576,9 +576,23 @@ function PurchasesContent() {
             }}
             actions={(row) => (
               <>
+                {/* v1.2 — mobile card parity with desktop table actions.
+                    Pre-v1.2 admins on phones could not edit or delete a
+                    purchase — both buttons existed only in the desktop
+                    table's إجراءات column. Same permission gates mirrored. */}
                 <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
                 {row.payment_status && row.payment_status !== 'paid' && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: 'white' }} onClick={() => setPaySupplierState({ purchaseId: row.id, supplier: row.supplier, total: parseFloat(row.total) || 0, currentPaid: parseFloat(row.paid_amount) || 0, amount: '', paymentMethod: 'كاش', notes: '', submitting: false })}>دفع</button>
+                )}
+                {isAdmin && (
+                  <button className="btn btn-outline btn-sm" onClick={() => startEditPurchase(row)}>
+                    تعديل
+                  </button>
+                )}
+                {isAdmin && (
+                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
+                    حذف
+                  </button>
                 )}
               </>
             )}
