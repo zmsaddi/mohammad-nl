@@ -588,6 +588,33 @@ function DeliveriesContent() {
             }}
             actions={(row) => (
               <>
+                {/* v1.2 — status-change select added to mobile card.
+                    Previously only "تفاصيل" / "إلغاء" / "تعيين سائق" buttons
+                    showed on mobile, leaving drivers no way to mark a
+                    delivery as "تم التوصيل" from the phone. The desktop
+                    table has this select in the status column; the card
+                    actions block now mirrors it so mobile parity holds. */}
+                {canChangeStatus && (
+                  <select
+                    value={row.status}
+                    onChange={(e) => handleStatusChange(row, e.target.value)}
+                    style={{
+                      flex: 2,
+                      padding: '6px 10px',
+                      border: 'none',
+                      borderRadius: '20px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      fontFamily: "'Cairo', sans-serif",
+                      cursor: 'pointer',
+                      ...getStatusStyle(row.status),
+                    }}
+                  >
+                    {DELIVERY_STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                )}
                 {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' && (
                   <select
                     value={row.assigned_driver || ''}
