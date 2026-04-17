@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
+import { formatNumber } from '@/lib/utils';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -20,7 +22,7 @@ function SuppliersContent() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/suppliers', { cache: 'no-store' });
+      const res = await fetch('/api/suppliers?withDebt=true', { cache: 'no-store' });
       const data = await res.json();
       setSuppliers(Array.isArray(data) ? data : []);
     } catch {
@@ -169,11 +171,15 @@ function SuppliersContent() {
               fields={[
                 { key: 'name', label: 'الاسم' },
                 { key: 'phone', label: 'الهاتف' },
-                { key: 'address', label: 'العنوان' },
-                { key: 'notes', label: 'ملاحظات' },
+                { key: 'totalPurchases', label: 'إجمالي المشتريات', format: (v) => formatNumber(v) },
+                { key: 'totalPaid', label: 'المدفوع', format: (v) => formatNumber(v) },
+                { key: 'remainingDebt', label: 'الدين المتبقي', format: (v) => formatNumber(v) },
               ]}
               actions={(row) => (
-                <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
+                <>
+                  <Link href={`/suppliers/${row.id}`} className="btn btn-primary btn-sm">تفاصيل</Link>
+                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
+                </>
               )}
               emptyMessage="لا يوجد موردين"
             />
@@ -184,20 +190,22 @@ function SuppliersContent() {
                     <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
                     <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>اسم المورد{getSortIndicator('name')}</th>
                     <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('phone')}>الهاتف{getSortIndicator('phone')}</th>
-                    <th>العنوان</th>
-                    <th>ملاحظات</th>
+                    <th onClick={() => requestSort('totalPurchases')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPurchases')}>إجمالي المشتريات{getSortIndicator('totalPurchases')}</th>
+                    <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPaid')}>المدفوع{getSortIndicator('totalPaid')}</th>
+                    <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remainingDebt')}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
                     <th>إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRows.map((s) => (
-                    <tr key={s.id}>
+                    <tr key={s.id} className="clickable-row" onClick={() => window.location.href = `/suppliers/${s.id}`}>
                       <td>{s.id}</td>
                       <td style={{ fontWeight: 600 }}>{s.name}</td>
                       <td style={{ direction: 'ltr', textAlign: 'right' }}>{s.phone || '—'}</td>
-                      <td>{s.address || '—'}</td>
-                      <td>{s.notes || '—'}</td>
-                      <td>
+                      <td className="number-cell">{formatNumber(s.totalPurchases)}</td>
+                      <td className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(s.totalPaid)}</td>
+                      <td className="number-cell" style={{ color: parseFloat(s.remainingDebt) > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(s.remainingDebt)}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(s.id)}>حذف</button>
                       </td>
                     </tr>

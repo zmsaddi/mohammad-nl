@@ -9,7 +9,8 @@ export async function GET(request) {
   const auth = await requireAuth(request, ['admin', 'manager']);
   if (auth.error) return auth.error;
   try {
-    const rows = await getSuppliers();
+    const { searchParams } = new URL(request.url);
+    const rows = await getSuppliers(searchParams.get('withDebt') === 'true');
     return NextResponse.json(rows);
   } catch (err) {
     return apiError(err, 'خطأ في جلب البيانات', 500, 'suppliers GET');
