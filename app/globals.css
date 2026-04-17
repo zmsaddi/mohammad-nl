@@ -187,7 +187,7 @@ html, body {
   right: 0;
   width: var(--sidebar-width);
   height: 100vh;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+  background: linear-gradient(195deg, #1e2a5a 0%, #0f1a3e 50%, #0a1128 100%);
   color: white;
   padding: 0;
   z-index: 50;
@@ -224,32 +224,25 @@ html, body {
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.8);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: background var(--transition-fast);
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .sidebar-link.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(99, 102, 241, 0.25);
+  color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.sidebar-link svg {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
 }
 
 .sidebar-footer {
@@ -268,15 +261,15 @@ html, body {
 }
 
 .sidebar-user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: 800;
+  font-size: 15px;
 }
 
 .logout-btn {
@@ -1462,10 +1455,11 @@ html, body {
 }
 .sidebar-group-label {
   display: block;
-  padding: 10px 20px 4px;
-  font-size: 0.68rem;
+  padding: 16px 12px 6px;
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.35;
   letter-spacing: 0.05em;
   color: #94a3b8;
   user-select: none;
