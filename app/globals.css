@@ -1576,6 +1576,7 @@ html, body {
   align-items: center;
   gap: 8px;
   margin-top: 16px;
+  height: 60px;
   margin-bottom: 0;
   padding: 0;
   background: none;
@@ -1584,11 +1585,10 @@ html, body {
   position: static;
 }
 .mic-btn {
-  width: 80px;
-  height: 40px;
-  min-width: 80px;
-  max-width: 80px;
-  flex-shrink: 0;
+  flex: 1;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
   padding: 0;
   margin: 0;
   border: 1.5px solid #e2e8f0;
@@ -1607,9 +1607,9 @@ html, body {
 .mic-btn:hover { border-color: #6366f1; }
 .sell-btn {
   flex: 1;
-  height: 40px;
-  min-height: 40px;
-  max-height: 40px;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
   border: none;
   border-radius: 10px;
   background: linear-gradient(135deg, #16a34a, #15803d);
@@ -1631,9 +1631,9 @@ html, body {
 .sell-btn:hover { opacity: 0.9; }
 .buy-btn {
   flex: 1;
-  height: 40px;
-  min-height: 40px;
-  max-height: 40px;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
   border: 1.5px solid #3b82f6;
   border-radius: 10px;
   background: #ffffff;
