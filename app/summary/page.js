@@ -339,46 +339,74 @@ function SummaryContent() {
                 </div>
               )}
 
-              {/* Cash vs Bank — Table Format */}
+              {/* v1.2 — REAL cash-flow table. Replaces the pre-v1.2 "Cash/Bank
+                  Breakdown" that classified sales by declared payment_type — a
+                  credit sale later paid in cash showed 0 in the cash column.
+                  Now reads from payments (clients), supplier_payments
+                  (suppliers), and expenses (with explicit =كاش/=بنك filters).
+                  Sign convention: Sales are inflow (+), Purchases and Expenses
+                  are outflow (−). The bottom row is the net cash movement
+                  per column. */}
               <div className="section-header">
                 <span style={{ fontSize: 18 }}>💳</span>
-                <span>تفصيل نقدي / بنك</span>
+                <span>التدفق النقدي الفعلي — في الفترة المختارة</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 12 }}>
+                أرقام حقيقية من جدول المدفوعات (ليست من طريقة البيع المعلنة) — تشمل تحصيلات ديون سابقة ودفعات موردين جزئية.
               </div>
               <div className="cash-table" style={{ marginBottom: 24 }}>
-                <div className="cash-header">
+                <div className="cash-header" style={{ gridTemplateColumns: '1.3fr 1fr 1fr 1fr' }}>
                   <div className="cash-col"></div>
                   <div className="cash-col cash-col-header"><span style={{ color: '#10b981' }}>●</span> كاش</div>
                   <div className="cash-col cash-col-header"><span style={{ color: 'var(--color-accent)' }}>●</span> بنك</div>
+                  <div className="cash-col cash-col-header">المجموع</div>
                 </div>
                 {[
-                  { label: 'مبيعات', cash: data.salesCash || 0, bank: data.salesBank || 0 },
-                  { label: 'مشتريات', cash: data.purchasesCash || 0, bank: data.purchasesBank || 0 },
-                  { label: 'مصاريف', cash: data.expensesCash || 0, bank: data.expensesBank || 0 },
-                ].map((row, i) => (
-                  <div key={i} className="cash-row" style={{ background: i % 2 === 0 ? 'rgba(99,102,241,0.03)' : 'transparent' }}>
-                    <div className="cash-col cash-col-label">{row.label}</div>
-                    <div className="cash-col">
-                      {row.cash > 0
-                        ? <span className="cash-highlight">{formatNumber(row.cash)}</span>
-                        : <span className="cash-zero">—</span>}
+                  { label: 'تحصيلات من عملاء', cash: data.cashFlowSalesCash || 0, bank: data.cashFlowSalesBank || 0, sign: '+' },
+                  { label: 'دفعات للموردين', cash: data.cashFlowPurchasesCash || 0, bank: data.cashFlowPurchasesBank || 0, sign: '−' },
+                  { label: 'مصاريف', cash: data.cashFlowExpensesCash || 0, bank: data.cashFlowExpensesBank || 0, sign: '−' },
+                ].map((row, i) => {
+                  const rowTotal = row.cash + row.bank;
+                  const outflow = row.sign === '−';
+                  return (
+                    <div key={i} className="cash-row" style={{ background: i % 2 === 0 ? 'rgba(99,102,241,0.03)' : 'transparent', gridTemplateColumns: '1.3fr 1fr 1fr 1fr' }}>
+                      <div className="cash-col cash-col-label">
+                        {outflow && <span style={{ color: '#dc2626', marginLeft: 4 }}>−</span>}
+                        {row.label}
+                      </div>
+                      <div className="cash-col">
+                        {row.cash > 0
+                          ? <span className="cash-highlight" style={{ color: outflow ? '#dc2626' : '#10b981' }}>{formatNumber(row.cash)}</span>
+                          : <span className="cash-zero">—</span>}
+                      </div>
+                      <div className="cash-col">
+                        {row.bank > 0
+                          ? <span style={{ fontWeight: 700, color: outflow ? '#dc2626' : 'var(--color-accent)' }}>{formatNumber(row.bank)}</span>
+                          : <span className="cash-zero">—</span>}
+                      </div>
+                      <div className="cash-col">
+                        {rowTotal > 0
+                          ? <span style={{ fontWeight: 700, color: outflow ? '#dc2626' : '#334155' }}>{formatNumber(rowTotal)}</span>
+                          : <span className="cash-zero">—</span>}
+                      </div>
                     </div>
-                    <div className="cash-col">
-                      {row.bank > 0
-                        ? <span style={{ fontWeight: 700 }}>{formatNumber(row.bank)}</span>
-                        : <span className="cash-zero">—</span>}
-                    </div>
-                  </div>
-                ))}
-                <div className="cash-total-row">
-                  <div className="cash-col" style={{ fontWeight: 700 }}>الإجمالي</div>
+                  );
+                })}
+                <div className="cash-total-row" style={{ gridTemplateColumns: '1.3fr 1fr 1fr 1fr' }}>
+                  <div className="cash-col" style={{ fontWeight: 700 }}>صافي التدفق</div>
                   <div className="cash-col">
-                    <span style={{ fontWeight: 700, color: '#10b981' }}>
-                      {formatNumber((data.salesCash || 0) + (data.purchasesCash || 0) + (data.expensesCash || 0))}
+                    <span style={{ fontWeight: 800, color: (data.cashFlowNetCash || 0) >= 0 ? '#10b981' : '#dc2626' }}>
+                      {formatNumber(data.cashFlowNetCash || 0)}
                     </span>
                   </div>
                   <div className="cash-col">
-                    <span style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
-                      {formatNumber((data.salesBank || 0) + (data.purchasesBank || 0) + (data.expensesBank || 0))}
+                    <span style={{ fontWeight: 800, color: (data.cashFlowNetBank || 0) >= 0 ? 'var(--color-accent)' : '#dc2626' }}>
+                      {formatNumber(data.cashFlowNetBank || 0)}
+                    </span>
+                  </div>
+                  <div className="cash-col">
+                    <span style={{ fontWeight: 800, color: ((data.cashFlowNetCash || 0) + (data.cashFlowNetBank || 0)) >= 0 ? '#1e293b' : '#dc2626' }}>
+                      {formatNumber((data.cashFlowNetCash || 0) + (data.cashFlowNetBank || 0))}
                     </span>
                   </div>
                 </div>
