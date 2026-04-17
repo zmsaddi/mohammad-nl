@@ -445,6 +445,8 @@ function UsersContent() {
         isOpen={!!toggleTarget}
         title="تغيير حالة المستخدم"
         message="هل أنت متأكد من تغيير حالة هذا المستخدم (تفعيل / تعطيل)؟"
+        confirmText="نعم، تغيير"
+        confirmClass="btn-primary"
         onConfirm={() => handleToggle(toggleTarget)}
         onCancel={() => setToggleTarget(null)}
       />
@@ -452,6 +454,8 @@ function UsersContent() {
         isOpen={confirmSettings}
         title="حفظ إعدادات العمولة"
         message="سيتم تحديث إعدادات العمولة لجميع المبيعات المستقبلية. هل أنت متأكد؟"
+        confirmText="نعم، حفظ"
+        confirmClass="btn-primary"
         onConfirm={handleSaveSettings}
         onCancel={() => setConfirmSettings(false)}
       />
