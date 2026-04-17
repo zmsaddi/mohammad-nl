@@ -661,7 +661,16 @@ function DeliveriesContent() {
                         row.assigned_driver || row.driver_name || '-'
                       )}
                     </td>
-                    <td>
+                    {/* v1.2 — status-change cell now stops click propagation.
+                        Without this, tapping the select bubbled up to the
+                        row's onClick, which opens setSelectedRow(row) — the
+                        DetailModal then rendered on top BEFORE the native
+                        dropdown could even open, so drivers saw the select
+                        "keep closing without letting me pick". The
+                        driver-assign select on the previous cell already
+                        had e.stopPropagation; this one was missed. Same
+                        treatment now. */}
+                    <td onClick={(e) => e.stopPropagation()}>
                       {canChangeStatus ? (
                       <select
                         value={row.status}
@@ -685,7 +694,7 @@ function DeliveriesContent() {
                         <span className="status-badge" style={getStatusStyle(row.status)}>{row.status}</span>
                       )}
                     </td>
-                    <td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       {isAdmin && row.status !== 'ملغي' && (
                         <button
                           className="btn btn-danger btn-sm"
