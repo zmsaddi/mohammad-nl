@@ -185,6 +185,7 @@ function SalesContent() {
   const startEditSale = (row) => {
     setEditSale(row);
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setDownPaymentTouched(true); // prevent reactive default from clobbering
     setForm({
       date: row.date || getTodayDate(),

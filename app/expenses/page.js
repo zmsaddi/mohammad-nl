@@ -77,6 +77,7 @@ function ExpensesContent() {
   const startEditExpense = (row) => {
     setEditExpense(row);
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setForm({
       date: row.date || getTodayDate(),
       category: row.category || '',

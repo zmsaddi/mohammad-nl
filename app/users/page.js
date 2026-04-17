@@ -144,7 +144,7 @@ function UsersContent() {
   const rateUsernames = new Set((bonusRates || []).map((r) => r.username));
   const usersWithoutRate = overridableUsers.filter((u) => !rateUsernames.has(u.username));
 
-  const startEdit = (u) => { setEditUser(u); setForm({ username: u.username, password: '', name: u.name, role: u.role }); setShowForm(true); };
+  const startEdit = (u) => { setEditUser(u); setForm({ username: u.username, password: '', name: u.name, role: u.role }); setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const getRoleLabel = (role) => {
     const r = ROLES.find((rl) => rl.value === role);

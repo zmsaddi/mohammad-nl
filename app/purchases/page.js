@@ -131,6 +131,7 @@ function PurchasesContent() {
   const startEditPurchase = (row) => {
     setEditPurchase(row);
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     const product = products.find((p) => p.name === row.item);
     setForm({
       date: row.date || getTodayDate(),

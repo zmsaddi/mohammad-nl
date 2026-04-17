@@ -206,9 +206,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Overlay to close sidebar on mobile */}
-      {isOpen && <div className="sidebar-overlay open" onClick={() => setIsOpen(false)} />}
-
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h1>Vitesse Eco</h1>
@@ -255,6 +252,9 @@ export default function Sidebar() {
           </button>
         </div>
       </aside>
+
+      {/* Overlay AFTER sidebar — CSS sibling selector + .open class both work */}
+      {isOpen && <div className="sidebar-overlay open" onClick={() => setIsOpen(false)} />}
     </>
   );
 }

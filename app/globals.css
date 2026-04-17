@@ -986,7 +986,7 @@ html, body {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
-  z-index: 45;
+  z-index: 55;
 }
 
 /* ===== TABLET (768px - 1024px) ===== */
@@ -1090,6 +1090,18 @@ html, body {
   .card {
     padding: 16px;
     border-radius: 12px;
+  }
+
+  /* Modals: full-width on mobile, scrollable */
+  .modal, .detail-modal {
+    width: 95vw;
+    max-width: 95vw;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    margin-top: 56px;
+  }
+  .modal-overlay {
+    align-items: flex-start;
   }
 
   /* Forms: single column */
