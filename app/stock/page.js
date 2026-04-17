@@ -17,9 +17,18 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 function StockContent() {
   const { data: session } = useSession();
   const addToast = useToast();
-  const isAdmin = session?.user?.role === 'admin';
+  const role = session?.user?.role;
+  const isAdmin = role === 'admin';
   // DONE: Bug 4 — only admin/manager may see cost data
-  const canSeeCosts = ['admin', 'manager'].includes(session?.user?.role);
+  const canSeeCosts = ['admin', 'manager'].includes(role);
+  // v1.2 — seller-scoped view. A seller uses this page to answer one
+  // question: "can I promise this item to the customer right now?" They
+  // don't need total-stock counts, inventory value, low-stock alerts
+  // (management's concern), the ID column, the per-product threshold
+  // field, or any edit/delete controls. Everything below branches on
+  // this flag so the page becomes a focused "what's available to sell"
+  // list when a seller lands on it.
+  const isSeller = role === 'seller';
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -160,10 +169,10 @@ function StockContent() {
     <AppLayout>
       <div className="page-header">
         <h2>المخزون</h2>
-        <p>جرد المنتجات والكميات المتاحة</p>
+        <p>{isSeller ? 'المنتجات المتاحة للبيع وأسعارها' : 'جرد المنتجات والكميات المتاحة'}</p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — v1.2 sellers see a focused "what can I sell?" view */}
       <div className="summary-cards" style={{ marginBottom: '24px' }}>
         <div className="summary-card">
           <div className="summary-card-icon" style={{ background: '#dbeafe' }}>
@@ -174,15 +183,31 @@ function StockContent() {
             <div className="value">{totalProducts}</div>
           </div>
         </div>
-        <div className="summary-card">
-          <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L12 12.75l-5.571-3m11.142 0l4.179 2.25L12 17.25l-9.75-5.25 4.179-2.25m11.142 0l4.179 2.25L12 21.75l-9.75-5.25 4.179-2.25" /></svg>
+        {/* Hide total-pieces count for sellers — it's a warehouse metric,
+            not a selling metric. Replace with an "available to sell" count. */}
+        {isSeller ? (
+          <div className="summary-card">
+            <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div className="summary-card-content">
+              <h3>متاح للبيع</h3>
+              <div className="value" style={{ color: '#16a34a' }}>
+                {products.filter((p) => (parseFloat(p.stock) || 0) > 0).length}
+              </div>
+            </div>
           </div>
-          <div className="summary-card-content">
-            <h3>إجمالي القطع</h3>
-            <div className="value" style={{ color: '#16a34a' }}>{formatNumber(totalStock)}</div>
+        ) : (
+          <div className="summary-card">
+            <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L12 12.75l-5.571-3m11.142 0l4.179 2.25L12 17.25l-9.75-5.25 4.179-2.25m11.142 0l4.179 2.25L12 21.75l-9.75-5.25 4.179-2.25" /></svg>
+            </div>
+            <div className="summary-card-content">
+              <h3>إجمالي القطع</h3>
+              <div className="value" style={{ color: '#16a34a' }}>{formatNumber(totalStock)}</div>
+            </div>
           </div>
-        </div>
+        )}
         {/* DONE: Bug 4 — hide entire inventory-value card from sellers */}
         {canSeeCosts && (
           <div className="summary-card">
@@ -195,24 +220,31 @@ function StockContent() {
             </div>
           </div>
         )}
-        <div className="summary-card">
-          <div className="summary-card-icon" style={{ background: lowStock > 0 || outOfStock > 0 ? '#fee2e2' : '#dcfce7' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={outOfStock > 0 ? '#dc2626' : '#16a34a'} width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-          </div>
-          <div className="summary-card-content">
-            <h3>تنبيهات</h3>
-            <div style={{ fontSize: '0.85rem' }}>
-              {totalProducts === 0 && <div style={{ color: '#94a3b8', fontWeight: 600 }}>لا توجد منتجات</div>}
-              {totalProducts > 0 && outOfStock > 0 && <div style={{ color: '#dc2626', fontWeight: 600 }}>{outOfStock} نفذ</div>}
-              {totalProducts > 0 && lowStock > 0 && <div style={{ color: '#f59e0b', fontWeight: 600 }}>{lowStock} مخزون منخفض</div>}
-              {totalProducts > 0 && outOfStock === 0 && lowStock === 0 && <div style={{ color: '#16a34a', fontWeight: 600 }}>كل شيء متوفر</div>}
+        {/* Alerts card: hidden for sellers (restocking is management's concern).
+            The per-row "نفذ" badge still shows sellers which products are
+            unavailable — they don't need a separate aggregate card. */}
+        {!isSeller && (
+          <div className="summary-card">
+            <div className="summary-card-icon" style={{ background: lowStock > 0 || outOfStock > 0 ? '#fee2e2' : '#dcfce7' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={outOfStock > 0 ? '#dc2626' : '#16a34a'} width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+            </div>
+            <div className="summary-card-content">
+              <h3>تنبيهات</h3>
+              <div style={{ fontSize: '0.85rem' }}>
+                {totalProducts === 0 && <div style={{ color: '#94a3b8', fontWeight: 600 }}>لا توجد منتجات</div>}
+                {totalProducts > 0 && outOfStock > 0 && <div style={{ color: '#dc2626', fontWeight: 600 }}>{outOfStock} نفذ</div>}
+                {totalProducts > 0 && lowStock > 0 && <div style={{ color: '#f59e0b', fontWeight: 600 }}>{lowStock} مخزون منخفض</div>}
+                {totalProducts > 0 && outOfStock === 0 && lowStock === 0 && <div style={{ color: '#16a34a', fontWeight: 600 }}>كل شيء متوفر</div>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* DONE: Step 5 — low/out stock alert banner. Click-through filters the table */}
-      {(lowStock > 0 || outOfStock > 0) && (
+      {/* Low/out stock alert banner — hidden for sellers (restocking alert,
+          not a selling alert). Sellers still see out-of-stock rows marked
+          with the red "نفذ" badge and row tint. */}
+      {!isSeller && (lowStock > 0 || outOfStock > 0) && (
         <div style={{
           background: outOfStock > 0 ? '#fef2f2' : '#fffbeb',
           border: `1px solid ${outOfStock > 0 ? '#fca5a5' : '#fcd34d'}`,
@@ -325,7 +357,10 @@ function StockContent() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
+                    {/* v1.2 — hide the internal "#" (DB id) column from sellers.
+                        Useful for admin audit, noise for sellers scanning for
+                        what to quote a customer. */}
+                    {!isSeller && <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>}
                     <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>المنتج (لاتيني){getSortIndicator('name')}</th>
                     <th onClick={() => requestSort('description_ar')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description_ar')}>الوصف (عربي){getSortIndicator('description_ar')}</th>
                     <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
@@ -351,7 +386,7 @@ function StockContent() {
                     const statusLabel = status === 'out' ? 'نفذ' : status === 'low' ? 'منخفض' : 'متوفر';
                     return (
                       <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
-                        <td>{p.id}</td>
+                        {!isSeller && <td>{p.id}</td>}
                         <td style={{ fontWeight: 600 }}>{p.name}</td>
                         <td onClick={(e) => e.stopPropagation()}>
                           {isAdmin ? (
@@ -459,9 +494,14 @@ function StockContent() {
                   })}
                 </tbody>
                 <tfoot>
-                  {/* DONE: Step 2 — colspan recomputed for the new "حد التنبيه" admin-only column */}
+                  {/* v1.2 — colspan recomputed across three axes:
+                        - id column: seller hidden (-1)
+                        - buy_price + value columns: canSeeCosts (+0 or +2)
+                        - threshold column: admin only (+1)
+                      Base columns up to "الكمية" = id + name + desc + category
+                      + sell_price = 5 (or 4 when id is hidden for seller). */}
                   <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                    <td colSpan={(canSeeCosts ? 4 : 3) + (isAdmin ? 1 : 0)} style={{ textAlign: 'center' }}>الإجمالي</td>
+                    <td colSpan={(isSeller ? 3 : 4) + (canSeeCosts ? 1 : 0) + (isAdmin ? 1 : 0)} style={{ textAlign: 'center' }}>الإجمالي</td>
                     <td className="number-cell">{formatNumber(totalStock)}</td>
                     {canSeeCosts && <td className="number-cell" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</td>}
                     <td colSpan={isAdmin ? 2 : 1}></td>
