@@ -34,7 +34,7 @@ describe('BUG-02: forced-error logging on /api/bonuses', () => {
     vi.clearAllMocks();
   });
 
-  it('catches a thrown DB error, logs with [bonuses] GET: prefix, returns 500', async () => {
+  it('catches a thrown DB error, logs with [bonuses GET] prefix, returns 500', async () => {
     // Dynamic import so the vi.mock() calls above take effect on the
     // route's dependency graph before it resolves.
     const { GET } = await import('../app/api/bonuses/route.js');
@@ -50,12 +50,15 @@ describe('BUG-02: forced-error logging on /api/bonuses', () => {
     const body = await response.json();
     expect(body.error).toBe('خطأ في جلب البيانات');
 
-    // The forced error must have been logged with the canonical
-    // [<route-name>] <METHOD>: prefix the BUG-02 rewrite introduced.
+    // v1.1 S4.7 F-057 unified the logging surface via lib/api-errors.js.
+    // The pre-F-057 test expected `console.error('[bonuses] GET:', Error)`
+    // (two args). The new helper formats the prefix + message as a single
+    // interpolated string, so the assertion now checks for that single
+    // argument containing both the '[bonuses GET]' prefix and the forced
+    // error message. See lib/api-errors.js:38 for the log template.
     expect(errorSpy).toHaveBeenCalled();
     const firstCall = errorSpy.mock.calls[0];
-    expect(firstCall[0]).toBe('[bonuses] GET:');
-    expect(firstCall[1]).toBeInstanceOf(Error);
-    expect(firstCall[1].message).toBe('forced DB failure (BUG-02 test)');
+    expect(firstCall[0]).toContain('[bonuses GET]');
+    expect(firstCall[0]).toContain('forced DB failure (BUG-02 test)');
   });
 });

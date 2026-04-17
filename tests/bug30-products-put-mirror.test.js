@@ -144,6 +144,7 @@ describe('BUG-30: /api/products PUT mirror check', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('معرف');
+    // schemas.js:230 uses 'معرّف' (with shadda) — match the exact char.
+    expect(body.error).toContain('معرّف');
   });
 });
