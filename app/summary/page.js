@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 import Link from 'next/link';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
@@ -135,22 +135,28 @@ function SummaryContent() {
     ? ((data.netProfit / data.totalRevenue) * 100).toFixed(1)
     : '0';
 
-  // DONE: Step 8 — category breakdown computed from the product list
+  // v1.2 — category breakdown now iterates the ACTUAL product rows instead
+  // of the fixed PRODUCT_CATEGORIES list. Pre-v1.2 any product whose
+  // category was NULL, empty, or typed differently (e.g. legacy data or a
+  // voice-entry typo) was silently excluded from the breakdown — yet it
+  // still contributed to `inventoryValue` on the KPI card, so the card and
+  // the breakdown didn't add up. Unknown/blank categories now fall into
+  // "غير مصنّف" so the breakdown sum = inventoryValue by construction.
   const categoryBreakdown = canSeeCosts
-    ? PRODUCT_CATEGORIES.map((cat) => {
-        const items = productList.filter((p) => p.category === cat);
-        return {
-          category: cat,
-          count: items.length,
-          // ARC-06: NUMERIC columns arrive as strings. `!p.stock` would be
-          // true for null but FALSE for "0.00" (non-empty string is truthy),
-          // so the outCount filter uses a numeric comparison instead.
-          totalStock: items.reduce((s, p) => s + (parseFloat(p.stock) || 0), 0),
-          totalValue: items.reduce((s, p) => s + ((parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0)), 0),
-          lowCount: items.filter((p) => (parseFloat(p.stock) || 0) > 0 && (parseFloat(p.stock) || 0) <= (p.low_stock_threshold ?? 3)).length,
-          outCount: items.filter((p) => (parseFloat(p.stock) || 0) <= 0).length,
-        };
-      }).filter((c) => c.count > 0)
+    ? Object.values(productList.reduce((acc, p) => {
+        const raw = (p.category || '').trim();
+        const cat = raw === '' ? 'غير مصنّف' : raw;
+        if (!acc[cat]) {
+          acc[cat] = { category: cat, count: 0, totalStock: 0, totalValue: 0, lowCount: 0, outCount: 0 };
+        }
+        const stock = parseFloat(p.stock) || 0;
+        acc[cat].count++;
+        acc[cat].totalStock += stock;
+        acc[cat].totalValue += stock * (parseFloat(p.buy_price) || 0);
+        if (stock > 0 && stock <= (p.low_stock_threshold ?? 3)) acc[cat].lowCount++;
+        if (stock <= 0) acc[cat].outCount++;
+        return acc;
+      }, {})).sort((a, b) => b.totalValue - a.totalValue)
     : [];
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
