@@ -447,12 +447,58 @@ function SummaryContent() {
           {/* ===== Tab 2: الأرباح والخسائر — P&L detailed cards ===== */}
           {activeTab === 'pnl' && (
             <>
-          {/* Accounting P&L Cards */}
-          <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#1e293b' }}>
-              قائمة الأرباح والخسائر (استحقاق)
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, marginRight: '8px' }}>(المبيعات المؤكدة بعد التوصيل فقط)</span>
+          {/* v1.2 — PROJECTED (Pipeline) P&L. Reserved + confirmed. Shown
+              first because it's the most optimistic view — users see the
+              "big picture" then drill into realized (accrual) then in-hand
+              (cash-basis). Bonus line marked "لم تُحسب" for reserved
+              portion per decision A in the fix plan. */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #8b5cf6' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#6d28d9' }}>
+              📊 الأرباح والخسائر — المتوقعة (Pipeline)
             </h3>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
+              محجوز + مؤكد — مؤشر تقديري، قابل للتغير مع الإلغاءات. عمولات الطلبات المحجوزة غير مدرجة (تُنشأ عند التوصيل).
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 500 }}>إيرادات متوقعة ({(data.confirmedCount || 0) + (data.reservedCount || 0)})</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#5b21b6' }}>{formatNumber(data.projectedRevenue || 0)}</div>
+                <div style={{ fontSize: '0.7rem', color: '#8b5cf6', marginTop: '4px' }}>
+                  محجوز: {formatNumber(data.reservedRevenue || 0)} • مؤكد: {formatNumber(data.totalRevenue || 0)}
+                </div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>COGS متوقع</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.projectedCOGS || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#f3e8ff', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#7e22ce', fontWeight: 500 }}>الربح الإجمالي المتوقع</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.projectedGrossProfit || 0) >= 0 ? '#7e22ce' : '#dc2626' }}>{formatNumber(data.projectedGrossProfit || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center', position: 'relative' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>عمولات (المؤكد فقط)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalBonusCost || 0)}</div>
+                <div style={{ fontSize: '0.65rem', color: '#dc2626', marginTop: '4px' }}>⚠ لا تشمل المحجوز</div>
+              </div>
+              <div style={{ padding: '16px', background: (data.projectedNetProfit || 0) >= 0 ? '#ede9fe' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>
+                <div style={{ fontSize: '0.8rem', color: (data.projectedNetProfit || 0) >= 0 ? '#6d28d9' : '#dc2626', fontWeight: 500 }}>صافي الربح المتوقع</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Accounting P&L Cards */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #3b82f6' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#1e293b' }}>
+              📘 الأرباح والخسائر — بعد التسليم (استحقاق)
+            </h3>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, marginBottom: '16px' }}>
+              اعتراف بالإيراد عند تسليم البضاعة — المعيار المحاسبي الدولي. يشمل المبيعات المؤكدة فقط.
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة (استحقاق) ({data.confirmedCount || 0})</div>
@@ -495,10 +541,10 @@ function SummaryContent() {
               both "what I booked" and "what I actually collected". */}
           <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #0ea5e9' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#0369a1' }}>
-              قائمة الأرباح والخسائر (محصّل)
+              💰 الأرباح والخسائر — المحصّل نقداً
             </h3>
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
-              (المبيعات المحصّلة بالكامل فقط — الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل)
+              اعتراف بالإيراد عند استلام المال كاملاً — المبيعات المدفوعة 100% فقط. الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '12px', textAlign: 'center' }}>
