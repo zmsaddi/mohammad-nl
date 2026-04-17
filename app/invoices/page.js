@@ -58,8 +58,14 @@ function InvoicesContent() {
   // PA-03 — pagination
   const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
 
-  // UX-08 — derive payment status from payment_type when payment_status not provided by API
+  // v1.2 — derivePaymentStatus now checks invoice.status FIRST. Pre-v1.2
+  // a cancelled invoice (status='ملغي', set by cancelSale step 9) would
+  // be displayed as "مدفوع"/"جزئي"/"معلق" depending on payment_type —
+  // wrong in every case, because the transaction no longer stands.
+  // getInvoices returns the full row via SELECT *, so `inv.status` is
+  // present when cancelSale soft-voided the invoice.
   const derivePaymentStatus = (inv) => {
+    if (inv.status === 'ملغي') return 'ملغي';
     if (inv.payment_status) return inv.payment_status;
     if (inv.payment_type === 'آجل') {
       if (inv.remaining != null && Number(inv.remaining) <= 0) return 'مدفوع';
