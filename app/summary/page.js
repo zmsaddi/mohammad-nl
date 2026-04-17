@@ -527,6 +527,11 @@ function SummaryContent() {
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, marginBottom: '16px' }}>
               اعتراف بالإيراد عند تسليم البضاعة — المعيار المحاسبي الدولي. يشمل المبيعات المؤكدة فقط.
             </div>
+            {(data.bonusSettledOutsideWindow || 0) > 0.005 && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, fontSize: '0.75rem', color: '#92400e' }}>
+                ℹ️ ملاحظة: عمولات بقيمة {formatNumber(data.bonusSettledOutsideWindow)}€ مستحقة في هذه الفترة لكن تسويتها تمت خارجها — غير مدرجة في هذا الحساب. اختر فترة أوسع لرؤية الصورة الكاملة.
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة (استحقاق) ({data.confirmedCount || 0})</div>
