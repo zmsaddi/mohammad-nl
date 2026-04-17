@@ -520,9 +520,9 @@ html, body {
 }
 
 .data-table .number-cell {
+  direction: ltr;
   text-align: right;
   font-weight: 500;
-  unicode-bidi: plaintext;
 }
 
 .data-table .status-badge {
