@@ -369,7 +369,7 @@ function PurchasesContent() {
                   const existing = products.find((p) => p.name === val);
                   setForm({ ...form, item: val, descriptionAr: existing?.description_ar || form.descriptionAr, category: existing?.category || form.category });
                 }}
-                options={products.map((p) => ({ name: p.name, value: p.name, label: p.name, sub: `مخزون: ${p.stock || 0}` }))}
+                options={products.map((p) => ({ name: p.name, value: p.name, label: p.description_ar ? `${p.name} — ${p.description_ar}` : p.name, sub: `مخزون: ${p.stock || 0}` }))}
                 placeholder="اكتب اسم المنتج..."
                 allowNew
                 newLabel="منتج جديد"

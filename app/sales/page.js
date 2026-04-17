@@ -463,14 +463,14 @@ function SalesContent() {
                 {/* DONE: Bug 3 — never expose buy_price (cost) in seller's product dropdown */}
                 {products.filter((p) => p.stock > 0).map((p) => (
                   <option key={p.id} value={p.name}>
-                    {p.name} (متاح: {p.stock}{canSeeCosts ? ` | تكلفة: ${p.buy_price}` : ''})
+                    {p.name}{p.description_ar ? ` — ${p.description_ar}` : ''} (متاح: {p.stock}{canSeeCosts ? ` | تكلفة: ${p.buy_price}` : ''})
                   </option>
                 ))}
                 {products.filter((p) => !p.stock || p.stock <= 0).length > 0 && (
                   <optgroup label="-- نفذ المخزون --">
                     {products.filter((p) => !p.stock || p.stock <= 0).map((p) => (
                       <option key={p.id} value={p.name} disabled style={{ color: '#999' }}>
-                        {p.name} (نفذ)
+                        {p.name}{p.description_ar ? ` — ${p.description_ar}` : ''} (نفذ)
                       </option>
                     ))}
                   </optgroup>
