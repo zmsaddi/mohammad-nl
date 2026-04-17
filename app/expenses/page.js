@@ -45,7 +45,7 @@ function ExpensesContent() {
     try {
       const res = await fetch('/api/expenses', { cache: 'no-store' });
       const data = await res.json();
-      setRows(Array.isArray(data) ? data.reverse() : []);
+      setRows(Array.isArray(data) ? data : []);
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {

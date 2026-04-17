@@ -82,7 +82,7 @@ function PurchasesContent() {
       const purchasesData = await purchasesRes.json();
       const productsData = await productsRes.json();
       const suppliersData = await suppliersRes.json();
-      setRows(Array.isArray(purchasesData) ? purchasesData.reverse() : []);
+      setRows(Array.isArray(purchasesData) ? purchasesData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
     } catch {

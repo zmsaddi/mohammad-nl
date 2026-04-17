@@ -135,7 +135,7 @@ function DeliveriesContent() {
         const usersData = await usersRes.json();
         setDrivers((Array.isArray(usersData) ? usersData : []).filter(u => u.role === 'driver' && u.active));
       }
-      setRows(Array.isArray(deliveriesData) ? deliveriesData.reverse() : []);
+      setRows(Array.isArray(deliveriesData) ? deliveriesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
@@ -274,10 +274,18 @@ function DeliveriesContent() {
     if (filterDriver !== 'all' && (r.assigned_driver || '') !== filterDriver) return false;
     return true;
   });
-  // Item 3 — click-to-sort, default to newest first
+  // Smart sort: pending/in-transit first, then by date newest
+  const STATUS_PRIORITY = { 'قيد الانتظار': 0, 'جاري التوصيل': 1, 'تم التوصيل': 2, 'ملغي': 3 };
+  const smartFiltered = [...filtered].sort((a, b) => {
+    const pa = STATUS_PRIORITY[a.status] ?? 9;
+    const pb = STATUS_PRIORITY[b.status] ?? 9;
+    if (pa !== pb) return pa - pb;
+    if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+    return (b.id || 0) - (a.id || 0);
+  });
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
-    filtered,
-    { key: 'date', direction: 'desc' }
+    smartFiltered,
+    { key: null, direction: null }
   );
   // PA-03: Pagination
   const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);

@@ -142,7 +142,7 @@ function SalesContent() {
       const salesData = await results[0].json();
       const clientsData = await results[1].json();
       const productsData = await results[2].json();
-      setRows(Array.isArray(salesData) ? salesData.reverse() : []);
+      setRows(Array.isArray(salesData) ? salesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
       if (isSeller && results[3]) setBonusSettings(await results[3].json());

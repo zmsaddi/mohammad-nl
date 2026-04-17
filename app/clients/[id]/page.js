@@ -73,8 +73,8 @@ function ClientDetailContent({ params }) {
         ]);
         const salesData = await salesRes.json();
         const paymentsData = await paymentsRes.json();
-        setSales(Array.isArray(salesData) ? salesData.reverse() : []);
-        setPayments(Array.isArray(paymentsData) ? paymentsData.reverse() : []);
+        setSales(Array.isArray(salesData) ? salesData : []);
+        setPayments(Array.isArray(paymentsData) ? paymentsData : []);
       }
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
