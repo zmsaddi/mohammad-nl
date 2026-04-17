@@ -334,15 +334,15 @@ function ExpensesContent() {
               <tbody>
                 {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td>{row.id}</td>
-                    <td>{row.date}</td>
-                    <td><span className="status-badge status-credit">{row.category}</span></td>
-                    <td>{row.description}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
-                    <td><StatusBadge status={row.payment_type || 'كاش'} /></td>
-                    <td>{row.notes}</td>
+                    <td data-label="#">{row.id}</td>
+                    <td data-label="التاريخ">{row.date}</td>
+                    <td data-label="الفئة"><span className="status-badge status-credit">{row.category}</span></td>
+                    <td data-label="الوصف">{row.description}</td>
+                    <td data-label="المبلغ" className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
+                    <td data-label="الدفع"><StatusBadge status={row.payment_type || 'كاش'} /></td>
+                    <td data-label="ملاحظات">{row.notes}</td>
                     {isAdmin && (
-                      <td>
+                      <td data-label="إجراءات">
                         <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
                           <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditExpense(row); }}>
                             تعديل

@@ -406,11 +406,11 @@ function SummaryContent() {
                       <tbody>
                         {data.recentDeliveries.map((d, i) => (
                           <tr key={i}>
-                            <td>{d.date}</td>
-                            <td style={{ fontWeight: 600 }}>{d.client_name}</td>
-                            <td>{d.address}</td>
-                            <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
-                            <td>
+                            <td data-label="التاريخ">{d.date}</td>
+                            <td data-label="العميل" style={{ fontWeight: 600 }}>{d.client_name}</td>
+                            <td data-label="العنوان">{d.address}</td>
+                            <td data-label="الأصناف" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
+                            <td data-label="الحالة">
                               <span style={{
                                 padding: '2px 10px',
                                 borderRadius: '20px',
@@ -621,12 +621,12 @@ function SummaryContent() {
                   <tbody>
                     {categoryBreakdown.map((c) => (
                       <tr key={c.category}>
-                        <td style={{ fontWeight: 600 }}>{c.category}</td>
-                        <td className="number-cell">{c.count}</td>
-                        <td className="number-cell">{formatNumber(c.totalStock)}</td>
-                        <td className="number-cell" style={{ color: '#4f46e5', fontWeight: 600 }}>{formatNumber(c.totalValue)}</td>
-                        <td className="number-cell" style={{ color: c.lowCount > 0 ? '#d97706' : '#94a3b8' }}>{c.lowCount}</td>
-                        <td className="number-cell" style={{ color: c.outCount > 0 ? '#dc2626' : '#94a3b8' }}>{c.outCount}</td>
+                        <td data-label="الفئة" style={{ fontWeight: 600 }}>{c.category}</td>
+                        <td data-label="عدد المنتجات" className="number-cell">{c.count}</td>
+                        <td data-label="إجمالي القطع" className="number-cell">{formatNumber(c.totalStock)}</td>
+                        <td data-label="قيمة المخزون" className="number-cell" style={{ color: '#4f46e5', fontWeight: 600 }}>{formatNumber(c.totalValue)}</td>
+                        <td data-label="منخفض" className="number-cell" style={{ color: c.lowCount > 0 ? '#d97706' : '#94a3b8' }}>{c.lowCount}</td>
+                        <td data-label="نفذ" className="number-cell" style={{ color: c.outCount > 0 ? '#dc2626' : '#94a3b8' }}>{c.outCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -653,9 +653,9 @@ function SummaryContent() {
                   <tbody>
                     {data.topDebtors.map((debtor, i) => (
                       <tr key={debtor.name}>
-                        <td>{i + 1}</td>
-                        <td style={{ fontWeight: 600 }}>{debtor.name}</td>
-                        <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(debtor.debt)}</td>
+                        <td data-label="الترتيب">{i + 1}</td>
+                        <td data-label="اسم العميل" style={{ fontWeight: 600 }}>{debtor.name}</td>
+                        <td data-label="الدين المتبقي" className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(debtor.debt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -684,14 +684,14 @@ function SummaryContent() {
                   <tbody>
                     {data.topProducts.map((p, i) => (
                       <tr key={p.item}>
-                        <td style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
+                        <td data-label="الترتيب" style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                         </td>
-                        <td style={{ fontWeight: 600 }}>{p.item}</td>
-                        <td className="number-cell">{formatNumber(p.count)}</td>
-                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(p.revenue)}</td>
+                        <td data-label="المنتج" style={{ fontWeight: 600 }}>{p.item}</td>
+                        <td data-label="الكمية" className="number-cell">{formatNumber(p.count)}</td>
+                        <td data-label="الإيرادات" className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(p.revenue)}</td>
                         {canSeeCosts && (
-                          <td className="number-cell" style={{ color: p.profit >= 0 ? '#1e40af' : '#dc2626', fontWeight: 600 }}>
+                          <td data-label="الربح" className="number-cell" style={{ color: p.profit >= 0 ? '#1e40af' : '#dc2626', fontWeight: 600 }}>
                             {formatNumber(p.profit)}
                           </td>
                         )}
@@ -731,16 +731,16 @@ function SummaryContent() {
                   <tbody>
                     {data.topSellers.map((s, i) => (
                       <tr key={s.username}>
-                        <td style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
+                        <td data-label="الترتيب" style={{ fontWeight: 700, color: i < 3 ? '#f59e0b' : '#94a3b8' }}>
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                         </td>
-                        <td style={{ fontWeight: 600 }}>{s.name || s.username}</td>
-                        <td className="number-cell">{s.salesCount}</td>
-                        <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                        <td data-label="البائع" style={{ fontWeight: 600 }}>{s.name || s.username}</td>
+                        <td data-label="عدد المبيعات" className="number-cell">{s.salesCount}</td>
+                        <td data-label="إجمالي المبيعات" className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
                           {formatNumber(s.totalSales)}
                         </td>
                         {canSeeCosts && (
-                          <td className="number-cell" style={{ color: '#7c3aed', fontWeight: 600 }}>
+                          <td data-label="العمولة المستحقة" className="number-cell" style={{ color: '#7c3aed', fontWeight: 600 }}>
                             {formatNumber(s.totalBonus)}
                           </td>
                         )}
@@ -778,16 +778,16 @@ function SummaryContent() {
                       const remaining = parseFloat(s.totalRemaining) || 0;
                       return (
                         <tr key={s.name}>
-                          <td style={{ fontWeight: 600 }}>{s.name}</td>
-                          <td className="number-cell">{s.orders}</td>
-                          <td className="number-cell">{s.itemCount}</td>
-                          <td className="number-cell" style={{ fontWeight: 600 }}>
+                          <td data-label="المورد" style={{ fontWeight: 600 }}>{s.name}</td>
+                          <td data-label="الطلبات" className="number-cell">{s.orders}</td>
+                          <td data-label="الأنواع" className="number-cell">{s.itemCount}</td>
+                          <td data-label="إجمالي" className="number-cell" style={{ fontWeight: 600 }}>
                             {formatNumber(s.totalSpent)}
                           </td>
-                          <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                          <td data-label="مدفوع" className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
                             {formatNumber(s.totalPaid)}
                           </td>
-                          <td className="number-cell" style={{
+                          <td data-label="متبقي" className="number-cell" style={{
                             color: remaining > 0.005 ? '#dc2626' : '#16a34a',
                             fontWeight: 700,
                           }}>

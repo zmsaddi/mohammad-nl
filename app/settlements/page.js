@@ -226,11 +226,11 @@ function SettlementsContent() {
                   const r = TYPES[data.role === 'driver' ? 'driver_payout' : 'seller_payout'];
                   return (
                     <tr key={username}>
-                      <td style={{ fontWeight: 600 }}>{user?.name || username}</td>
-                      <td><span className="status-badge" style={{ background: r.bg, color: r.color }}>{data.role === 'driver' ? 'سائق' : 'بائع'}</span></td>
-                      <td className="number-cell">{data.count}</td>
-                      <td className="number-cell" style={{ fontWeight: 700, color: '#dc2626' }}>{formatNumber(data.total)}</td>
-                      <td><button className="btn btn-primary btn-sm" onClick={() => handleQuickSettle(username, data.total)}>تسوية</button></td>
+                      <td data-label="المستخدم" style={{ fontWeight: 600 }}>{user?.name || username}</td>
+                      <td data-label="الدور"><span className="status-badge" style={{ background: r.bg, color: r.color }}>{data.role === 'driver' ? 'سائق' : 'بائع'}</span></td>
+                      <td data-label="عدد العمليات" className="number-cell">{data.count}</td>
+                      <td data-label="المبلغ المستحق" className="number-cell" style={{ fontWeight: 700, color: '#dc2626' }}>{formatNumber(data.total)}</td>
+                      <td data-label="إجراء"><button className="btn btn-primary btn-sm" onClick={() => handleQuickSettle(username, data.total)}>تسوية</button></td>
                     </tr>
                   );
                 })}
@@ -384,15 +384,15 @@ function SettlementsContent() {
                     const t = TYPES[s.type];
                     return (
                       <tr key={s.id}>
-                        <td>{s.id}</td>
-                        <td>{s.date}</td>
-                        <td><StatusBadge status={t?.label || s.type} bg={t?.bg} color={t?.color} /></td>
-                        <td style={{ fontWeight: 600 }}>{s.username || '-'}</td>
-                        <td>{s.description}</td>
-                        <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(s.amount)}</td>
-                        <td>{s.settled_by}</td>
-                        <td>{s.notes}</td>
-                        <td>
+                        <td data-label="#">{s.id}</td>
+                        <td data-label="التاريخ">{s.date}</td>
+                        <td data-label="النوع"><StatusBadge status={t?.label || s.type} bg={t?.bg} color={t?.color} /></td>
+                        <td data-label="المستخدم" style={{ fontWeight: 600 }}>{s.username || '-'}</td>
+                        <td data-label="الوصف">{s.description}</td>
+                        <td data-label="المبلغ" className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(s.amount)}</td>
+                        <td data-label="بواسطة">{s.settled_by}</td>
+                        <td data-label="ملاحظات">{s.notes}</td>
+                        <td data-label="التفاصيل">
                           <button
                             className="btn btn-outline btn-sm"
                             onClick={() => openDetails(s.id)}
@@ -487,16 +487,16 @@ function SettlementsContent() {
                       <tbody>
                         {detailsState.data.linked_items.map((it) => (
                           <tr key={it.bonus_id}>
-                            <td>{it.bonus_id}</td>
-                            <td>{it.bonus_date}</td>
-                            <td>#{it.sale_id || '—'}</td>
-                            <td>{it.client_name}</td>
-                            <td>{it.sale_item}</td>
-                            <td className="number-cell">{formatNumber(it.sale_total)}</td>
-                            <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                            <td data-label="#">{it.bonus_id}</td>
+                            <td data-label="التاريخ">{it.bonus_date}</td>
+                            <td data-label="الطلب">#{it.sale_id || '—'}</td>
+                            <td data-label="العميل">{it.client_name}</td>
+                            <td data-label="المنتج">{it.sale_item}</td>
+                            <td data-label="إجمالي البيع" className="number-cell">{formatNumber(it.sale_total)}</td>
+                            <td data-label="العمولة" className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
                               {formatNumber(it.total_bonus)}
                             </td>
-                            <td>
+                            <td data-label="الفاتورة">
                               {it.invoice_ref_code ? (
                                 <button
                                   className="btn btn-sm"

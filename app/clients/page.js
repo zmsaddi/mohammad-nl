@@ -261,8 +261,8 @@ function ClientsContent() {
                     key={client.id}
                     style={client._duplicateOfId ? { background: '#fffbeb' } : undefined}
                   >
-                    <td>{client.id}</td>
-                    <td style={{ fontWeight: 600 }}>
+                    <td data-label="#">{client.id}</td>
+                    <td data-label="الاسم (لاتيني)" style={{ fontWeight: 600 }}>
                       {client.name}
                       {/* v1.0.3 Bug C — duplicate-name client rows are flagged
                           by getClients with _duplicateOfId. The aggregate is
@@ -285,14 +285,14 @@ function ClientsContent() {
                         </span>
                       )}
                     </td>
-                    <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{client.description_ar || '—'}</td>
-                    <td>{client.phone}</td>
-                    <td className="number-cell">{formatNumber(client.totalSales)}</td>
-                    <td className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>
-                    <td className="number-cell" style={{ color: client.remainingDebt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                    <td data-label="الاسم (عربي)" style={{ color: '#64748b', fontSize: '0.85rem' }}>{client.description_ar || '—'}</td>
+                    <td data-label="رقم الهاتف">{client.phone}</td>
+                    <td data-label="إجمالي المشتريات" className="number-cell">{formatNumber(client.totalSales)}</td>
+                    <td data-label="المدفوع" className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>
+                    <td data-label="الدين المتبقي" className="number-cell" style={{ color: client.remainingDebt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                       {formatNumber(client.remainingDebt)}
                     </td>
-                    <td>
+                    <td data-label="إجراءات">
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <Link href={`/clients/${client.id}`} className="btn btn-primary btn-sm">
                           التفاصيل

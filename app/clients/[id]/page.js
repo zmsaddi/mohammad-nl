@@ -309,12 +309,12 @@ function ClientDetailContent({ params }) {
               <tbody>
                 {salesSort.sortedRows.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.date}</td>
-                    <td>{row.item}</td>
-                    <td className="number-cell">{formatNumber(row.quantity)}</td>
-                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    <td>
+                    <td data-label="التاريخ">{row.date}</td>
+                    <td data-label="الصنف">{row.item}</td>
+                    <td data-label="الكمية" className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td data-label="سعر الوحدة" className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td data-label="الإجمالي" className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td data-label="الدفع">
                       <span className="status-badge" style={{
                         background: row.payment_type === 'بنك' ? '#dbeafe' : row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
                         color: row.payment_type === 'بنك' ? '#1e40af' : row.payment_type === 'آجل' ? '#d97706' : '#16a34a'
@@ -322,11 +322,11 @@ function ClientDetailContent({ params }) {
                         {row.payment_type || 'كاش'}
                       </span>
                     </td>
-                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
-                    <td className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a' }}>
+                    <td data-label="المدفوع" className="number-cell">{formatNumber(row.paid_amount)}</td>
+                    <td data-label="المتبقي" className="number-cell" style={{ color: parseFloat(row.remaining) > 0 ? '#dc2626' : '#16a34a' }}>
                       {formatNumber(row.remaining)}
                     </td>
-                    <td>
+                    <td data-label="إجراءات">
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                         {/* Item 5a: invoice PDF button for confirmed sales that have an invoice row */}
                         {row.status === 'مؤكد' && row.invoice_ref_code && (
@@ -387,11 +387,11 @@ function ClientDetailContent({ params }) {
                   const isRefund = row.type === 'refund' || amt < 0;
                   return (
                     <tr key={row.id}>
-                      <td>{row.date}</td>
-                      <td className="number-cell" style={{ color: isRefund ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                      <td data-label="التاريخ">{row.date}</td>
+                      <td data-label="المبلغ" className="number-cell" style={{ color: isRefund ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                         {formatNumber(amt)}
                       </td>
-                      <td>
+                      <td data-label="الطريقة">
                         <span className="status-badge" style={{
                           background: row.payment_method === 'بنك' ? '#dbeafe' : '#dcfce7',
                           color: row.payment_method === 'بنك' ? '#1e40af' : '#16a34a',
@@ -399,10 +399,10 @@ function ClientDetailContent({ params }) {
                           {row.payment_method || 'كاش'}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>
+                      <td data-label="طلب #" style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>
                         {row.sale_id ? `#${row.sale_id}` : '-'}
                       </td>
-                      <td>{row.notes}</td>
+                      <td data-label="ملاحظات">{row.notes}</td>
                     </tr>
                   );
                 })}

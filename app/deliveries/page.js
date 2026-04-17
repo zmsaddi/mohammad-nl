@@ -536,14 +536,14 @@ function DeliveriesContent() {
               <tbody>
                 {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
-                    <td>{row.date}</td>
-                    <td style={{ fontWeight: 600 }}>{row.client_name}</td>
-                    <td style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
-                    <td>{row.address}</td>
-                    <td>{row.items}</td>
-                    <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
-                    <td>
+                    <td data-label="الكود" style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
+                    <td data-label="التاريخ">{row.date}</td>
+                    <td data-label="العميل" style={{ fontWeight: 600 }}>{row.client_name}</td>
+                    <td data-label="الهاتف" style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
+                    <td data-label="العنوان">{row.address}</td>
+                    <td data-label="الأصناف">{row.items}</td>
+                    <td data-label="المبلغ" className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
+                    <td data-label="السائق">
                       {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' ? (
                         <select
                           value={row.assigned_driver || ''}
@@ -568,7 +568,7 @@ function DeliveriesContent() {
                         row.assigned_driver || row.driver_name || '-'
                       )}
                     </td>
-                    <td>
+                    <td data-label="الحالة">
                       {canChangeStatus ? (
                       <select
                         value={row.status}
@@ -592,7 +592,7 @@ function DeliveriesContent() {
                         <span className="status-badge" style={getStatusStyle(row.status)}>{row.status}</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="إجراءات">
                       {isAdmin && row.status !== 'ملغي' && (
                         <button
                           className="btn btn-danger btn-sm"

@@ -145,17 +145,17 @@ function InvoicesContent() {
               <tbody>
                 {paginatedRows.map((inv) => (
                   <tr key={inv.id} className="clickable-row" onClick={() => setSelectedInvoice(inv)}>
-                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{inv.ref_code}</td>
-                    <td>{inv.date}</td>
-                    <td style={{ fontWeight: 600 }}>{inv.client_name}</td>
-                    <td>{inv.item}</td>
-                    <td className="number-cell">{formatNumber(inv.quantity)}</td>
-                    <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(inv.total)}</td>
-                    <td><StatusBadge status={inv.payment_type || 'كاش'} /></td>
-                    <td><StatusBadge status={derivePaymentStatus(inv)} /></td>
-                    <td style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
+                    <td data-label="رقم الفاتورة" style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{inv.ref_code}</td>
+                    <td data-label="التاريخ">{inv.date}</td>
+                    <td data-label="العميل" style={{ fontWeight: 600 }}>{inv.client_name}</td>
+                    <td data-label="المنتج">{inv.item}</td>
+                    <td data-label="الكمية" className="number-cell">{formatNumber(inv.quantity)}</td>
+                    <td data-label="الإجمالي" className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(inv.total)}</td>
+                    <td data-label="الدفع"><StatusBadge status={inv.payment_type || 'كاش'} /></td>
+                    <td data-label="حالة الدفع"><StatusBadge status={derivePaymentStatus(inv)} /></td>
+                    <td data-label="VIN" style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
                     {/* DONE: Step 4 — open the French invoice in a new tab; user prints with Ctrl+P */}
-                    <td>
+                    <td data-label="الفاتورة">
                       <button
                         className="btn btn-sm"
                         style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}

@@ -236,16 +236,16 @@ function UsersContent() {
                 <tbody>
                   {paginatedRows.map((u) => (
                     <tr key={u.id} style={{ opacity: u.active ? 1 : 0.5 }}>
-                      <td>{u.id}</td>
-                      <td style={{ direction: 'ltr', textAlign: 'right', fontWeight: 600 }}>{u.username}</td>
-                      <td>{u.name}</td>
-                      <td><StatusBadge status={getRoleLabel(u.role)} /></td>
-                      <td>
+                      <td data-label="#">{u.id}</td>
+                      <td data-label="اسم المستخدم" style={{ direction: 'ltr', textAlign: 'right', fontWeight: 600 }}>{u.username}</td>
+                      <td data-label="الاسم">{u.name}</td>
+                      <td data-label="الدور"><StatusBadge status={getRoleLabel(u.role)} /></td>
+                      <td data-label="الحالة">
                         <button className="btn btn-sm" onClick={() => setToggleTarget(u.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
                           <StatusBadge status={u.active ? 'مفعّل' : 'معطّل'} bg={u.active ? '#dcfce7' : '#fee2e2'} color={u.active ? '#16a34a' : '#dc2626'} />
                         </button>
                       </td>
-                      <td>
+                      <td data-label="إجراءات">
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button className="btn btn-outline btn-sm" onClick={() => startEdit(u)}>تعديل</button>
                           {u.username !== 'admin' && <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(u.id)}>حذف</button>}
@@ -341,23 +341,23 @@ function UsersContent() {
                       const user = safeUsers.find((u) => u.username === r.username);
                       return (
                         <tr key={r.username}>
-                          <td style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
-                          <td>{(() => {
+                          <td data-label="المستخدم" style={{ fontWeight: 600 }}>{user?.name || r.username}</td>
+                          <td data-label="الدور">{(() => {
                             const u = safeUsers.find(u2 => u2.username === r.username);
                             return u?.role === 'seller' ? 'بائع' : u?.role === 'driver' ? 'سائق' : u?.role || '—';
                           })()}</td>
-                          <td className="number-cell">{(() => {
+                          <td data-label="العمولة الثابتة (لكل قطعة)" className="number-cell">{(() => {
                             const u = safeUsers.find(u2 => u2.username === r.username);
                             if (u?.role === 'seller') return r.seller_fixed != null ? `${parseFloat(r.seller_fixed)} €` : '—';
                             if (u?.role === 'driver') return r.driver_fixed != null ? `${parseFloat(r.driver_fixed)} €` : '—';
                             return '—';
                           })()}</td>
-                          <td className="number-cell">{(() => {
+                          <td data-label="نسبة فرق السعر %" className="number-cell">{(() => {
                             const u = safeUsers.find(u2 => u2.username === r.username);
                             if (u?.role === 'seller') return r.seller_percentage != null ? `${parseFloat(r.seller_percentage)}%` : '—';
                             return '—';
                           })()}</td>
-                          <td>
+                          <td data-label="إجراءات">
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button className="btn btn-outline btn-sm" onClick={() => startEditRate(r)}>تعديل</button>
                               <button className="btn btn-danger btn-sm" onClick={() => handleDeleteRate(r.username)}>حذف</button>

@@ -177,14 +177,14 @@ function SupplierDetailContent() {
                   const statusLabel = p.payment_status === 'paid' ? 'مدفوع' : p.payment_status === 'partial' ? 'جزئي' : 'معلق';
                   return (
                     <tr key={p.id}>
-                      <td>{p.date}</td>
-                      <td style={{ fontWeight: 600 }}>{p.item}</td>
-                      <td className="number-cell">{formatNumber(p.quantity)}</td>
-                      <td className="number-cell">{formatNumber(p.unit_price)}</td>
-                      <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(p.total)}</td>
-                      <td className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(p.paid_amount)}</td>
-                      <td className="number-cell" style={{ color: remaining > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(remaining)}</td>
-                      <td><StatusBadge status={statusLabel} /></td>
+                      <td data-label="التاريخ">{p.date}</td>
+                      <td data-label="المنتج" style={{ fontWeight: 600 }}>{p.item}</td>
+                      <td data-label="الكمية" className="number-cell">{formatNumber(p.quantity)}</td>
+                      <td data-label="سعر الوحدة" className="number-cell">{formatNumber(p.unit_price)}</td>
+                      <td data-label="الإجمالي" className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(p.total)}</td>
+                      <td data-label="المدفوع" className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(p.paid_amount)}</td>
+                      <td data-label="المتبقي" className="number-cell" style={{ color: remaining > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(remaining)}</td>
+                      <td data-label="الحالة"><StatusBadge status={statusLabel} /></td>
                     </tr>
                   );
                 })}
