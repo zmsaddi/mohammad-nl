@@ -8,6 +8,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import DetailModal from '@/components/DetailModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
@@ -42,6 +43,7 @@ function InvoicesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const filtered = invoices.filter((inv) =>
     inv.client_name?.includes(search) || inv.ref_code?.includes(search) || inv.item?.includes(search) || inv.vin?.includes(search)

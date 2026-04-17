@@ -9,6 +9,7 @@ import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function SupplierDetailContent() {
   const { id } = useParams();
@@ -39,6 +40,7 @@ function SupplierDetailContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [id]);
+  useAutoRefresh(fetchData);
 
   const handlePay = async (e) => {
     e.preventDefault();

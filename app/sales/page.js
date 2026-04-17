@@ -12,6 +12,7 @@ import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -157,6 +158,7 @@ function SalesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   // Item 2 — filter pipeline. Client-side because row volumes are small
   // (Phase 0.5 production shows ~200 rows). Server-side can come later

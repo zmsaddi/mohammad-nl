@@ -9,6 +9,7 @@ import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 const ROLES = [
   { value: 'admin', label: 'مدير عام', color: '#dc2626', bg: '#fee2e2' },
@@ -60,6 +61,7 @@ function UsersContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

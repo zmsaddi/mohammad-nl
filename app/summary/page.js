@@ -9,6 +9,7 @@ import Link from 'next/link';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -132,6 +133,7 @@ function SummaryContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(() => fetchData(dateFrom, dateTo));
 
   const handleFilter = () => {
     fetchData(dateFrom, dateTo);

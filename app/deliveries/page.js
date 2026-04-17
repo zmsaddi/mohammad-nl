@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -146,6 +147,7 @@ function DeliveriesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   // Auto-fill phone when client is selected
   const handleClientChange = (name) => {

@@ -12,6 +12,7 @@ import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function ExpensesContent() {
   const { data: session } = useSession();
@@ -55,6 +56,7 @@ function ExpensesContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   // UX-05: filter pipeline
   const filtered = rows.filter((r) => {

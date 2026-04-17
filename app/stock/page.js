@@ -12,6 +12,7 @@ import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function StockContent() {
   const { data: session } = useSession();
@@ -62,6 +63,7 @@ function StockContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const handleDelete = async () => {
     if (!deleteId) return;

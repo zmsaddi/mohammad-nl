@@ -6,6 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -24,17 +25,18 @@ function MyBonusContent() {
   const [filterTo, setFilterTo] = useState('');
   const [filterSettled, setFilterSettled] = useState('all'); // 'all' | 'settled' | 'unsettled'
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/bonuses', { cache: 'no-store' });
-        const data = await res.json();
-        setBonuses(Array.isArray(data) ? data : []);
-      } catch { addToast('خطأ', 'error'); }
-      finally { setLoading(false); }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/bonuses', { cache: 'no-store' });
+      const data = await res.json();
+      setBonuses(Array.isArray(data) ? data : []);
+    } catch { addToast('خطأ', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   // Stats — ARC-06: parseFloat on every NUMERIC read so reducers coerce to number.
   const totalAll = bonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);

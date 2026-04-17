@@ -8,6 +8,7 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 import ConfirmModal from '@/components/ConfirmModal';
 import Pagination, { usePagination } from '@/components/Pagination';
 import PageSkeleton from '@/components/PageSkeleton';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 // v1.0.2 Feature 2 — profit distribution (توزيع أرباح)
 //
@@ -73,6 +74,7 @@ function ProfitDistributionsContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   // Auto-fetch the full distributable-pool breakdown whenever the
   // period bounds change. Blank bounds → all-time. The endpoint

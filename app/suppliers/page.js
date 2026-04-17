@@ -10,6 +10,7 @@ import PageSkeleton from '@/components/PageSkeleton';
 import DataCardList from '@/components/DataCardList';
 import Pagination, { usePagination } from '@/components/Pagination';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function SuppliersContent() {
   const addToast = useToast();
@@ -34,6 +35,7 @@ function SuppliersContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

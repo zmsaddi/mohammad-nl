@@ -12,6 +12,7 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 // v1.1 F-016 — read settings.vat_rate and compute TVA via the
 // centralized helper instead of hardcoding `/ 6`. See lib/money.js.
 import { tvaFromTtc } from '@/lib/money';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function ClientDetailContent({ params }) {
   const { id } = use(params);
@@ -85,6 +86,7 @@ function ClientDetailContent({ params }) {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [id]);
+  useAutoRefresh(fetchData);
 
   const handlePayment = async (e) => {
     e.preventDefault();

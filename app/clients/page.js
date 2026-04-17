@@ -8,6 +8,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
 
 function ClientsContent() {
@@ -46,6 +47,7 @@ function ClientsContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

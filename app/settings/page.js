@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
+import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function SettingsContent() {
   const { data: session } = useSession();
@@ -50,6 +51,7 @@ function SettingsContent() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
+  useAutoRefresh(fetchData);
 
   const handleSave = async (e) => {
     e.preventDefault();
