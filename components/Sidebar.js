@@ -19,7 +19,7 @@ const navLinks = [
   { href: '/purchases', label: 'المشتريات', group: 'operations', roles: ['admin', 'manager'], icon: '🛒' },
   { href: '/sales', label: 'المبيعات', group: 'operations', roles: ['admin', 'manager', 'seller'], icon: '💰' },
   { href: '/expenses', label: 'المصاريف', group: 'operations', roles: ['admin', 'manager'], icon: '📋' },
-  { href: '/stock', label: 'المخزون', group: 'data', roles: ['admin', 'manager'], icon: '📦' },
+  { href: '/stock', label: 'المخزون', group: 'data', roles: ['admin', 'manager', 'seller'], icon: '📦' },
   { href: '/deliveries', label: 'التوصيل', group: 'operations', roles: ['admin', 'manager', 'seller', 'driver'], icon: '🚚' },
   { href: '/my-bonus', label: 'العمولة', group: 'data', roles: ['seller', 'driver'], icon: '💵' },
   { href: '/invoices', label: 'الفواتير', group: 'financial', roles: ['admin', 'manager', 'seller', 'driver'], icon: '🧾' },
