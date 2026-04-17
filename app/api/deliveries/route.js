@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDeliveries, addDelivery, updateDelivery, cancelDelivery } from '@/lib/db';
 import { DeliverySchema, DeliveryUpdateSchema, zodArabicError } from '@/lib/schemas';
 import { sql } from '@vercel/postgres';
+import { invalidateCache } from '@/lib/entity-resolver';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
@@ -51,6 +52,7 @@ export async function POST(request) {
 
     const data = { ...parsed.data, createdBy: token.username }; // audit trail
     const id = await addDelivery(data);
+    invalidateCache();
     return NextResponse.json({ success: true, id });
   } catch (err) {
     return apiError(err, 'خطأ في إضافة البيانات', 500, 'deliveries POST');
@@ -122,6 +124,7 @@ export async function PUT(request) {
 
     // SP-011: pass cancelledBy for audit trail on delivery cancel path
     await updateDelivery({ ...parsed.data, cancelledBy: token.username });
+    invalidateCache();
     return NextResponse.json({ success: true });
   } catch (error) {
     // v1.2 — surface the real error message to help debug confirm-flow
@@ -138,6 +141,7 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     await cancelDelivery(searchParams.get('id'));
+    invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في حذف البيانات', 500, 'deliveries DELETE');

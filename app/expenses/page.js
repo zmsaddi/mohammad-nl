@@ -108,9 +108,11 @@ function ExpensesContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: editExpense.id,
+            date: form.date,
             category: form.category,
             description: form.description,
             amount: form.amount,
+            paymentType: form.paymentType,
             notes: form.notes,
           }),
           cache: 'no-store',

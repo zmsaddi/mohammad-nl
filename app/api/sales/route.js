@@ -102,6 +102,7 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
     }
     await updateSale({ ...parsed.data, adminOverride: token.role === 'admin', updatedBy: token.username });
+    invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في تحديث البيانات', 500, 'sales PUT');
@@ -127,6 +128,7 @@ export async function DELETE(request) {
       return NextResponse.json({ error: CANCEL_DENIED_ERROR }, { status: 403 });
     }
     await deleteSale(id, { cancelledBy: token.username });
+    invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {
     return apiError(err, 'خطأ في حذف البيانات', 500, 'sales DELETE');

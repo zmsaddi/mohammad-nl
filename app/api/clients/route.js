@@ -49,7 +49,8 @@ export async function PUT(request) {
     const body = await request.json();
     const parsed = ClientUpdateSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: zodArabicError(parsed.error) }, { status: 400 });
-    await updateClient(parsed.data);
+    const { token } = auth;
+    await updateClient({ ...parsed.data, updatedBy: token.username });
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -177,7 +177,7 @@ function DeliveriesContent() {
       });
       if (res.ok) {
         addToast('تم إضافة التوصيلة بنجاح');
-        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', address: '', items: '', totalAmount: '', driverName: '', notes: '' });
+        setForm({ date: getTodayDate(), clientName: '', clientPhone: '', clientEmail: '', address: '', items: '', totalAmount: '', driverName: '', notes: '' });
         setShowForm(false);
         fetchData();
       } else {

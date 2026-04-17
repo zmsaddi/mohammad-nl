@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getExpenses, addExpense, deleteExpense, updateExpense } from '@/lib/db';
 import { ExpenseSchema, ExpenseUpdateSchema, zodArabicError } from '@/lib/schemas';
+import { invalidateCache } from '@/lib/entity-resolver';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
