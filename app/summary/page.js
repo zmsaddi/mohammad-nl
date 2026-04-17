@@ -189,17 +189,36 @@ function SummaryContent() {
         <p>نظرة شاملة على أداء المتجر</p>
       </div>
 
-      {/* Voice Input */}
-      {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
-        <div className="card" style={{ marginBottom: '24px', textAlign: 'center', padding: '24px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#374151' }}>إدخال صوتي</h3>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '16px' }}>اضغط مع الاستمرار وتكلم: «بعت لأحمد دراجة بسبعمية كاش»</p>
-          <VoiceButton
-            onResult={(r) => setVoiceResult(r)}
-            onError={(e) => addToast(e, 'error')}
-          />
+      {/* Quick Actions Bar */}
+      <div className="card" style={{ marginBottom: '24px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
+            <VoiceButton
+              onResult={(r) => setVoiceResult(r)}
+              onError={(e) => addToast(e, 'error')}
+            />
+          )}
+          <a href="/sales" style={{ textDecoration: 'none' }}>
+            <button className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              عملية بيع
+            </button>
+          </a>
+          {['admin', 'manager'].includes(session?.user?.role) && (
+            <a href="/purchases" style={{ textDecoration: 'none' }}>
+              <button className="btn btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem', background: '#1e40af', color: 'white', border: 'none', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                عملية شراء
+              </button>
+            </a>
+          )}
+          {canUseVoice && (
+            <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginRight: 'auto' }}>
+              تكلم: «بعت لأحمد دراجة بسبعمية كاش»
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Voice Confirmation Modal */}
       <VoiceConfirm

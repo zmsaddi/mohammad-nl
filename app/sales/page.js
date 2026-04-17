@@ -368,7 +368,7 @@ function SalesContent() {
       {!showForm ? (
         <div style={{ marginBottom: '24px' }}>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            إضافة مبيعة جديدة
+            إضافة عملية بيع جديدة
           </button>
         </div>
       ) : (
