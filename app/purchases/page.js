@@ -179,8 +179,11 @@ function PurchasesContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: editPurchase.id,
+            date: form.date,
             supplier: form.supplier,
             item: form.item,
+            descriptionAr: form.descriptionAr,
+            category: form.category,
             quantity: form.quantity,
             unitPrice: form.unitPrice,
             sellPrice: form.sellPrice,
