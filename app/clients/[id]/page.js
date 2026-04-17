@@ -13,6 +13,7 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 // centralized helper instead of hardcoding `/ 6`. See lib/money.js.
 import { tvaFromTtc } from '@/lib/money';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import DataCardList from '@/components/DataCardList';
 
 function ClientDetailContent({ params }) {
   const { id } = use(params);
@@ -290,7 +291,43 @@ function ClientDetailContent({ params }) {
         {sales.length === 0 ? (
           <div className="empty-state" style={{ padding: '24px' }}><h3>لا توجد مبيعات</h3></div>
         ) : (
-          <div className="table-container">
+          <>
+          <DataCardList
+            rows={salesSort.sortedRows}
+            fields={[
+              { key: 'date', label: 'التاريخ' },
+              { key: 'item', label: 'الصنف' },
+              { key: 'quantity', label: 'الكمية', format: (v) => formatNumber(v) },
+              { key: 'unit_price', label: 'سعر الوحدة', format: (v) => formatNumber(v) },
+              { key: 'total', label: 'الإجمالي', format: (v) => formatNumber(v) },
+              { key: 'payment_type', label: 'الدفع', format: (v) => v || 'كاش' },
+              { key: 'paid_amount', label: 'المدفوع', format: (v) => formatNumber(v) },
+              { key: 'remaining', label: 'المتبقي', format: (v) => formatNumber(v) },
+            ]}
+            actions={(row) => (
+              <>
+                {row.status === 'مؤكد' && row.invoice_ref_code && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: '#1a3a2a', color: 'white' }}
+                    onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}
+                  >
+                    فاتورة
+                  </button>
+                )}
+                {canCancelSale(row, currentUser) && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setCancelSaleState({ saleId: row.id, invoiceMode: 'soft' })}
+                  >
+                    إلغاء
+                  </button>
+                )}
+              </>
+            )}
+            emptyMessage="لا توجد مبيعات"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -357,6 +394,7 @@ function ClientDetailContent({ params }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -370,7 +408,19 @@ function ClientDetailContent({ params }) {
         {payments.length === 0 ? (
           <div className="empty-state" style={{ padding: '24px' }}><h3>لا توجد دفعات مسجلة</h3></div>
         ) : (
-          <div className="table-container">
+          <>
+          <DataCardList
+            rows={paymentsSort.sortedRows}
+            fields={[
+              { key: 'date', label: 'التاريخ' },
+              { key: 'amount', label: 'المبلغ', format: (v) => formatNumber(v) },
+              { key: 'payment_method', label: 'الطريقة', format: (v) => v || 'كاش' },
+              { key: 'sale_id', label: 'طلب', format: (v) => v ? `#${v}` : '—' },
+              { key: 'notes', label: 'ملاحظات' },
+            ]}
+            emptyMessage="لا توجد دفعات"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -409,6 +459,7 @@ function ClientDetailContent({ params }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

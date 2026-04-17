@@ -10,6 +10,7 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import DataCardList from '@/components/DataCardList';
 
 function SupplierDetailContent() {
   const { id } = useParams();
@@ -157,7 +158,25 @@ function SupplierDetailContent() {
         {purchases.length === 0 ? (
           <div className="empty-state"><h3>لا توجد مشتريات من هذا المورد</h3></div>
         ) : (
-          <div className="table-container">
+          <>
+          <DataCardList
+            rows={purchasesSort.sortedRows}
+            fields={[
+              { key: 'date', label: 'التاريخ' },
+              { key: 'item', label: 'المنتج' },
+              { key: 'quantity', label: 'الكمية', format: (v) => formatNumber(v) },
+              { key: 'unit_price', label: 'سعر الوحدة', format: (v) => formatNumber(v) },
+              { key: 'total', label: 'الإجمالي', format: (v) => formatNumber(v) },
+              { key: 'paid_amount', label: 'المدفوع', format: (v) => formatNumber(v) },
+              { key: 'remaining', label: 'المتبقي', format: (_v, row) => {
+                const remaining = Math.max(0, (parseFloat(row.total) || 0) - (parseFloat(row.paid_amount) || 0));
+                return formatNumber(remaining);
+              } },
+              { key: 'payment_status', label: 'الحالة', format: (v) => v === 'paid' ? 'مدفوع' : v === 'partial' ? 'جزئي' : 'معلق' },
+            ]}
+            emptyMessage="لا توجد مشتريات"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -191,6 +210,7 @@ function SupplierDetailContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </AppLayout>

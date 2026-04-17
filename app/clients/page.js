@@ -10,6 +10,7 @@ import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
+import DataCardList from '@/components/DataCardList';
 
 function ClientsContent() {
   const { data: session } = useSession();
@@ -241,7 +242,28 @@ function ClientsContent() {
             <p>{search ? 'جرب كلمة بحث مختلفة' : 'أضف أول عميل بالضغط على زر الإضافة'}</p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+            <DataCardList
+              rows={sortedRows}
+              fields={[
+                { key: 'name', label: 'الاسم' },
+                { key: 'description_ar', label: 'عربي' },
+                { key: 'phone', label: 'الهاتف' },
+                { key: 'totalSales', label: 'المشتريات', format: (v) => formatNumber(v) },
+                { key: 'totalPaid', label: 'المدفوع', format: (v) => formatNumber(v) },
+                { key: 'remainingDebt', label: 'الدين', format: (v) => formatNumber(v) },
+              ]}
+              actions={(row) => (
+                <>
+                  <Link href={`/clients/${row.id}`} className="btn btn-primary btn-sm">التفاصيل</Link>
+                  {isAdmin && (
+                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
+                  )}
+                </>
+              )}
+              emptyMessage="لا يوجد عملاء"
+            />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead>
                 <tr>
@@ -309,6 +331,7 @@ function ClientsContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

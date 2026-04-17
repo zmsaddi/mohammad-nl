@@ -9,6 +9,7 @@ import Link from 'next/link';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
 import PageSkeleton from '@/components/PageSkeleton';
+import DataCardList from '@/components/DataCardList';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -392,7 +393,18 @@ function SummaryContent() {
                     </svg>
                     التوصيلات المعلقة والجارية
                   </h3>
-                  <div className="table-container">
+                  <DataCardList
+                    rows={data.recentDeliveries}
+                    fields={[
+                      { key: 'date', label: 'التاريخ' },
+                      { key: 'client_name', label: 'العميل' },
+                      { key: 'address', label: 'العنوان' },
+                      { key: 'items', label: 'الأصناف' },
+                      { key: 'status', label: 'الحالة' },
+                    ]}
+                    emptyMessage="لا توجد توصيلات"
+                  />
+                  <div className="table-container has-card-fallback">
                     <table className="data-table">
                       <thead>
                         <tr>
@@ -606,7 +618,19 @@ function SummaryContent() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 المخزون حسب الفئة
               </h3>
-              <div className="table-container">
+              <DataCardList
+                rows={categoryBreakdown}
+                fields={[
+                  { key: 'category', label: 'الفئة' },
+                  { key: 'count', label: 'عدد المنتجات' },
+                  { key: 'totalStock', label: 'إجمالي القطع', format: (v) => formatNumber(v) },
+                  { key: 'totalValue', label: 'قيمة المخزون', format: (v) => formatNumber(v) },
+                  { key: 'lowCount', label: 'منخفض' },
+                  { key: 'outCount', label: 'نفذ' },
+                ]}
+                emptyMessage="لا يوجد مخزون"
+              />
+              <div className="table-container has-card-fallback">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -641,7 +665,15 @@ function SummaryContent() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 أعلى المدينين
               </h3>
-              <div className="table-container">
+              <DataCardList
+                rows={data.topDebtors}
+                fields={[
+                  { key: 'name', label: 'اسم العميل' },
+                  { key: 'debt', label: 'الدين المتبقي', format: (v) => formatNumber(v) },
+                ]}
+                emptyMessage="لا يوجد مدينون"
+              />
+              <div className="table-container has-card-fallback">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -670,7 +702,17 @@ function SummaryContent() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 أكثر المنتجات مبيعاً
               </h3>
-              <div className="table-container">
+              <DataCardList
+                rows={data.topProducts}
+                fields={[
+                  { key: 'item', label: 'المنتج' },
+                  { key: 'count', label: 'الكمية', format: (v) => formatNumber(v) },
+                  { key: 'revenue', label: 'الإيرادات', format: (v) => formatNumber(v) },
+                  ...(canSeeCosts ? [{ key: 'profit', label: 'الربح', format: (v) => formatNumber(v) }] : []),
+                ]}
+                emptyMessage="لا توجد مبيعات"
+              />
+              <div className="table-container has-card-fallback">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -717,7 +759,17 @@ function SummaryContent() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 أفضل البائعين
               </h3>
-              <div className="table-container">
+              <DataCardList
+                rows={data.topSellers}
+                fields={[
+                  { key: 'name', label: 'البائع', format: (v, row) => v || row.username },
+                  { key: 'salesCount', label: 'عدد المبيعات' },
+                  { key: 'totalSales', label: 'إجمالي المبيعات', format: (v) => formatNumber(v) },
+                  ...(canSeeCosts ? [{ key: 'totalBonus', label: 'العمولة المستحقة', format: (v) => formatNumber(v) }] : []),
+                ]}
+                emptyMessage="لا يوجد بائعون"
+              />
+              <div className="table-container has-card-fallback">
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -761,7 +813,19 @@ function SummaryContent() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
                 أداء الموردين
               </h3>
-              <div className="table-container">
+              <DataCardList
+                rows={data.topSuppliers}
+                fields={[
+                  { key: 'name', label: 'المورد' },
+                  { key: 'orders', label: 'الطلبات' },
+                  { key: 'itemCount', label: 'الأنواع' },
+                  { key: 'totalSpent', label: 'إجمالي', format: (v) => formatNumber(v) },
+                  { key: 'totalPaid', label: 'مدفوع', format: (v) => formatNumber(v) },
+                  { key: 'totalRemaining', label: 'متبقي', format: (v) => formatNumber(v) },
+                ]}
+                emptyMessage="لا يوجد موردون"
+              />
+              <div className="table-container has-card-fallback">
                 <table className="data-table">
                   <thead>
                     <tr>
