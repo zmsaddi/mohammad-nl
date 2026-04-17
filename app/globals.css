@@ -1205,31 +1205,39 @@ html, body {
     font-size: 1.2rem;
   }
 
-  /* UNIFIED RESPONSIVE TABLE */
+  /* UNIFIED RESPONSIVE TABLE: ALL data tables auto-collapse to card
+     style on mobile. No more DataCardList duplicate — one table renders
+     both on desktop and mobile via pure CSS. Each <td> must have a
+     data-label attribute containing the column header text. */
   .data-card-list { display: none; }
   .table-container { overflow: visible; margin: 0; padding: 0; }
-  .table-container .data-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+  .table-container .data-table,
+  .table-container .data-table tbody,
+  .table-container .data-table tr,
+  .table-container .data-table td {
+    display: block;
+    width: 100%;
+  }
   .table-container .data-table thead { display: none; }
   .table-container .data-table tfoot { display: none; }
-  .table-container .data-table tbody { display: block; }
   .table-container .data-table tr {
-    display: block;
     background: #fff;
     border: 1px solid var(--color-border);
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 12px 14px;
     margin-bottom: 10px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   .table-container .data-table td {
-    display: grid;
-    grid-template-columns: minmax(90px, auto) 1fr;
-    gap: 12px;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    padding: 7px 0;
+    padding: 6px 0;
     border: none;
     font-size: 0.85rem;
+    gap: 12px;
     text-align: right;
+    min-width: 0;
   }
   .table-container .data-table td:not(:last-child) {
     border-bottom: 1px solid var(--color-border-light);
@@ -1239,18 +1247,10 @@ html, body {
     font-size: 0.75rem;
     color: var(--color-text-muted);
     font-weight: 600;
-    white-space: nowrap;
+    flex-shrink: 0;
   }
   .table-container .data-table td:not([data-label])::before {
-    content: "";
-    display: none;
-  }
-  .table-container .data-table td:not([data-label]) {
-    grid-template-columns: 1fr;
-  }
-  .table-container .data-table td.number-cell {
-    text-align: right;
-    justify-content: end;
+    content: none;
   }
 
   .data-table {
