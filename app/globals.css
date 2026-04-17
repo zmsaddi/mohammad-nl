@@ -219,6 +219,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .sidebar-link {
