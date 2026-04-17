@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
+import Link from 'next/link';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirm from '@/components/VoiceConfirm';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -189,35 +190,31 @@ function SummaryContent() {
         <p>نظرة شاملة على أداء المتجر</p>
       </div>
 
-      {/* Quick Actions Bar */}
-      <div className="card" style={{ marginBottom: '24px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
+      {/* Quick Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+        <Link href="/sales" style={{ textDecoration: 'none' }}>
+          <div style={{ background: '#16a34a', color: 'white', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            عملية بيع
+          </div>
+        </Link>
+        {['admin', 'manager'].includes(session?.user?.role) && (
+          <Link href="/purchases" style={{ textDecoration: 'none' }}>
+            <div style={{ background: '#1e40af', color: 'white', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              عملية شراء
+            </div>
+          </Link>
+        )}
+        {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
+          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <VoiceButton
               onResult={(r) => setVoiceResult(r)}
               onError={(e) => addToast(e, 'error')}
             />
-          )}
-          <a href="/sales" style={{ textDecoration: 'none' }}>
-            <button className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-              عملية بيع
-            </button>
-          </a>
-          {['admin', 'manager'].includes(session?.user?.role) && (
-            <a href="/purchases" style={{ textDecoration: 'none' }}>
-              <button className="btn btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem', background: '#1e40af', color: 'white', border: 'none', borderRadius: '10px', whiteSpace: 'nowrap' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                عملية شراء
-              </button>
-            </a>
-          )}
-          {canUseVoice && (
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginRight: 'auto' }}>
-              تكلم: «بعت لأحمد دراجة بسبعمية كاش»
-            </span>
-          )}
-        </div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>إدخال صوتي</span>
+          </div>
+        )}
       </div>
 
       {/* Voice Confirmation Modal */}
