@@ -118,7 +118,12 @@ function ClientsContent() {
     { key: 'name', direction: 'asc' }
   );
 
-  const totalDebt = clients.reduce((sum, c) => sum + (parseFloat(c.remainingDebt) || 0), 0);
+  // v1.2 — totalDebt now mirrors the filtered list the user is actually
+  // viewing. Pre-v1.2 this read from `clients` (the unfiltered array), so
+  // a user searching for three debtors saw the summary card showing the
+  // aggregate debt of ALL clients — the number didn't match what they
+  // were looking at.
+  const totalDebt = filtered.reduce((sum, c) => sum + (parseFloat(c.remainingDebt) || 0), 0);
 
   return (
     <AppLayout>
