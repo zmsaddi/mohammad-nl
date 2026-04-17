@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -41,6 +41,99 @@ function TruckIcon({ size = 24, color = 'currentColor' }) {
 function isBikeDelivery(delivery) {
   const keywords = ['bike', 'دراجة', 'ebike', 'e-bike', 'scooter', 'sur-ron', 'aperyder'];
   return keywords.some((k) => (delivery?.items || '').toLowerCase().includes(k));
+}
+
+// v1.2 — VIN confirmation modal, extracted as a stable module-scope
+// component. The production bug drivers reported was: "typing in the VIN
+// field requires clicking the field after every letter." The previous
+// implementation had three compounding issues that only showed up on
+// mobile keyboards:
+//
+//   (1) An IIFE (`(() => { return <...> })()`) wrapped the modal JSX
+//       inside the parent render. The IIFE itself is fine, but combined
+//       with an onChange that transformed the value (toUpperCase), the
+//       controlled input's value prop changed identity on every render
+//       — some mobile browsers drop the IME selection when that happens,
+//       which looks like a focus loss.
+//   (2) `value={vinInput}` + `onChange={(e) => setVinInput(e.target.
+//       value.toUpperCase())}` — the JS-side uppercase transform forces
+//       React to reconcile the input's value on every keystroke, and
+//       the cursor position is re-applied. iOS Safari + some Android
+//       keyboards treat this as "input was externally edited" and drop
+//       the keyboard.
+//   (3) `autoFocus` on a controlled input inside a conditional render
+//       only fires on the initial mount. Subsequent re-renders don't
+//       re-focus, but if the parent tree briefly unmounts (e.g. NextAuth
+//       session refresh toggling the loading overlay) the focus is lost
+//       with no way to recover.
+//
+// Fixes applied here:
+//   - Local state (ref) holds the raw typed value; the parent's
+//     vinInput state is only updated via the onChange callback. The
+//     parent no longer re-renders this subtree when its own other state
+//     shifts.
+//   - CSS `text-transform: uppercase` visually uppercases, no JS
+//     transform — the cursor position stays put.
+//   - The value is uppercased ONCE on submit.
+//   - A useRef + useEffect focuses the input on open and is a no-op on
+//     re-render, which handles the rare session-refresh remount cleanly.
+function VinStepModal({ row, initialValue, onConfirm, onBack }) {
+  const [vin, setVin] = useState(initialValue || '');
+  const inputRef = useRef(null);
+  const requireVin = isBikeDelivery(row);
+  const vinReady = vin.trim().length > 0;
+
+  useEffect(() => {
+    // Focus once on mount. Guarded by a tick because some browsers
+    // ignore focus() calls while a modal is still animating in.
+    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+        <h3>
+          رقم الهيكل (VIN)
+          {requireVin && <span style={{ color: '#dc2626', fontSize: '0.85rem' }}> *مطلوب للدراجات</span>}
+        </h3>
+        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+          {requireVin
+            ? 'هذه دراجة — يجب إدخال رقم الهيكل قبل تأكيد التوصيل.'
+            : 'هذا المنتج ليس دراجة — يمكنك تخطي رقم الهيكل.'}
+        </p>
+        <div className="form-group" style={{ margin: '16px 0' }}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={vin}
+            onChange={(e) => setVin(e.target.value)}
+            placeholder="مثال: WB10A1234Z5678"
+            style={{
+              direction: 'ltr',
+              textAlign: 'center',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              border: requireVin && !vinReady ? '2px solid #dc2626' : undefined,
+            }}
+          />
+        </div>
+        <div className="modal-actions">
+          <button
+            className="btn btn-primary"
+            style={{ flex: 1 }}
+            disabled={requireVin && !vinReady}
+            onClick={() => onConfirm(vin.trim().toUpperCase())}
+          >
+            {requireVin ? 'تأكيد مع VIN' : (vinReady ? 'تأكيد مع VIN' : 'تخطي وتأكيد')}
+          </button>
+          <button className="btn btn-outline" onClick={onBack}>رجوع</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DeliveriesContent() {
@@ -713,59 +806,27 @@ function DeliveriesContent() {
         </div>
       )}
 
-      {/* DONE: Bug 5 — VIN required for bikes; non-bike deliveries can still skip */}
-      {confirmDelivery && confirmDelivery.step === 'vin' && (() => {
-        const requireVin = isBikeDelivery(confirmDelivery.row);
-        const vinReady = vinInput.trim().length > 0;
-        return (
-          <div className="modal-overlay">
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-              <h3>
-                رقم الهيكل (VIN)
-                {requireVin && <span style={{ color: '#dc2626', fontSize: '0.85rem' }}> *مطلوب للدراجات</span>}
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                {requireVin
-                  ? 'هذه دراجة — يجب إدخال رقم الهيكل قبل تأكيد التوصيل.'
-                  : 'هذا المنتج ليس دراجة — يمكنك تخطي رقم الهيكل.'}
-              </p>
-              <div className="form-group" style={{ margin: '16px 0' }}>
-                <input
-                  type="text"
-                  value={vinInput}
-                  onChange={(e) => setVinInput(e.target.value.toUpperCase())}
-                  placeholder="مثال: WB10A1234Z5678"
-                  style={{
-                    direction: 'ltr', textAlign: 'center', fontSize: '1.1rem',
-                    fontWeight: 600, letterSpacing: '2px',
-                    border: requireVin && !vinReady ? '2px solid #dc2626' : undefined,
-                  }}
-                  autoFocus
-                />
-              </div>
-              <div className="modal-actions">
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  disabled={requireVin && !vinReady}
-                  onClick={async () => {
-                    if (requireVin && !vinReady) {
-                      addToast('رقم VIN مطلوب لتأكيد توصيل الدراجة', 'error');
-                      return;
-                    }
-                    await doStatusChange(confirmDelivery.row, 'تم التوصيل', vinInput);
-                    setConfirmDelivery(null);
-                    setVinInput('');
-                  }}
-                >
-                  {requireVin ? 'تأكيد مع VIN' : (vinReady ? 'تأكيد مع VIN' : 'تخطي وتأكيد')}
-                </button>
-                <button className="btn btn-outline" onClick={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}>رجوع</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* DONE: Bug 5 — VIN required for bikes; non-bike deliveries can still skip.
+          v1.2 — extracted to VinStepModal (module-scope) to stop mobile keyboards
+          from dropping focus on each keystroke. See the long docblock on the
+          component for the full explanation. */}
+      {confirmDelivery && confirmDelivery.step === 'vin' && (
+        <VinStepModal
+          row={confirmDelivery.row}
+          initialValue={vinInput}
+          onConfirm={async (vin) => {
+            const needed = isBikeDelivery(confirmDelivery.row);
+            if (needed && !vin) {
+              addToast('رقم VIN مطلوب لتأكيد توصيل الدراجة', 'error');
+              return;
+            }
+            await doStatusChange(confirmDelivery.row, 'تم التوصيل', vin);
+            setConfirmDelivery(null);
+            setVinInput('');
+          }}
+          onBack={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}
+        />
+      )}
 
       <ConfirmModal
         isOpen={!!deleteId}
