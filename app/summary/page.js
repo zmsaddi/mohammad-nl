@@ -71,26 +71,47 @@ function SummaryContent() {
     }
   };
 
-  // DONE: Fix 4 — CSV export of the P&L summary, BOM-prefixed for correct Arabic in Excel
+  // v1.2 — CSV export covers all three P&L views and the corrected
+  // cash-flow block. Old section "مبيعات كاش / بنك / آجل" replaced by
+  // the actual money-flow numbers from payments + supplier_payments.
   const exportCSV = () => {
     if (!data) return;
     const rows = [
       ['البند', 'المبلغ'],
-      ['إيرادات مؤكدة (استحقاق)', data.totalRevenue],
-      ['تكلفة البضاعة المباعة (استحقاق)', data.totalCOGS],
-      ['الربح الإجمالي (استحقاق)', data.grossProfit],
+      ['=== متوقعة (Pipeline) ===', ''],
+      ['إيرادات متوقعة', data.projectedRevenue || 0],
+      ['COGS متوقع', data.projectedCOGS || 0],
+      ['ربح إجمالي متوقع', data.projectedGrossProfit || 0],
+      ['صافي متوقع (بدون عمولات المحجوز)', data.projectedNetProfit || 0],
+      [''],
+      ['=== استحقاق (بعد التسليم) ===', ''],
+      ['إيرادات مؤكدة', data.totalRevenue],
+      ['تكلفة البضاعة المباعة', data.totalCOGS],
+      ['الربح الإجمالي', data.grossProfit],
       ['المصاريف التشغيلية', data.totalExpenses],
       ['عمولات مدفوعة', data.totalBonusPaid],
       ['عمولات مستحقة', data.totalBonusOwed],
-      ['صافي الربح (استحقاق)', data.netProfit],
+      ['صافي الربح', data.netProfit],
       [''],
+      ['=== محصّل نقداً ===', ''],
+      ['إيرادات محصّلة', data.totalRevenueCashBasis || 0],
+      ['تكلفة المحصّل', data.totalCOGSCashBasis || 0],
+      ['صافي الربح المحصّل', data.netProfitCashBasis || 0],
+      [''],
+      ['=== الحالة ===', ''],
       ['إجمالي المشتريات', data.totalPurchases],
       ['قيمة المخزون', data.inventoryValue],
       ['الديون المستحقة', data.totalDebt],
       [''],
-      ['مبيعات كاش', data.salesCash],
-      ['مبيعات بنك', data.salesBank],
-      ['مبيعات آجل', data.salesCredit],
+      ['=== التدفق النقدي الفعلي (الفترة) ===', ''],
+      ['تحصيلات من عملاء — كاش', data.cashFlowSalesCash || 0],
+      ['تحصيلات من عملاء — بنك', data.cashFlowSalesBank || 0],
+      ['دفعات للموردين — كاش', data.cashFlowPurchasesCash || 0],
+      ['دفعات للموردين — بنك', data.cashFlowPurchasesBank || 0],
+      ['مصاريف — كاش', data.cashFlowExpensesCash || 0],
+      ['مصاريف — بنك', data.cashFlowExpensesBank || 0],
+      ['صافي التدفق — كاش', data.cashFlowNetCash || 0],
+      ['صافي التدفق — بنك', data.cashFlowNetBank || 0],
     ];
     const csv = rows.map((r) => r.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -332,9 +353,14 @@ function SummaryContent() {
                       <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>طلبات محجوزة (بانتظار التوصيل)</h3>
                       <span style={{ fontSize: '0.85rem', color: '#a16207' }}>{data.reservedCount} طلب بقيمة {formatNumber(data.reservedRevenue)} - ربح متوقع: {formatNumber(data.reservedProfit)}</span>
                     </div>
-                    <span className="status-badge" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.9rem', padding: '6px 16px' }}>
-                      لم تُحسب في الأرباح
-                    </span>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="status-badge" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.9rem', padding: '6px 16px' }}>
+                        لم تُحسب في الأرباح
+                      </span>
+                      <button className="btn btn-sm" style={{ background: '#8b5cf6', color: 'white', fontSize: '0.8rem' }} onClick={() => setActiveTab('pnl')}>
+                        📊 عرض القائمة المتوقعة
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
