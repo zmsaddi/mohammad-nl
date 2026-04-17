@@ -1,7 +1,8 @@
 # دليل إعداد نظام vitesse-eco
 
-> نظام إدارة عمليات داخلي (Next.js 16 + Neon Postgres + NextAuth). انظر
-> [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) للنظرة المعمارية الكاملة.
+> نظام إدارة عمليات داخلي (Next.js 16 + Neon Postgres + NextAuth). مرجع
+> البنية المعمارية الحي هو الكود نفسه — `app/` للـ routes، `lib/db.js` لطبقة
+> البيانات، `components/` للـ UI، `proxy.js` للـ middleware.
 
 ---
 
@@ -82,7 +83,7 @@ curl -X POST http://localhost:3000/api/init \
 ```
 
 - `action:'reset'` محظور في `NODE_ENV=production` ويتطلب إعداد `ALLOW_DB_RESET=true` في
-  `.env` لبيئة التطوير (راجع [BUG-03 في SPRINT_PLAN.md](SPRINT_PLAN.md)).
+  `.env` لبيئة التطوير.
 - `action:'clean'` يحذف بيانات الأعمال لكنه يحتفظ بالمستخدمين والإعدادات. مع
   `keepLearning:true` يحتفظ أيضاً بجداول `ai_corrections`، `ai_patterns`، `entity_aliases`.
 
@@ -137,8 +138,6 @@ node scripts/env-test-doctor.mjs
 
 السكربت يطبع المضيف واسم قاعدة البيانات ويُجري فحص `current_database()` الحي قبل أي
 DDL. رمز الخروج 0 = آمن للتشغيل، 1 = رفض، 2 = فشل الفحص (شبكة/اتصال).
-
-المرجع: [F-009 في docs/v1-1-comprehensive-study.md](docs/v1-1-comprehensive-study.md).
 
 ### 4.2 تشغيل المجموعة الكاملة
 
@@ -195,30 +194,10 @@ Claude لا يستطيع تفعيل هذه الحمايات تلقائياً —
 
 ---
 
-## 5. ملء الأسماء البديلة (Alias Backfill)
-
-بعد تهيئة DB على مستودع جديد، شغّل سكربت التعبئة لتوليد الأسماء البديلة لكل المنتجات
-والعملاء والموردين الموجودين. هذا ضروري لأن FEAT-01 يُولّد الأسماء البديلة فقط عند إنشاء
-كيان جديد — الكيانات الموجودة قبل FEAT-01 تحتاج تعبئة يدوية لمرة واحدة.
-
-```bash
-node scripts/backfill-aliases.mjs
-```
-
-السكربت:
-- idempotent (آمن للتشغيل أكثر من مرة — يحترم `first-writer-wins` على الأسماء
-  الموجودة).
-- يقرأ `POSTGRES_URL` من `.env.test` أولاً ثم `.env.local`.
-- يطبع لكل جدول `processed / skipped / aliases_created`.
-- يُبطل ذاكرة مُقرّر الكيانات (Fuse cache) في النهاية حتى يعكس التطبيق الحي الأسماء
-  الجديدة فوراً.
-
----
-
-## 6. النشر على Vercel
+## 5. النشر على Vercel
 
 المشروع الحالي منشور على `mohammadnl.vercel.app`. الاسم المرجعي للمشروع في الوثائق
-والسكربتات الجديدة هو **vitesse-eco** (قرار ARC-05 — انظر [SPRINT_PLAN.md](SPRINT_PLAN.md)).
+والسكربتات الجديدة هو **vitesse-eco**.
 
 ### متغيرات البيئة على Vercel (Production + Preview)
 
@@ -233,7 +212,7 @@ node scripts/backfill-aliases.mjs
 
 ---
 
-## 7. سير العمل اليومي
+## 6. سير العمل اليومي
 
 ```bash
 # صباحاً — تأكد من أحدث نسخة
@@ -254,7 +233,7 @@ npm run build
 
 ---
 
-## 8. First-Time Admin Password Rotation
+## 7. First-Time Admin Password Rotation
 
 **Run this procedure immediately after go-live.** The default `admin123`
 password is a well-known placeholder and must be rotated before the
@@ -295,7 +274,7 @@ Then log in with the new password and rotate it again via the UI
 
 ---
 
-## 9. Secret Rotation Procedure
+## 8. Secret Rotation Procedure
 
 Each production secret has its own rotation workflow, blast radius,
 and cadence. **Do not copy-paste old values — always generate fresh.**
@@ -390,7 +369,7 @@ the old URL will break until manually updated.
 
 ---
 
-## 10. Disaster Recovery
+## 9. Disaster Recovery
 
 ### Neon point-in-time restore
 
