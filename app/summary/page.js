@@ -191,20 +191,22 @@ function SummaryContent() {
         <p>نظرة شاملة على أداء المتجر</p>
       </div>
 
-      {/* Quick Actions — single compact row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      {/* Action Bar */}
+      <div className="action-bar">
         {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
           <VoiceButton
             onResult={(r) => setVoiceResult(r)}
             onError={(e) => addToast(e, 'error')}
           />
         )}
-        <Link href="/sales?new=1" className="btn btn-sm" style={{ background: '#16a34a', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, borderRadius: '8px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-          + عملية بيع
+        <Link href="/sales?new=1" className="sell-btn">
+          <span style={{ fontSize: 16, fontWeight: 700 }}>+</span>
+          <span>عملية بيع</span>
         </Link>
         {['admin', 'manager'].includes(session?.user?.role) && (
-          <Link href="/purchases?new=1" className="btn btn-sm" style={{ background: '#1e40af', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, borderRadius: '8px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            + عملية شراء
+          <Link href="/purchases?new=1" className="buy-btn">
+            <span style={{ fontSize: 16, fontWeight: 700 }}>+</span>
+            <span>عملية شراء</span>
           </Link>
         )}
       </div>
@@ -227,33 +229,27 @@ function SummaryContent() {
         onRetry={() => setVoiceResult(null)}
       />
 
-      {/* Filters — chips + expandable custom date */}
+      {/* Filter Chips */}
       {!isSellerView && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <button className={`btn btn-sm ${!dateFrom && !dateTo ? 'btn-primary' : 'btn-outline'}`} style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
-          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
-          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('thisYear')}>هذه السنة</button>
-          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('all')}>الكل</button>
-          <button
-            className={`btn btn-sm ${showCustomDate ? 'btn-primary' : 'btn-outline'}`}
-            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-            onClick={() => setShowCustomDate(!showCustomDate)}
-          >
-            تخصيص
-          </button>
+        <div className="filter-bar-v2">
+          <div className="filter-chips">
+            <button className={`chip${!dateFrom && !dateTo && !showCustomDate ? ' active' : ''}`} onClick={() => { handlePreset('thisMonth'); setShowCustomDate(false); }}>هذا الشهر</button>
+            <button className="chip" onClick={() => { handlePreset('lastMonth'); setShowCustomDate(false); }}>الشهر الماضي</button>
+            <button className="chip" onClick={() => { handlePreset('thisYear'); setShowCustomDate(false); }}>هذه السنة</button>
+            <button className="chip" onClick={() => { handlePreset('all'); setShowCustomDate(false); }}>الكل</button>
+            <button className={`chip${showCustomDate ? ' active' : ''}`} onClick={() => setShowCustomDate(!showCustomDate)}>📅 فترة مخصصة</button>
+          </div>
           {data && canSeeCosts && (
-            <button className="btn btn-outline btn-sm" onClick={exportCSV} style={{ padding: '6px 12px', fontSize: '0.78rem', marginRight: 'auto' }}>
-              📥 CSV
-            </button>
+            <button className="csv-btn" onClick={exportCSV}>📥 CSV</button>
           )}
         </div>
       )}
       {!isSellerView && showCustomDate && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', padding: '12px 16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem', fontFamily: "'Cairo', sans-serif" }} />
-          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>إلى</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem', fontFamily: "'Cairo', sans-serif" }} />
-          <button className="btn btn-primary btn-sm" onClick={handleFilter} style={{ padding: '6px 14px', fontSize: '0.82rem' }}>تصفية</button>
+        <div className="date-range-row">
+          <input type="date" className="date-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>إلى</span>
+          <input type="date" className="date-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <button className="filter-apply-btn" onClick={handleFilter}>تصفية</button>
         </div>
       )}
 
@@ -300,44 +296,30 @@ function SummaryContent() {
           {/* ===== Tab 1: ملخص سريع — KPI cards & revenue breakdown ===== */}
           {activeTab === 'quick' && (
             <>
-              {/* Quick KPI summary from both accrual and cash bases */}
-              <div className="summary-cards">
-                <div className="summary-card">
-                  <div className="summary-card-icon" style={{ background: '#dcfce7' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#16a34a" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-                  <div className="summary-card-content">
-                    <h3>إيرادات مؤكدة (استحقاق)</h3>
-                    <div className="value" style={{ color: '#16a34a' }}>{formatNumber(data.totalRevenue)}</div>
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-card-icon" style={{ background: '#e0f2fe' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#0369a1" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-                  </div>
-                  <div className="summary-card-content">
-                    <h3>صافي الربح (محصّل)</h3>
-                    <div className="value" style={{ color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>{formatNumber(data.netProfitCashBasis || 0)}</div>
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-card-icon" style={{ background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={data.netProfit >= 0 ? '#16a34a' : '#dc2626'} width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-                  </div>
-                  <div className="summary-card-content">
-                    <h3>صافي الربح (استحقاق)</h3>
-                    <div className="value" style={{ color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-card-icon" style={{ background: '#fee2e2' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#dc2626" width="24" height="24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                  </div>
-                  <div className="summary-card-content">
-                    <h3>الديون المستحقة</h3>
-                    <div className="value" style={{ color: '#dc2626' }}>{formatNumber(data.totalDebt)}</div>
-                  </div>
-                </div>
+              {/* KPI Cards — new design with colored borders */}
+              <div className="kpi-grid">
+                {[
+                  { label: 'إيرادات مؤكدة (استحقاق)', value: data.totalRevenue, icon: '💎', color: '#10b981' },
+                  { label: 'صافي الربح (محصّل)', value: data.netProfitCashBasis || 0, icon: '📊', color: '#6366f1' },
+                  { label: 'صافي الربح (استحقاق)', value: data.netProfit, icon: '📈', color: '#3b82f6' },
+                  { label: 'الديون المستحقة', value: data.totalDebt, icon: '⚠️', color: '#f43f5e' },
+                ].map((kpi, i) => {
+                  const num = parseFloat(kpi.value) || 0;
+                  return (
+                    <div key={i} className="kpi-card" style={{ borderRight: `3px solid ${kpi.color}`, animationDelay: `${i * 0.07}s` }}>
+                      <div className="kpi-top">
+                        <span style={{ fontSize: 24 }}>{kpi.icon}</span>
+                        <span className="kpi-label">{kpi.label}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span className="kpi-value" style={{ color: kpi.color }}>
+                          {num === 0 ? '—' : formatNumber(num)}
+                        </span>
+                        {num === 0 && <span className="kpi-empty">لا بيانات</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Reserved Orders */}
@@ -355,35 +337,47 @@ function SummaryContent() {
                 </div>
               )}
 
-              {/* Cash vs Bank Breakdown */}
-              <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-                  تفصيل نقدي / بنك
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-                  <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: '4px' }}>مبيعات كاش (COD)</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.salesCash || 0)}</div>
+              {/* Cash vs Bank — Table Format */}
+              <div className="section-header">
+                <span style={{ fontSize: 18 }}>💳</span>
+                <span>تفصيل نقدي / بنك</span>
+              </div>
+              <div className="cash-table" style={{ marginBottom: 24 }}>
+                <div className="cash-header">
+                  <div className="cash-col"></div>
+                  <div className="cash-col cash-col-header"><span style={{ color: '#10b981' }}>●</span> كاش</div>
+                  <div className="cash-col cash-col-header"><span style={{ color: 'var(--color-accent)' }}>●</span> بنك</div>
+                </div>
+                {[
+                  { label: 'مبيعات', cash: data.salesCash || 0, bank: data.salesBank || 0 },
+                  { label: 'مشتريات', cash: data.purchasesCash || 0, bank: data.purchasesBank || 0 },
+                  { label: 'مصاريف', cash: data.expensesCash || 0, bank: data.expensesBank || 0 },
+                ].map((row, i) => (
+                  <div key={i} className="cash-row" style={{ background: i % 2 === 0 ? 'rgba(99,102,241,0.03)' : 'transparent' }}>
+                    <div className="cash-col cash-col-label">{row.label}</div>
+                    <div className="cash-col">
+                      {row.cash > 0
+                        ? <span className="cash-highlight">{formatNumber(row.cash)}</span>
+                        : <span className="cash-zero">—</span>}
+                    </div>
+                    <div className="cash-col">
+                      {row.bank > 0
+                        ? <span style={{ fontWeight: 700 }}>{formatNumber(row.bank)}</span>
+                        : <span className="cash-zero">—</span>}
+                    </div>
                   </div>
-                  <div style={{ padding: '16px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#2563eb', marginBottom: '4px' }}>مبيعات بنك</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1d4ed8' }}>{formatNumber(data.salesBank || 0)}</div>
+                ))}
+                <div className="cash-total-row">
+                  <div className="cash-col" style={{ fontWeight: 700 }}>الإجمالي</div>
+                  <div className="cash-col">
+                    <span style={{ fontWeight: 700, color: '#10b981' }}>
+                      {formatNumber((data.salesCash || 0) + (data.purchasesCash || 0) + (data.expensesCash || 0))}
+                    </span>
                   </div>
-                  <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#dc2626', marginBottom: '4px' }}>مشتريات كاش</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.purchasesCash || 0)}</div>
-                  </div>
-                  <div style={{ padding: '16px', background: '#fdf4ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginBottom: '4px' }}>مشتريات بنك</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#6d28d9' }}>{formatNumber(data.purchasesBank || 0)}</div>
-                  </div>
-                  <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#d97706', marginBottom: '4px' }}>مصاريف كاش</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.expensesCash || 0)}</div>
-                  </div>
-                  <div style={{ padding: '16px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#0284c7', marginBottom: '4px' }}>مصاريف بنك</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0369a1' }}>{formatNumber(data.expensesBank || 0)}</div>
+                  <div className="cash-col">
+                    <span style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
+                      {formatNumber((data.salesBank || 0) + (data.purchasesBank || 0) + (data.expensesBank || 0))}
+                    </span>
                   </div>
                 </div>
               </div>
