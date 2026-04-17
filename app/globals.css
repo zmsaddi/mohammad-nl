@@ -1248,10 +1248,6 @@ html, body {
   .table-container .data-table td:not([data-label]) {
     grid-template-columns: 1fr;
   }
-  .table-container .data-table td.number-cell {
-    text-align: right;
-    justify-content: end;
-  }
 
   .data-table {
     min-width: 600px;
