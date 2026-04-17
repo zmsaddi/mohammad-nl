@@ -195,18 +195,17 @@ function SummaryContent() {
       <div className="action-bar">
         {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
           <VoiceButton
+            compact
             onResult={(r) => setVoiceResult(r)}
             onError={(e) => addToast(e, 'error')}
           />
         )}
         <Link href="/sales?new=1" className="sell-btn">
-          <span style={{ fontSize: 16, fontWeight: 700 }}>+</span>
-          <span>عملية بيع</span>
+          + عملية بيع
         </Link>
         {['admin', 'manager'].includes(session?.user?.role) && (
           <Link href="/purchases?new=1" className="buy-btn">
-            <span style={{ fontSize: 16, fontWeight: 700 }}>+</span>
-            <span>عملية شراء</span>
+            + عملية شراء
           </Link>
         )}
       </div>
@@ -312,7 +311,7 @@ function SummaryContent() {
                         <span className="kpi-label">{kpi.label}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span className="kpi-value" style={{ color: kpi.color }}>
+                        <span className="kpi-value" style={{ color: num === 0 ? '#cbd5e1' : kpi.color }}>
                           {num === 0 ? '—' : formatNumber(num)}
                         </span>
                         {num === 0 && <span className="kpi-empty">لا بيانات</span>}

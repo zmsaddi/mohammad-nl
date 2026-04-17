@@ -311,7 +311,10 @@ html, body {
 
 /* Page Header */
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+.page-header + .action-bar {
+  margin-top: -12px;
 }
 
 .page-header h2 {
@@ -1475,7 +1478,8 @@ html, body {
   display: flex;
   gap: 0;
   border-bottom: 2px solid #e2e8f0;
-  margin-bottom: 20px;
+  margin-top: 16px;
+  margin-bottom: 16px;
 }
 .tab {
   padding: 10px 20px;
@@ -1568,34 +1572,48 @@ html, body {
    ============================ */
 .action-bar {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
-  height: 40px;
   margin-top: 16px;
+  margin-bottom: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  position: static;
 }
 .mic-btn {
   width: 40px;
   height: 40px;
   min-width: 40px;
+  max-width: 40px;
   flex-shrink: 0;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-accent);
+  padding: 0;
+  margin: 0;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #6366f1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: static;
+  z-index: auto;
+  box-shadow: none;
   transition: border-color var(--transition-fast);
 }
-.mic-btn:hover { border-color: var(--color-accent); }
+.mic-btn:hover { border-color: #6366f1; }
 .sell-btn {
   flex: 1;
   height: 40px;
+  min-height: 40px;
+  max-height: 40px;
   border: none;
-  border-radius: var(--radius-md);
-  background: var(--color-success-gradient);
-  color: #fff;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #ffffff;
   font-size: 14px;
   font-weight: 700;
   font-family: 'Cairo', sans-serif;
@@ -1605,16 +1623,21 @@ html, body {
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  padding: 0 16px;
+  white-space: nowrap;
+  line-height: 1;
   transition: opacity var(--transition-fast);
 }
 .sell-btn:hover { opacity: 0.9; }
 .buy-btn {
   flex: 1;
   height: 40px;
-  border: 1.5px solid var(--color-info);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-info);
+  min-height: 40px;
+  max-height: 40px;
+  border: 1.5px solid #3b82f6;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #3b82f6;
   font-size: 14px;
   font-weight: 700;
   font-family: 'Cairo', sans-serif;
@@ -1624,11 +1647,14 @@ html, body {
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  padding: 0 16px;
+  white-space: nowrap;
+  line-height: 1;
   transition: background var(--transition-fast);
 }
 .buy-btn:hover { background: #eff6ff; }
 @media (max-width: 768px) {
-  .sell-btn, .buy-btn { font-size: 13px; }
+  .sell-btn, .buy-btn { font-size: 13px; padding: 0 8px; }
 }
 
 /* ============================
@@ -1638,7 +1664,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16px;
+  margin-top: 12px;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -1722,18 +1748,25 @@ html, body {
 }
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 16px;
+}
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .kpi-grid { grid-template-columns: 1fr; }
 }
 .kpi-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
+  background: #ffffff;
+  border-radius: 12px;
   padding: 16px 18px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  border: none;
   animation: fadeIn 0.3s ease both;
 }
 .kpi-card:nth-child(1) { animation-delay: 0s; }
@@ -1752,8 +1785,8 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 28px;
-  margin-bottom: 12px;
+  margin-top: 24px;
+  margin-bottom: 8px;
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text-primary);

@@ -13,7 +13,7 @@ const MIN_DURATION_MS = 1500;
 // still passing a whispered utterance. Tune if real speech gets rejected.
 const SILENCE_RMS_THRESHOLD = 0.02;
 
-export default function VoiceButton({ onResult, onError }) {
+export default function VoiceButton({ onResult, onError, compact }) {
   const [state, setState] = useState('idle'); // idle, recording, processing
   const [seconds, setSeconds] = useState(0);
   const mediaRecorder = useRef(null);
@@ -209,6 +209,33 @@ export default function VoiceButton({ onResult, onError }) {
       setSeconds(0);
     }
   };
+
+  if (compact) {
+    return (
+      <button
+        className="mic-btn"
+        onClick={handleClick}
+        disabled={state === 'processing'}
+        title={state === 'recording' ? `اضغط للإيقاف (${seconds})` : 'إدخال صوتي'}
+        style={state === 'recording' ? { borderColor: '#dc2626', color: '#dc2626' } : undefined}
+      >
+        {state === 'processing' ? (
+          <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+        ) : state === 'recording' ? (
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="18" height="18">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        )}
+      </button>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
