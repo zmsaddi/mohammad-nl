@@ -105,9 +105,17 @@ function SupplierDetailContent() {
       </div>
 
       {/* Pay Supplier Form */}
-      {unpaidPurchases.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 12, color: 'var(--color-text-secondary)' }}>دفع للمورد</h3>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 12, color: 'var(--color-text-secondary)' }}>تسوية ديون المورد</h3>
+        {unpaidPurchases.length === 0 ? (
+          <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-success)', fontSize: '0.9rem', fontWeight: 600 }}>
+            ✓ لا يوجد ديون مستحقة — جميع المشتريات مدفوعة بالكامل
+          </div>
+        ) : (
+          <>
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca', fontSize: '0.85rem', color: '#dc2626', fontWeight: 600 }}>
+            ⚠ يوجد {unpaidPurchases.length} عملية غير مدفوعة بالكامل — إجمالي الدين: {formatNumber(totalDebt)}
+          </div>
           <form onSubmit={handlePay}>
             <div className="form-grid">
               <div className="form-group">
@@ -137,8 +145,9 @@ function SupplierDetailContent() {
             </div>
             <button type="submit" className="btn btn-primary" disabled={paying}>{paying ? 'جاري الدفع...' : 'تسجيل الدفعة'}</button>
           </form>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {/* Purchases History */}
       <div className="card">
