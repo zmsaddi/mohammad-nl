@@ -181,15 +181,15 @@ function MyBonusContent() {
               <tbody>
                 {paginatedRows.map((b) => (
                   <tr key={b.id}>
-                    <td data-label="التاريخ">{b.date}</td>
-                    <td data-label="المنتج">{b.item}</td>
-                    <td data-label="الكمية" className="number-cell">{b.quantity}</td>
-                    {role === 'seller' && <td data-label="السعر الموصى" className="number-cell">{formatNumber(b.recommended_price)}</td>}
-                    {role === 'seller' && <td data-label="سعر البيع" className="number-cell">{formatNumber(b.actual_price)}</td>}
-                    <td data-label="ثابت" className="number-cell">{formatNumber(b.fixed_bonus)}</td>
-                    {role === 'seller' && <td data-label="إضافي" className="number-cell" style={{ color: b.extra_bonus > 0 ? '#1e40af' : '#94a3b8' }}>{formatNumber(b.extra_bonus)}</td>}
-                    <td data-label="المجموع" className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>{formatNumber(b.total_bonus)}</td>
-                    <td data-label="الحالة">
+                    <td>{b.date}</td>
+                    <td>{b.item}</td>
+                    <td className="number-cell">{b.quantity}</td>
+                    {role === 'seller' && <td className="number-cell">{formatNumber(b.recommended_price)}</td>}
+                    {role === 'seller' && <td className="number-cell">{formatNumber(b.actual_price)}</td>}
+                    <td className="number-cell">{formatNumber(b.fixed_bonus)}</td>
+                    {role === 'seller' && <td className="number-cell" style={{ color: b.extra_bonus > 0 ? '#1e40af' : '#94a3b8' }}>{formatNumber(b.extra_bonus)}</td>}
+                    <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>{formatNumber(b.total_bonus)}</td>
+                    <td>
                       <StatusBadge status={b.settled ? 'تم الصرف' : 'مستحق'} />
                     </td>
                   </tr>

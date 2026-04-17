@@ -346,9 +346,9 @@ function StockContent() {
                     const statusLabel = status === 'out' ? 'نفذ' : status === 'low' ? 'منخفض' : 'متوفر';
                     return (
                       <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
-                        <td data-label="#">{p.id}</td>
-                        <td data-label="المنتج (لاتيني)" style={{ fontWeight: 600 }}>{p.name}</td>
-                        <td data-label="الوصف (عربي)" onClick={(e) => e.stopPropagation()}>
+                        <td>{p.id}</td>
+                        <td style={{ fontWeight: 600 }}>{p.name}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           {isAdmin ? (
                             <input
                               type="text"
@@ -375,9 +375,9 @@ function StockContent() {
                             <span style={{ color: '#64748b' }}>{p.description_ar || '—'}</span>
                           )}
                         </td>
-                        <td data-label="الفئة">{p.category || '-'}</td>
-                        {canSeeCosts && <td data-label="سعر الشراء" className="number-cell">{formatNumber(p.buy_price)}</td>}
-                        <td data-label="سعر البيع" className="number-cell">
+                        <td>{p.category || '-'}</td>
+                        {canSeeCosts && <td className="number-cell">{formatNumber(p.buy_price)}</td>}
+                        <td className="number-cell">
                           {isAdmin ? (
                             <input
                               type="number"
@@ -407,7 +407,7 @@ function StockContent() {
                         </td>
                         {/* DONE: Step 2G — inline editable low-stock threshold (admin only) */}
                         {isAdmin && (
-                          <td data-label="حد التنبيه" onClick={(e) => e.stopPropagation()}>
+                          <td onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min="0"
@@ -437,15 +437,15 @@ function StockContent() {
                             />
                           </td>
                         )}
-                        <td data-label="الكمية" className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
+                        <td className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
                           {formatNumber(p.stock)}
                         </td>
-                        {canSeeCosts && <td data-label="قيمة المخزون" className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(value)}</td>}
-                        <td data-label="الحالة">
+                        {canSeeCosts && <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(value)}</td>}
+                        <td>
                           <StatusBadge status={statusLabel} />
                         </td>
                         {isAdmin && (
-                          <td data-label="إجراءات">
+                          <td>
                             <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(p.id)}>حذف</button>
                           </td>
                         )}

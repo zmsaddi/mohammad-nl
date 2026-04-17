@@ -753,20 +753,20 @@ function SalesContent() {
               <tbody>
                 {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td data-label="الكود" style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
-                    <td data-label="التاريخ">{row.date}</td>
-                    <td data-label="العميل">{row.client_name}</td>
-                    <td data-label="الصنف">{row.item}</td>
-                    <td data-label="الكمية" className="number-cell">{formatNumber(row.quantity)}</td>
-                    <td data-label="سعر الوحدة" className="number-cell">{formatNumber(row.unit_price)}</td>
-                    <td data-label="الإجمالي" className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    <td data-label="المدفوع" className="number-cell">{formatNumber(row.paid_amount)}</td>
-                    <td data-label="المتبقي" className="number-cell" style={{ color: (row.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(row.remaining)}</td>
-                    {canSeeCosts && <td data-label="التكلفة" className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>}
-                    {canSeeCosts && <td data-label="الربح" className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
+                    <td>{row.date}</td>
+                    <td>{row.client_name}</td>
+                    <td>{row.item}</td>
+                    <td className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
+                    <td className="number-cell" style={{ color: (row.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(row.remaining)}</td>
+                    {canSeeCosts && <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>}
+                    {canSeeCosts && <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
                       {formatNumber(row.profit)}
                     </td>}
-                    <td data-label="الحالة">
+                    <td>
                       <span className="status-badge" style={{
                         background: row.status === 'مؤكد' ? '#dcfce7' : row.status === 'ملغي' ? '#fee2e2' : '#fef3c7',
                         color: row.status === 'مؤكد' ? '#16a34a' : row.status === 'ملغي' ? '#dc2626' : '#d97706',
@@ -774,7 +774,7 @@ function SalesContent() {
                         {row.status || 'محجوز'}
                       </span>
                     </td>
-                    <td data-label="الدفع">
+                    <td>
                       <span className="status-badge" style={{
                         background: row.payment_type === 'بنك' ? '#dbeafe' : row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
                         color: row.payment_type === 'بنك' ? '#1e40af' : row.payment_type === 'آجل' ? '#d97706' : '#16a34a'
@@ -782,7 +782,7 @@ function SalesContent() {
                         {row.payment_type || 'كاش'}
                       </span>
                     </td>
-                    <td data-label="إجراءات">
+                    <td>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           className="btn btn-sm"

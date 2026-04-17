@@ -201,13 +201,13 @@ function SuppliersContent() {
                 <tbody>
                   {paginatedRows.map((s) => (
                     <tr key={s.id} className="clickable-row" onClick={() => window.location.href = `/suppliers/${s.id}`}>
-                      <td data-label="#">{s.id}</td>
-                      <td data-label="اسم المورد" style={{ fontWeight: 600 }}>{s.name}</td>
-                      <td data-label="الهاتف" style={{ direction: 'ltr', textAlign: 'right' }}>{s.phone || '—'}</td>
-                      <td data-label="إجمالي المشتريات" className="number-cell">{formatNumber(s.totalPurchases)}</td>
-                      <td data-label="المدفوع" className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(s.totalPaid)}</td>
-                      <td data-label="الدين المتبقي" className="number-cell" style={{ color: parseFloat(s.remainingDebt) > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(s.remainingDebt)}</td>
-                      <td data-label="إجراءات" onClick={(e) => e.stopPropagation()}>
+                      <td>{s.id}</td>
+                      <td style={{ fontWeight: 600 }}>{s.name}</td>
+                      <td style={{ direction: 'ltr', textAlign: 'right' }}>{s.phone || '—'}</td>
+                      <td className="number-cell">{formatNumber(s.totalPurchases)}</td>
+                      <td className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(s.totalPaid)}</td>
+                      <td className="number-cell" style={{ color: parseFloat(s.remainingDebt) > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(s.remainingDebt)}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(s.id)}>حذف</button>
                       </td>
                     </tr>

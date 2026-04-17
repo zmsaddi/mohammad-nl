@@ -595,12 +595,12 @@ function PurchasesContent() {
               <tbody>
                 {paginatedRows.map((row) => (
                   <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td data-label="الكود" style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
-                    <td data-label="التاريخ">{row.date}</td>
-                    <td data-label="المورد">{row.supplier}</td>
-                    <td data-label="المنتج">{row.item}</td>
+                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
+                    <td>{row.date}</td>
+                    <td>{row.supplier}</td>
+                    <td>{row.item}</td>
                     {/* DONE: Step 6 — category cell (legacy rows show '-') */}
-                    <td data-label="الفئة">
+                    <td>
                       <span style={{
                         fontSize: '0.75rem',
                         background: '#f1f5f9',
@@ -611,24 +611,24 @@ function PurchasesContent() {
                         {row.category || '-'}
                       </span>
                     </td>
-                    <td data-label="الكمية" className="number-cell">{formatNumber(row.quantity)}</td>
-                    <td data-label="سعر الوحدة" className="number-cell">{formatNumber(row.unit_price)}</td>
-                    <td data-label="الإجمالي" className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
+                    <td className="number-cell">{formatNumber(row.quantity)}</td>
+                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
+                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
                     {/* v1.0.1 Feature 6 — paid + status cells */}
-                    <td data-label="المدفوع" className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
                       {formatNumber(row.paid_amount ?? row.total)}
                     </td>
                     {/* UX-10: StatusBadge for payment status */}
-                    <td data-label="الحالة">
+                    <td>
                       <StatusBadge status={
                         (row.payment_status || 'paid') === 'paid' ? 'مدفوع'
                         : row.payment_status === 'partial' ? 'جزئي'
                         : 'معلق'
                       } />
                     </td>
-                    <td data-label="طريقة الدفع"><StatusBadge status={row.payment_type || 'كاش'} /></td>
-                    <td data-label="ملاحظات">{row.notes}</td>
-                    <td data-label="إجراءات">
+                    <td><StatusBadge status={row.payment_type || 'كاش'} /></td>
+                    <td>{row.notes}</td>
+                    <td>
                       <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
                         {/* v1.0.1 Feature 6 — "pay now" button for partial/pending */}
                         {row.payment_status && row.payment_status !== 'paid' && (
