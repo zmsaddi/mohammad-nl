@@ -130,12 +130,13 @@ function PurchasesContent() {
 
   const startEditPurchase = (row) => {
     setEditPurchase(row);
-    setShowForm(true); // PA-01: auto-open form on edit
+    setShowForm(true);
+    const product = products.find((p) => p.name === row.item);
     setForm({
       date: row.date || getTodayDate(),
       supplier: row.supplier || '',
       item: row.item || '',
-      descriptionAr: row.description_ar || '',
+      descriptionAr: product?.description_ar || '',
       category: row.category || '',
       quantity: String(row.quantity ?? ''),
       unitPrice: String(row.unit_price ?? ''),
@@ -366,7 +367,7 @@ function PurchasesContent() {
                 onChange={(val) => {
                   // DONE: Step 3 — auto-fill category from existing product when picked
                   const existing = products.find((p) => p.name === val);
-                  setForm({ ...form, item: val, category: existing?.category || form.category });
+                  setForm({ ...form, item: val, descriptionAr: existing?.description_ar || form.descriptionAr, category: existing?.category || form.category });
                 }}
                 options={products.map((p) => ({ name: p.name, value: p.name, label: p.name, sub: `مخزون: ${p.stock || 0}` }))}
                 placeholder="اكتب اسم المنتج..."
