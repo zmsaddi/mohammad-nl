@@ -231,6 +231,39 @@ function ProfitDistributionsContent() {
   const handleConfirmedSubmit = async () => {
     setShowConfirm(false);
     setSubmitting(true);
+    // v1.2 — re-fetch the pool before committing. Pre-v1.2 the pool was
+    // fetched once when the period bounds changed, so a concurrent
+    // distribution by another admin could shrink the remaining amount
+    // without this form knowing — the commit then hit the backend
+    // solvency cap and the user saw a generic "exceeds" error after
+    // filling the whole form. Now we re-read and compare; if baseAmount
+    // now exceeds the fresh remaining, we surface the new number and
+    // update `pool` so the form reflects reality.
+    try {
+      const url = new URL('/api/profit-distributions/collected-revenue', window.location.origin);
+      if (form.periodStart) url.searchParams.set('start', form.periodStart);
+      if (form.periodEnd)   url.searchParams.set('end',   form.periodEnd);
+      const poolRes = await fetch(url.toString(), { cache: 'no-store' });
+      if (poolRes.ok) {
+        const fresh = await poolRes.json();
+        const freshRemaining = parseFloat(fresh?.remaining) || 0;
+        const baseAmt = parseFloat(form.baseAmount) || 0;
+        if (baseAmt > freshRemaining + 0.01) {
+          setPool({
+            net_profit: parseFloat(fresh.net_profit_cash_basis) || 0,
+            already_distributed: parseFloat(fresh.already_distributed) || 0,
+            remaining: freshRemaining,
+            collected: parseFloat(fresh.collected) || 0,
+            cogs: parseFloat(fresh.cogs) || 0,
+            expenses: parseFloat(fresh.expenses) || 0,
+            gross_profit: parseFloat(fresh.gross_profit) || 0,
+          });
+          addToast(`المبلغ المتاح تغيّر — المتبقي الآن ${freshRemaining.toFixed(2)}€ فقط`, 'error');
+          setSubmitting(false);
+          return;
+        }
+      }
+    } catch { /* fall through — backend is the hard gate */ }
     try {
       const res = await fetch('/api/profit-distributions', {
         method: 'POST',

@@ -117,6 +117,26 @@ function SettlementsContent() {
       addToast('المبلغ يتجاوز الرصيد المتاح', 'error');
       return;
     }
+    // v1.2 — re-validate available_credit right before commit. Pre-v1.2
+    // the UI fetched eligibleUsers once on mount/type-change, so another
+    // admin settling a bonus in parallel made the cached credit stale —
+    // the form showed "green" while the backend rejected with "يتجاوز
+    // الرصيد". Now we refresh and compare; if the credit dropped below
+    // the amount the user typed, we stop and surface the fresh number
+    // instead of sending a request that will fail server-side anyway.
+    if (form.type === 'seller_payout' || form.type === 'driver_payout') {
+      try {
+        const res = await fetch(`/api/users/eligible-for-settlement?type=${form.type}`, { cache: 'no-store' });
+        const fresh = await res.json();
+        const freshUser = (Array.isArray(fresh) ? fresh : []).find((u) => u.username === form.username);
+        const freshCredit = freshUser?.available_credit;
+        if (freshCredit != null && amountNum > freshCredit + 0.01) {
+          setEligibleUsers(Array.isArray(fresh) ? fresh : []);
+          addToast(`الرصيد تغيّر — المتاح الآن ${freshCredit.toFixed(2)}€ فقط`, 'error');
+          return;
+        }
+      } catch { /* fall through — backend is still the hard gate */ }
+    }
     try {
       const res = await fetch('/api/settlements', {
         method: 'POST',
