@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -48,7 +49,8 @@ function SalesContent() {
   const [whatsappShare, setWhatsappShare] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [editSale, setEditSale] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  const searchParams = useSearchParams();
+  const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -954,8 +956,10 @@ function SalesContent() {
 
 export default function SalesPage() {
   return (
+    <Suspense>
     <ToastProvider>
       <SalesContent />
     </ToastProvider>
+    </Suspense>
   );
 }

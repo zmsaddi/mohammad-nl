@@ -1042,11 +1042,13 @@ html, body {
 
 /* ===== MOBILE (< 768px) ===== */
 @media (max-width: 768px) {
-  /* Sidebar: off-screen, slides in */
+  /* Sidebar: full-width on mobile, slides from right */
   .sidebar {
-    width: 280px;
+    width: 100vw;
+    max-width: 100vw;
     transform: translateX(100%);
     transition: transform 0.3s ease;
+    overflow-y: auto;
   }
 
   .sidebar.open {

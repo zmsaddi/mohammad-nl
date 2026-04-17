@@ -31,6 +31,7 @@ function SummaryContent() {
   const [fetchError, setFetchError] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [showCustomDate, setShowCustomDate] = useState(false);
   const [voiceResult, setVoiceResult] = useState(null);
   // PA-06 — tab state for splitting the summary page
   const [activeTab, setActiveTab] = useState('quick');
@@ -190,30 +191,21 @@ function SummaryContent() {
         <p>نظرة شاملة على أداء المتجر</p>
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
-        <Link href="/sales" style={{ textDecoration: 'none' }}>
-          <div style={{ background: '#16a34a', color: 'white', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            عملية بيع
-          </div>
+      {/* Quick Actions — single compact row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
+          <VoiceButton
+            onResult={(r) => setVoiceResult(r)}
+            onError={(e) => addToast(e, 'error')}
+          />
+        )}
+        <Link href="/sales?new=1" className="btn btn-sm" style={{ background: '#16a34a', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, borderRadius: '8px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          + عملية بيع
         </Link>
         {['admin', 'manager'].includes(session?.user?.role) && (
-          <Link href="/purchases" style={{ textDecoration: 'none' }}>
-            <div style={{ background: '#1e40af', color: 'white', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width="18" height="18"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-              عملية شراء
-            </div>
+          <Link href="/purchases?new=1" className="btn btn-sm" style={{ background: '#1e40af', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, borderRadius: '8px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            + عملية شراء
           </Link>
-        )}
-        {canUseVoice && process.env.NEXT_PUBLIC_VOICE_ENABLED !== 'false' && (
-          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <VoiceButton
-              onResult={(r) => setVoiceResult(r)}
-              onError={(e) => addToast(e, 'error')}
-            />
-            <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>إدخال صوتي</span>
-          </div>
         )}
       </div>
 
@@ -235,31 +227,33 @@ function SummaryContent() {
         onRetry={() => setVoiceResult(null)}
       />
 
-      {/* Date Filters — hidden for seller view (their data is all-time) */}
+      {/* Filters — chips + expandable custom date */}
       {!isSellerView && (
-        <div className="card" style={{ marginBottom: '24px' }}>
-          <div className="filters-bar">
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <span style={{ color: '#64748b' }}>إلى</span>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            <button className="btn btn-primary btn-sm" onClick={handleFilter}>تصفية</button>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
-              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
-              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('thisYear')}>هذه السنة</button>
-              <button className="btn btn-outline btn-sm" onClick={() => handlePreset('all')}>الكل</button>
-            </div>
-            {/* DONE: Fix 4 — CSV export button (admin/manager only) */}
-            {data && canSeeCosts && (
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={exportCSV}
-                style={{ marginRight: 'auto' }}
-              >
-                📥 تصدير CSV
-              </button>
-            )}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <button className={`btn btn-sm ${!dateFrom && !dateTo ? 'btn-primary' : 'btn-outline'}`} style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('thisMonth')}>هذا الشهر</button>
+          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('lastMonth')}>الشهر الماضي</button>
+          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('thisYear')}>هذه السنة</button>
+          <button className="btn btn-outline btn-sm" style={{ padding: '6px 12px', fontSize: '0.78rem' }} onClick={() => handlePreset('all')}>الكل</button>
+          <button
+            className={`btn btn-sm ${showCustomDate ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+            onClick={() => setShowCustomDate(!showCustomDate)}
+          >
+            تخصيص
+          </button>
+          {data && canSeeCosts && (
+            <button className="btn btn-outline btn-sm" onClick={exportCSV} style={{ padding: '6px 12px', fontSize: '0.78rem', marginRight: 'auto' }}>
+              📥 CSV
+            </button>
+          )}
+        </div>
+      )}
+      {!isSellerView && showCustomDate && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', padding: '12px 16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem', fontFamily: "'Cairo', sans-serif" }} />
+          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>إلى</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.82rem', fontFamily: "'Cairo', sans-serif" }} />
+          <button className="btn btn-primary btn-sm" onClick={handleFilter} style={{ padding: '6px 14px', fontSize: '0.82rem' }}>تصفية</button>
         </div>
       )}
 

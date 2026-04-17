@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -28,7 +29,8 @@ function PurchasesContent() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [editPurchase, setEditPurchase] = useState(null);
   // PA-01: collapsible form
-  const [showForm, setShowForm] = useState(false);
+  const searchParams = useSearchParams();
+  const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
   // UX-05: filter state
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -841,8 +843,10 @@ function PurchasesContent() {
 
 export default function PurchasesPage() {
   return (
+    <Suspense>
     <ToastProvider>
       <PurchasesContent />
     </ToastProvider>
+    </Suspense>
   );
 }
