@@ -6,7 +6,7 @@ const PAGE_ROLES = {
   '/summary': ['admin', 'manager', 'seller'],
   '/purchases': ['admin', 'manager'],
   '/expenses': ['admin', 'manager'],
-  '/stock': ['admin', 'manager'],
+  '/stock': ['admin', 'manager', 'seller'],
   '/clients': ['admin', 'manager'],
   '/sales': ['admin', 'manager', 'seller'],
   '/invoices': ['admin', 'manager', 'seller', 'driver'],
