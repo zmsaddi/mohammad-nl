@@ -121,9 +121,21 @@ function PurchasesContent() {
   // PA-03: Pagination
   const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
 
-  // AC-02: supplier debt summary
+  // v1.2 — AC-02 supplier debt summary with safer NUMERIC handling.
+  // Previous line used `parseFloat(r.paid_amount) ?? parseFloat(r.total)`
+  // but `??` only falls through on null/undefined, not on NaN. A row
+  // with a genuinely missing paid_amount produced NaN on the left side,
+  // and `NaN ?? X` returned NaN, which the `|| 0` finally zeroed — so
+  // legacy rows without paid_amount contributed 0 instead of falling
+  // back to their total (the pre-credit-schema assumption that they
+  // were fully paid). Using an explicit Number.isFinite guard restores
+  // the intended fallback.
   const summaryTotalPurchases = rows.reduce((sum, r) => sum + (parseFloat(r.total) || 0), 0);
-  const summaryTotalPaid = rows.reduce((sum, r) => sum + ((parseFloat(r.paid_amount) ?? parseFloat(r.total)) || 0), 0);
+  const summaryTotalPaid = rows.reduce((sum, r) => {
+    const paid = parseFloat(r.paid_amount);
+    const total = parseFloat(r.total) || 0;
+    return sum + (Number.isFinite(paid) ? paid : total);
+  }, 0);
   const summaryTotalDebt = rows.reduce((sum, r) => {
     if (r.payment_status === 'paid' || !r.payment_status) return sum;
     return sum + Math.max(0, (parseFloat(r.total) || 0) - (parseFloat(r.paid_amount) || 0));

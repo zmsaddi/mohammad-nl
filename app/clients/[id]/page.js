@@ -60,11 +60,17 @@ function ClientDetailContent({ params }) {
       // JSON response returns c.id as a number. Strict equality needs a
       // coerce or the .find() never matches and the page 404s.
       const found = clientsData.find((c) => c.id === Number(id));
-      // Settings may return 500 or an error object — fall back to 20%.
+      // v1.2 — if settings fetch fails we keep the default vatRate=20 but
+      // surface a warning toast so the user knows the on-screen TVA
+      // preview is using a fallback rate, not the configured one.
+      // Pre-v1.2 the failure was silent: the form happily computed TVA
+      // at 20% even if the shop's real rate was 19% or 21%.
       if (settingsRes.ok) {
         const settings = await settingsRes.json();
         const r = parseFloat(settings?.vat_rate);
         if (Number.isFinite(r) && r > 0) setVatRate(r);
+      } else {
+        addToast('تعذّر قراءة نسبة الضريبة — يُستخدم 20% مؤقتاً', 'error');
       }
 
       if (found) {

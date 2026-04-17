@@ -340,7 +340,12 @@ function StockContent() {
                 </thead>
                 <tbody>
                   {paginatedRows.map((p) => {
-                    const value = (p.stock || 0) * (p.buy_price || 0);
+                    // v1.2 — parseFloat both operands. @vercel/postgres returns
+                    // NUMERIC columns as strings; `"5.00" * "12.50"` silently
+                    // coerces through JS's loose multiplication but any sibling
+                    // `|| 0` fallback made the whole expression NaN when stock
+                    // or buy_price was missing.
+                    const value = (parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0);
                     // DONE: Step 2F — replace hardcoded ≤5 threshold with per-product getStatus()
                     const status = getStatus(p);
                     const statusLabel = status === 'out' ? 'نفذ' : status === 'low' ? 'منخفض' : 'متوفر';
@@ -491,8 +496,9 @@ function StockContent() {
           ...(canSeeCosts ? [{ label: 'سعر الشراء', type: 'money', value: selectedRow.buy_price }] : []),
           { label: 'سعر البيع الموصى', type: 'money', value: selectedRow.sell_price, color: '#1e40af' },
           { type: 'divider' },
-          { label: 'الكمية المتاحة', value: String(selectedRow.stock || 0), color: (selectedRow.stock || 0) > 5 ? '#16a34a' : (selectedRow.stock || 0) > 0 ? '#d97706' : '#dc2626' },
-          ...(canSeeCosts ? [{ label: 'قيمة المخزون', type: 'money', value: (selectedRow.stock || 0) * (selectedRow.buy_price || 0) }] : []),
+          { label: 'الكمية المتاحة', value: String(parseFloat(selectedRow.stock) || 0), color: (parseFloat(selectedRow.stock) || 0) > 5 ? '#16a34a' : (parseFloat(selectedRow.stock) || 0) > 0 ? '#d97706' : '#dc2626' },
+          // v1.2 — parseFloat for NUMERIC-as-string from @vercel/postgres.
+          ...(canSeeCosts ? [{ label: 'قيمة المخزون', type: 'money', value: (parseFloat(selectedRow.stock) || 0) * (parseFloat(selectedRow.buy_price) || 0) }] : []),
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
         ] : []}
       />

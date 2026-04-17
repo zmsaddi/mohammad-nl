@@ -42,9 +42,15 @@ function MyBonusContent() {
   const totalAll = bonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
   const unsettled = bonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
   const settled = bonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
+  // v1.2 — derive YYYY-MM from today's ISO date to match the format of
+  // bonuses.date (stored as TEXT in ISO form). Pre-v1.2 this used
+  // `new Date().getFullYear() + getMonth()` which quietly shifted the
+  // reference month when the user's local clock crossed midnight UTC
+  // but was still "yesterday" locally (or vice-versa). All other date
+  // filters on this page use ISO string comparison, so the card now
+  // matches that convention.
   const thisMonth = (() => {
-    const now = new Date();
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const ym = new Date().toISOString().slice(0, 7); // YYYY-MM
     return bonuses.filter((b) => b.date?.startsWith(ym)).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0);
   })();
   const count = bonuses.length;

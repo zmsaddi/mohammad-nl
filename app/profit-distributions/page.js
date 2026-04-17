@@ -423,7 +423,7 @@ function ProfitDistributionsContent() {
                 <input
                   type="date"
                   value={form.periodStart}
-                  onChange={(e) => setForm({ ...form, periodStart: e.target.value })}
+                  onChange={(e) => setForm({ ...form, periodStart: e.target.value, baseAmount: '' })}
                 />
               </div>
               <div className="form-group">
@@ -431,7 +431,7 @@ function ProfitDistributionsContent() {
                 <input
                   type="date"
                   value={form.periodEnd}
-                  onChange={(e) => setForm({ ...form, periodEnd: e.target.value })}
+                  onChange={(e) => setForm({ ...form, periodEnd: e.target.value, baseAmount: '' })}
                 />
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
