@@ -238,7 +238,17 @@ describe('v1.1 F-001 — profit distribution solvency cap', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('T4b — concurrent same-period: two halves of the pool both succeed', async () => {
+  it('T4b — concurrent same-period: DB-level unique-period backstop allows only one group', async () => {
+    // v1.2 — profit_dist_groups_period_unique partial UNIQUE index now
+    // enforces "one group per (start, end)" at the DB level (see
+    // scripts/migrations/v1-2/001-profit-distribution-groups.sql:37 +
+    // lib/db/_migrations.js mirror in initDatabase).
+    //
+    // Pre-v1.2 the F-001 advisory lock was the only guard, so two
+    // halves of the pool could both land if their sum <= cap. v1.2
+    // tightens this: even if pool would allow it, only ONE group per
+    // period is permitted. The losing call rejects with a unique-
+    // violation error from Postgres.
     await seedPaidSale(2000, '2026-04-20');
 
     const a = addProfitDistribution({
@@ -256,10 +266,21 @@ describe('v1.1 F-001 — profit distribution solvency cap', () => {
 
     const results = await Promise.allSettled([a, b]);
     const fulfilled = results.filter(r => r.status === 'fulfilled');
-    expect(fulfilled).toHaveLength(2);
+    const rejected  = results.filter(r => r.status === 'rejected');
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    // The rejection should be either the F-001 cap message (if the
+    // first call's commit caused the second's read to see a reduced cap)
+    // OR the DB unique-constraint message (if both passed the cap check
+    // before either committed). Both are valid v1.2 outcomes.
+    const reasonMsg = rejected[0].reason?.message || String(rejected[0].reason);
+    expect(
+      /يتجاوز صافي الربح المتاح للتوزيع|profit_dist_groups_period_unique|duplicate key/i.test(reasonMsg)
+    ).toBe(true);
 
     const rows = await getProfitDistributions();
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
   });
 
   // ─────────────────────────────────────────────────────────────

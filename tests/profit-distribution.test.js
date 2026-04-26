@@ -49,18 +49,33 @@ async function seedUsers() {
   }
 }
 
-// v1.1 F-001 — addProfitDistribution now caps the base amount at
-// collected(period) − already_distributed(period). Feature-2 mechanics
-// tests below predate the cap and don't specify periods (null period
-// = all-time bucket). Tests that only verify split math / row persistence
-// call seedCapPool() to ensure the cap is non-binding. Tests that
-// exercise the cap itself live in tests/invariants/profit-distribution-
-// solvency.test.js. Test 7 (getCollectedRevenueForPeriod) does NOT call
-// seedCapPool because it audits the pool math directly.
+// v1.2 — F-001 cap is now computed from net profit on paid sales (cash
+// basis), not from raw payment rows. Feature-2 mechanics tests below
+// don't specify periods (null period = all-time bucket). Tests that
+// only verify split math / row persistence call seedCapPool() to ensure
+// the cap is non-binding. Tests that exercise the cap itself live in
+// tests/invariants/profit-distribution-solvency.test.js. Test 7
+// (getCollectedRevenueForPeriod) does NOT call seedCapPool because it
+// audits the pool math directly.
 async function seedCapPool(amount = 10000) {
+  // Seed a paid confirmed sale with no costs so net profit = revenue = amount.
+  // This satisfies the v1.2 cap (lib/db.js:2549-2571) without binding it.
+  const { rows } = await sql`
+    INSERT INTO sales (
+      date, client_name, item, quantity, cost_price, unit_price, total,
+      cost_total, profit, payment_method, payment_type,
+      paid_amount, remaining, status, payment_status, created_by
+    )
+    VALUES (
+      '2026-01-01', 'cap-seed', 'CAP-POOL', 1, 0, ${amount}, ${amount},
+      0, ${amount}, 'كاش', 'كاش',
+      ${amount}, 0, 'مؤكد', 'paid', 'test-seed'
+    )
+    RETURNING id
+  `;
   await sql`
     INSERT INTO payments (date, client_name, amount, sale_id, type, payment_method, tva_amount, created_by, notes)
-    VALUES ('2026-01-01', 'cap-seed', ${amount}, NULL, 'collection', 'كاش', 0, 'test-seed', 'F-001 test pool')
+    VALUES ('2026-01-01', 'cap-seed', ${amount}, ${rows[0].id}, 'collection', 'كاش', 0, 'test-seed', 'F-001 test pool')
   `;
 }
 

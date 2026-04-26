@@ -225,9 +225,11 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     expect(inv[0].vin).toBe('TEST-VIN-001');
     ctx.invoiceId = inv[0].id;
 
-    // Bonuses: one for test-seller (10), one for test-driver (5),
-    // both unsettled. Seller extra_bonus is 0 because unit_price
-    // (1500) equals recommended_price (1500) — no overcharge.
+    // Bonuses: v1.2 multiplies the fixed component by quantity.
+    // Sale quantity=2, settings seller_fixed=10, driver_fixed=5:
+    //   seller.total_bonus = 10 × 2 = 20 (extra=0 because unit_price
+    //     1500 equals recommended_price 1500 — no overcharge)
+    //   driver.total_bonus = 5 × 2 = 10
     const { rows: bonuses } = await sql`
       SELECT * FROM bonuses WHERE sale_id = ${ctx.saleId} ORDER BY role
     `;
@@ -239,11 +241,11 @@ describe('TEST-01: full sale lifecycle against real DB', () => {
     expect(seller).toBeTruthy();
 
     expect(driver.username).toBe('test-driver');
-    expect(parseFloat(driver.total_bonus)).toBe(5);
+    expect(parseFloat(driver.total_bonus)).toBe(10);
     expect(driver.settled).toBe(false);
 
     expect(seller.username).toBe('test-seller');
-    expect(parseFloat(seller.total_bonus)).toBe(10);
+    expect(parseFloat(seller.total_bonus)).toBe(20);
     expect(parseFloat(seller.extra_bonus)).toBe(0);
     expect(seller.settled).toBe(false);
   });
