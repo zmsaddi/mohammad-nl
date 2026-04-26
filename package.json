@@ -16,12 +16,14 @@
     "migrate:dry": "node scripts/migrate.mjs --dry-run"
   },
   "dependencies": {
+    "@sparticuz/chromium-min": "^147.0.2",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
     "fuse.js": "^7.3.0",
     "groq-sdk": "^1.1.2",
     "next": "16.2.3",
     "next-auth": "^4.24.13",
+    "puppeteer-core": "^24.42.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
