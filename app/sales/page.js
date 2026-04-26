@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
@@ -984,7 +985,7 @@ function SalesContent() {
           option for bonuses and forces 'remove' (FK cascade rule). The
           actual DELETE of the sale row happens inside cancelSale's
           deleteSale wrapper. */}
-      <div className="cross-nav"><a href="/clients">العملاء &rarr;</a><a href="/deliveries">التوصيل &rarr;</a><a href="/invoices">الفواتير &rarr;</a></div>
+      <div className="cross-nav"><Link href="/clients">العملاء &rarr;</Link><Link href="/deliveries">التوصيل &rarr;</Link><Link href="/invoices">الفواتير &rarr;</Link></div>
 
       {cancelSale && (
         <CancelSaleDialog

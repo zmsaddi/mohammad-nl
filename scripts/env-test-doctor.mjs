@@ -30,7 +30,8 @@ config({ path: resolve(process.cwd(), '.env.test') });
 
 function die(code, msg) {
   console.error(`${RED}✖ env-test-doctor REFUSING: ${msg}${RESET}`);
-  console.error(`${RED}  Fix .env.test and re-run. See docs/v1-1-comprehensive-study.md §F-009.${RESET}`);
+  console.error(`${RED}  Fix .env.test and re-run.${RESET}`);
+  console.error(`${RED}  Required: POSTGRES_URL host or db name must contain test|sandbox|dev|staging|preview|ephemeral.${RESET}`);
   process.exit(code);
 }
 

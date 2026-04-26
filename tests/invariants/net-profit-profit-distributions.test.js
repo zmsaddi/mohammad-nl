@@ -59,11 +59,29 @@ async function seedAdmin(username) {
   `;
 }
 
-async function seedCollection(amount, date = '2026-04-15') {
-  await sql`
-    INSERT INTO payments (client_name, amount, payment_method, date, type, notes, created_by)
-    VALUES ('test', ${amount}, 'كاش', ${date}, 'collection', '', 'test-seed')
+// v1.2 — the F-001 cap reads net profit from PAID SALES (cash basis)
+// rather than payments. To produce a cap of `amount`, we seed a paid
+// confirmed sale with no costs so net profit = revenue = amount.
+// Pre-v1.2 a payments-only INSERT was sufficient. See lib/db.js:2549-2571.
+async function seedPaidSale(amount, date = '2026-04-15') {
+  const { rows } = await sql`
+    INSERT INTO sales (
+      date, client_name, item, quantity, cost_price, unit_price, total,
+      cost_total, profit, payment_method, payment_type,
+      paid_amount, remaining, status, payment_status, created_by
+    )
+    VALUES (
+      ${date}, 'test-client', 'TEST-ITEM', 1, 0, ${amount}, ${amount},
+      0, ${amount}, 'كاش', 'كاش',
+      ${amount}, 0, 'مؤكد', 'paid', 'test-seed'
+    )
+    RETURNING id
   `;
+  await sql`
+    INSERT INTO payments (client_name, amount, payment_method, date, type, sale_id, notes, created_by)
+    VALUES ('test-client', ${amount}, 'كاش', ${date}, 'collection', ${rows[0].id}, '', 'test-seed')
+  `;
+  return rows[0].id;
 }
 
 // Bypass addSettlement (which now rejects profit_distribution) so we can
@@ -106,8 +124,10 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
   // T2 — one distribution reduces netProfit by its amount
   // ─────────────────────────────────────────────────────────────
   it('T2 — single distribution reduces both netProfit variants', async () => {
-    // Pool: 2,000€ collected. Distribute 1,500€ to f002-admin.
-    await seedCollection(2000);
+    // v1.2 — seed a paid sale so the F-001 cap permits the distribution.
+    // Net profit before distribution = 2000 (revenue 2000, no costs).
+    // After distributing 1500 → netProfit = 2000 - 1500 = 500.
+    await seedPaidSale(2000);
     await addProfitDistribution({
       baseAmount: 1500,
       recipients: [{ username: 'f002-admin', percentage: 100 }],
@@ -120,24 +140,21 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
     expect(summary.totalProfitDistributed).toBe(1500);
     expect(summary.profitDistFromTable).toBe(1500);
     expect(summary.profitDistFromLegacySettlements).toBe(0);
-    // With no sales, netProfit = 0 - 0 - 0 - 1500 = -1500
-    // This is mathematically correct: distributing 1500 of cash as profit
-    // when gross profit is 0 creates a 1500 paper loss. Real operators
-    // would also have sales to offset this; the test just checks the term
-    // flows through the formula.
-    expect(summary.netProfit).toBe(-1500);
-    expect(summary.netProfitCashBasis).toBe(-1500);
-    // distributable clamps negative at 0
-    expect(summary.distributable).toBe(0);
+    // With 2000 in paid sales (no costs) and 1500 distributed:
+    // netProfit = 2000 gross - 0 expenses - 0 bonuses - 1500 distributed = 500
+    expect(summary.netProfit).toBe(500);
+    expect(summary.netProfitCashBasis).toBe(500);
+    // 500 still distributable
+    expect(summary.distributable).toBe(500);
   });
 
   // ─────────────────────────────────────────────────────────────
   // T3 — multiple distributions sum correctly
   // ─────────────────────────────────────────────────────────────
   it('T3 — multiple distributions across different periods sum correctly', async () => {
-    // Seed collection in BOTH April and May so the F-001 cap doesn't block.
-    await seedCollection(2000, '2026-04-10'); // April pool
-    await seedCollection(2000, '2026-05-10'); // May pool
+    // v1.2 — seed paid sales in BOTH April and May so the F-001 cap doesn't block.
+    await seedPaidSale(2000, '2026-04-10'); // April: 2000 net profit
+    await seedPaidSale(2000, '2026-05-10'); // May:   2000 net profit (4000 total)
     await addProfitDistribution({
       baseAmount: 1000,
       recipients: [{ username: 'f002-admin', percentage: 100 }],
@@ -155,8 +172,8 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
 
     const summary = await getSummaryData();
     expect(summary.totalProfitDistributed).toBe(1500);
-    // netProfit = 0 gross - 0 expenses - 0 bonuses - 1500 distributed
-    expect(summary.netProfit).toBe(-1500);
+    // netProfit = 4000 gross - 0 expenses - 0 bonuses - 1500 distributed = 2500
+    expect(summary.netProfit).toBe(2500);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -176,7 +193,8 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
   // T5 — mixed: new table + legacy settlements
   // ─────────────────────────────────────────────────────────────
   it('T5 — new table and legacy settlement rows both counted once', async () => {
-    await seedCollection(3000);
+    // v1.2 — paid sale of 3000 covers both the legacy 500 + new 1000 distributions.
+    await seedPaidSale(3000);
     await seedLegacyProfitSettlement(500);
     await addProfitDistribution({
       baseAmount: 1000,
@@ -190,23 +208,22 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
     expect(summary.profitDistFromTable).toBe(1000);
     expect(summary.profitDistFromLegacySettlements).toBe(500);
     expect(summary.totalProfitDistributed).toBe(1500);
-    expect(summary.netProfit).toBe(-1500);
+    // netProfit = 3000 gross - 0 expenses - 0 bonuses - 1500 distributed = 1500
+    expect(summary.netProfit).toBe(1500);
   });
 
   // ─────────────────────────────────────────────────────────────
   // T6 — distributable clamps at 0
   // ─────────────────────────────────────────────────────────────
   it('T6 — distributable clamps negative netProfitCashBasis at 0', async () => {
-    await seedCollection(1000);
-    await addProfitDistribution({
-      baseAmount: 900,
-      recipients: [{ username: 'f002-admin', percentage: 100 }],
-      basePeriodStart: '2026-04-01',
-      basePeriodEnd:   '2026-04-30',
-      createdBy: 'f002-admin',
-    });
+    // v1.2 — addProfitDistribution now caps at distributable, so we cannot
+    // create a negative-netProfit scenario through it. We use a legacy
+    // settlement row (which bypasses the cap and represents pre-v1.1 data)
+    // to drive netProfit negative and verify the clamp.
+    await seedLegacyProfitSettlement(900);
     const summary = await getSummaryData();
-    // No sales → cash-basis revenue = 0, netProfitCashBasis = 0 - 0 - 0 - 900 = -900
+    // No sales, no expenses, no bonuses, 900 legacy distributed:
+    // netProfitCashBasis = 0 - 0 - 0 - 900 = -900
     expect(summary.netProfitCashBasis).toBe(-900);
     expect(summary.distributable).toBe(0);
   });
@@ -215,7 +232,7 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
   // T7 — cash-basis reflects the subtraction
   // ─────────────────────────────────────────────────────────────
   it('T7 — cash-basis netProfit identity holds: gross - expenses - bonuses - distributed', async () => {
-    await seedCollection(2000);
+    await seedPaidSale(2000);
     await addProfitDistribution({
       baseAmount: 1200,
       recipients: [{ username: 'f002-admin', percentage: 100 }],
@@ -238,7 +255,7 @@ describe('v1.1 F-002 — netProfit subtracts profit_distributions', () => {
   // T8 — period filter scopes profit_distributions by created_at
   // ─────────────────────────────────────────────────────────────
   it('T8 — period filter (from/to) scopes profit_distributions by created_at', async () => {
-    await seedCollection(3000);
+    await seedPaidSale(3000);
     // Seed a distribution NOW (today) with created_at current timestamp
     await addProfitDistribution({
       baseAmount: 1000,

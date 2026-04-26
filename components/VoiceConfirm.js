@@ -395,7 +395,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                     borderRadius: '6px',
                     marginTop: '3px',
                   }}>
-                    ⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - BLACK" وليس "في عشرين برو أسود"
+                    {'⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - BLACK" وليس "في عشرين برو أسود"'}
                   </div>
                 )}
                 {/* DONE: Bug 2 — surface "this product will be added" notice when AI detected a new product */}
@@ -405,7 +405,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                     background: '#dbeafe', padding: '6px 10px',
                     borderRadius: '6px', marginTop: '4px',
                   }}>
-                    💡 المنتج "{form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.
+                    {`💡 المنتج "${form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.`}
                   </div>
                 )}
               </div>
@@ -490,7 +490,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                     borderRadius: '6px',
                     marginTop: '3px',
                   }}>
-                    ⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - BLACK" وليس "في عشرين برو أسود"
+                    {'⚠ اسم المنتج يجب أن يكون بالإنجليزي — مثال: "V20 Pro - BLACK" وليس "في عشرين برو أسود"'}
                   </div>
                 )}
                 {/* DONE: Bug 2 — same notice in PURCHASE FORM */}
@@ -500,7 +500,7 @@ function EditableForm({ action: initialAction, data, warnings, transcript, missi
                     background: '#dbeafe', padding: '6px 10px',
                     borderRadius: '6px', marginTop: '4px',
                   }}>
-                    💡 المنتج "{form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.
+                    {`💡 المنتج "${form.item}" غير موجود في القاعدة. سيُضاف تلقائياً عند التأكيد.`}
                   </div>
                 )}
               </div>

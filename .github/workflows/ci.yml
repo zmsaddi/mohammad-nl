@@ -123,22 +123,24 @@ jobs:
   test-real-db:
     runs-on: ubuntu-latest
     needs: build
-    # v1.2 — temporarily disabled. The shared Neon test branch drifted
-    # into a state where invariants (INV-04, INV-08, INV-11) and multiple
-    # integration suites fail because of accumulated cross-test data,
-    # and several voice-related suites additionally fail on a missing
-    # GROQ_API_KEY. These are test-infrastructure issues, not production
-    # regressions — Vercel builds are green, the app is deployed, and
-    # the mock/unit suite still runs.
+    # v1.2 — re-enabled after v1.2 fix-plan completion:
+    #   1. Drifting tests aligned with current code (cap_collected →
+    #      cap_net_profit, SETTLED_BONUS → negative settlement,
+    #      seedCollection → seedPaidSale).
+    #   2. profit_distribution_groups now created by initDatabase()
+    #      so a fresh Neon branch has full schema.
+    #   3. GROQ_API_KEY exposed as a job-scoped secret (optional).
     #
-    # To re-enable:
-    #   1. Reset the Neon test branch (or point NEON_TEST_BRANCH_URL at
-    #      a freshly-seeded branch).
-    #   2. Add GROQ_API_KEY to repo secrets, or gate voice suites on
-    #      its presence.
-    #   3. Change the condition below back to
-    #      `vars.ENABLE_REAL_DB_TESTS == 'true'`.
-    if: ${{ vars.ENABLE_REAL_DB_TESTS == 'forced-off-pending-test-db-reset' }}
+    # Required repo secrets:
+    #   NEON_TEST_BRANCH_URL              — pooled URL for test branch
+    #   NEON_TEST_BRANCH_URL_NON_POOLING  — non-pooling URL
+    #   GROQ_API_KEY (optional)           — voice tests skip if absent
+    #
+    # Required repo variable:
+    #   ENABLE_REAL_DB_TESTS = 'true'     — gate to allow running
+    #
+    # Without these, the job is skipped (forks + CI-on-PR-from-fork stay safe).
+    if: ${{ vars.ENABLE_REAL_DB_TESTS == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -157,4 +159,6 @@ jobs:
       - name: env-test-doctor (F-009 guard)
         run: node scripts/env-test-doctor.mjs
       - name: Vitest (real-DB integration suites)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: npm test

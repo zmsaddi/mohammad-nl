@@ -136,9 +136,8 @@ export default function CancelSaleDialog({
     // the "رجوع" back button, or a successful cancellation.
     <div className="modal-overlay">
       <div
-        className="modal"
+        className="modal cancel-sale-dialog"
         onClick={(e) => e.stopPropagation()}
-        className="cancel-sale-dialog"
         style={{ maxWidth: '520px' }}
       >
         <h3 style={{ marginBottom: '12px' }}>{title}</h3>

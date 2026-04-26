@@ -48,3 +48,6 @@ next-env.d.ts
 
 # claude local state (session logs, scheduled tasks, settings, worktrees)
 .claude/
+
+# DB snapshots (baseline JSONs may contain payment totals — keep local)
+snapshots/

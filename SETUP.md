@@ -162,7 +162,7 @@ npx vitest run tests/voice-normalizer.test.js
 > تلقائياً قبل vitest. إذا كان `.env.test` يُشير إلى الإنتاج، سيرفض تشغيل الاختبارات
 > مع رسالة `F-009 env-test guard REFUSING TO RUN`.
 
-المجموعة الحالية: **206 اختبار، 13 ملف**. الاختبارات التي لا تحتاج DB تستخدم mocks
+المجموعة الحالية: **~488 اختبار، 54 ملف**. الاختبارات التي لا تحتاج DB تستخدم mocks
 (راجع `tests/bug04-deliveries-driver-put.test.js` كمثال).
 
 ### 4.3 GitHub Actions CI (v1.1 — F-069)

@@ -65,7 +65,7 @@ if (!SAFE_PATTERN.test(host) && !SAFE_PATTERN.test(dbName)) {
     `  database: ${dbName}\n` +
     `  Expected host or database to match /test|sandbox|dev|staging|preview|ephemeral/i\n` +
     `  Fix: create a dedicated Neon branch named "test-sandbox" (or similar), update\n` +
-    `  .env.test to point at it, and re-run. See docs/v1-1-comprehensive-study.md §F-009.`
+    `  .env.test to point at it, and re-run.`
   );
 }
 

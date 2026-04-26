@@ -1,6 +1,6 @@
 {
   "name": "mohammad_nl",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:ui": "vitest",
     "test:unsafe": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project jsconfig.json --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "migrate:dry": "node scripts/migrate.mjs --dry-run"
   },

@@ -10,7 +10,8 @@
 //   2. cancelSale keeps bonuses when bonusActions: {seller:'keep', driver:'keep'}
 //   3. cancelSale throws BONUS_CHOICE_REQUIRED when bonuses exist and
 //      bonusActions is null
-//   4. cancelSale throws SETTLED_BONUS_SELLER when seller bonus is settled
+//   4. cancelSale creates negative settlement when seller bonus is settled
+//      (v1.2 — replaces the pre-v1.2 SETTLED_BONUS_SELLER throw behavior)
 //   5. Preview mode returns the expected shape without writes
 //   6. deleteSale entry point removes sale + delivery rows + writes audit
 //   7. cancelDelivery entry point (BUG-X1 fix) cancels delivery + cancels sale
@@ -235,24 +236,52 @@ describe('FEAT-05: cancelSale helper + entry-point parity', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────
-  // Test 4: SETTLED_BONUS block
+  // Test 4: settled-bonus recovery via negative settlement (v1.2 behavior)
+  //
+  // Pre-v1.2 this case threw SETTLED_BONUS_SELLER and blocked the cancel.
+  // v1.2 (lib/db.js:526-531, 666-684) allows the cancel and creates a
+  // negative settlement so the bonus gets clawed back from the employee's
+  // future payouts. The bonus row itself is then deleted.
   // ──────────────────────────────────────────────────────────────────────
-  it('cancelSale throws SETTLED_BONUS_SELLER when seller bonus is settled', async () => {
+  it('cancelSale creates negative settlement when seller bonus is settled', async () => {
     const { saleId, invoiceId } = await seedConfirmedSale();
 
-    // Mark seller bonus as settled
+    // Capture seller bonus details BEFORE marking it settled
+    const { rows: bonusBefore } = await sql`
+      SELECT username, total_bonus FROM bonuses
+      WHERE sale_id = ${saleId} AND role = 'seller'
+    `;
+    expect(bonusBefore).toHaveLength(1);
+    const sellerName = bonusBefore[0].username;
+    const sellerBonus = parseFloat(bonusBefore[0].total_bonus);
+
+    // Mark seller bonus as settled (simulates a completed settlement payout)
     await sql`
       UPDATE bonuses SET settled = true
       WHERE sale_id = ${saleId} AND role = 'seller'
     `;
 
-    await expect(
-      voidInvoice(invoiceId, {
-        cancelledBy: 'test-admin',
-        reason: 'Blocked test',
-        bonusActions: { seller: 'remove', driver: 'remove' },
-      })
-    ).rejects.toMatchObject({ code: 'SETTLED_BONUS_SELLER' });
+    // Cancel must NOT throw — it must succeed and create a recovery row
+    await voidInvoice(invoiceId, {
+      cancelledBy: 'test-admin',
+      reason: 'Settled bonus recovery test',
+      bonusActions: { seller: 'remove', driver: 'remove' },
+    });
+
+    // A negative settlement row was created with amount = -bonus
+    const { rows: settlementRows } = await sql`
+      SELECT amount, type, username FROM settlements
+      WHERE username = ${sellerName} AND type = 'seller_payout'
+      ORDER BY id DESC LIMIT 1
+    `;
+    expect(settlementRows).toHaveLength(1);
+    expect(parseFloat(settlementRows[0].amount)).toBe(-sellerBonus);
+
+    // The seller bonus row was deleted (settled + unsettled both removed)
+    const { rows: bonusAfter } = await sql`
+      SELECT id FROM bonuses WHERE sale_id = ${saleId} AND role = 'seller'
+    `;
+    expect(bonusAfter).toHaveLength(0);
   });
 
   // ──────────────────────────────────────────────────────────────────────
