@@ -33,7 +33,9 @@ export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  // /api/health is intentionally public for uptime monitors / load balancers
+  // (see app/api/health/route.js — the route handler itself does no auth check).
+  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth') || pathname === '/api/health') {
     return NextResponse.next();
   }
 
