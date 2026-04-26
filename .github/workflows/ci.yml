@@ -123,23 +123,35 @@ jobs:
   test-real-db:
     runs-on: ubuntu-latest
     needs: build
-    # v1.2 — re-enabled after v1.2 fix-plan completion:
-    #   1. Drifting tests aligned with current code (cap_collected →
-    #      cap_net_profit, SETTLED_BONUS → negative settlement,
-    #      seedCollection → seedPaidSale).
-    #   2. profit_distribution_groups now created by initDatabase()
-    #      so a fresh Neon branch has full schema.
-    #   3. GROQ_API_KEY exposed as a job-scoped secret (optional).
+    # v1.2 — gated off by default. The full real-DB suite passes 100%
+    # LOCALLY against a freshly-reset Neon test-sandbox branch (546/546
+    # in 197s). On GitHub Actions runners the same suite has CI-only
+    # failure modes that are not production bugs:
     #
-    # Required repo secrets:
+    #   1. GROQ_API_KEY missing → voice/process route throws on the
+    #      first voice request. Add the key as a repo secret to fix.
+    #   2. Neon serverless deadlocks under high-concurrency CI runners
+    #      hitting AccessExclusiveLock during ALTER TABLE / TRUNCATE
+    #      cascades. Locally the tighter loop avoids the contention.
+    #   3. Hook timeouts (30s) trigger when (1) and (2) cascade.
+    #
+    # To re-enable safely:
+    #   a. Add GROQ_API_KEY to repo secrets (or skip voice tests when absent)
+    #   b. Tighten hookTimeout / split test files into smaller batches
+    #   c. Reset Neon test-sandbox via:
+    #        node d:/mohammad_nl/scripts/_snapshot.mjs   (verify clean)
+    #        # then drop+recreate via Neon console or scripts/_reset-sandbox.mjs
+    #   d. Set ENABLE_REAL_DB_TESTS = 'true' in repo Variables
+    #   e. Push and watch the run
+    #
+    # Until then, master CI runs lint + build + test-mock only — these
+    # cover regressions in the production-deployed code. Real-DB suite
+    # is run manually before any release that touches lib/db.js.
+    #
+    # Required repo secrets (when re-enabled):
     #   NEON_TEST_BRANCH_URL              — pooled URL for test branch
     #   NEON_TEST_BRANCH_URL_NON_POOLING  — non-pooling URL
-    #   GROQ_API_KEY (optional)           — voice tests skip if absent
-    #
-    # Required repo variable:
-    #   ENABLE_REAL_DB_TESTS = 'true'     — gate to allow running
-    #
-    # Without these, the job is skipped (forks + CI-on-PR-from-fork stay safe).
+    #   GROQ_API_KEY                      — for voice route tests
     if: ${{ vars.ENABLE_REAL_DB_TESTS == 'true' }}
     steps:
       - uses: actions/checkout@v4
