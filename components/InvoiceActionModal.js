@@ -23,33 +23,76 @@ export default function InvoiceActionModal({ refCode, onClose, onError }) {
     return res.text();
   };
 
-  // Build a styled DOM container off-screen, render it to PDF via html2pdf.
-  // We mount the HTML string into a hidden div instead of using `from(html-string)`
-  // so the html2canvas pass picks up the inline <style> rules correctly.
+  // Render the invoice HTML inside an off-screen <iframe> so the document's
+  // own `body { padding:40px; max-width:794px; ... }` rules apply correctly.
+  // First attempt used innerHTML on a div, but a wrapper-div has no <body>
+  // element, so the body-targeted rules never matched and html2canvas
+  // captured an unstyled (effectively empty) DOM. Iframe fully isolates
+  // the document context, so the page renders the same way it does when
+  // opened directly in a browser tab.
   const generatePdfBlob = async () => {
     const html = await fetchInvoiceHtml();
     const html2pdf = (await import('html2pdf.js')).default;
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = html;
-    wrapper.style.position = 'fixed';
-    wrapper.style.left = '-10000px';
-    wrapper.style.top = '0';
-    wrapper.style.width = '794px'; // matches body max-width in invoice-generator.js
-    document.body.appendChild(wrapper);
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText = [
+      'position:fixed',
+      'left:-99999px',
+      'top:0',
+      'width:794px',
+      'height:1px',
+      'border:0',
+      'opacity:0',
+      'pointer-events:none',
+    ].join(';');
+    iframe.srcdoc = html;
+    document.body.appendChild(iframe);
+
     try {
+      // Wait for the iframe document to finish parsing.
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('iframe load timeout')), 15000);
+        iframe.addEventListener(
+          'load',
+          () => { clearTimeout(t); resolve(); },
+          { once: true }
+        );
+      });
+
+      // One extra rAF tick so layout + font swaps settle before capture.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const idoc = iframe.contentDocument;
+      const ibody = idoc?.body;
+      if (!ibody || ibody.scrollHeight < 10) {
+        throw new Error('invoice document failed to render');
+      }
+
+      // Resize iframe to actual content so html2canvas captures everything,
+      // not just the initial 1px viewport.
+      iframe.style.height = ibody.scrollHeight + 'px';
+
       const blob = await html2pdf()
-        .from(wrapper)
+        .from(ibody)
         .set({
           margin: 8,
           filename: `facture-${refCode}.pdf`,
           image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 794,
+            windowHeight: ibody.scrollHeight,
+          },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .outputPdf('blob');
       return blob;
     } finally {
-      document.body.removeChild(wrapper);
+      document.body.removeChild(iframe);
     }
   };
 
