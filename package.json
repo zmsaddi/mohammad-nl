@@ -20,6 +20,7 @@
     "bcryptjs": "^3.0.3",
     "fuse.js": "^7.3.0",
     "groq-sdk": "^1.1.2",
+    "html2pdf.js": "^0.10.2",
     "next": "16.2.3",
     "next-auth": "^4.24.13",
     "react": "19.2.4",

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import DetailModal from '@/components/DetailModal';
+import InvoiceActionModal from '@/components/InvoiceActionModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
@@ -27,6 +28,7 @@ function InvoicesContent() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [pdfRefCode, setPdfRefCode] = useState(null);
   const [search, setSearch] = useState('');
 
   const fetchData = async () => {
@@ -124,7 +126,7 @@ function InvoicesContent() {
                 <button
                   className="btn btn-sm"
                   style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
-                  onClick={() => window.open(`/api/invoices/${row.ref_code}/pdf`, '_blank')}
+                  onClick={() => setPdfRefCode(row.ref_code)}
                 >
                   PDF
                 </button>
@@ -160,16 +162,18 @@ function InvoicesContent() {
                     <td><StatusBadge status={inv.payment_type || 'كاش'} /></td>
                     <td><StatusBadge status={derivePaymentStatus(inv)} /></td>
                     <td style={{ direction: 'ltr', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#4f46e5' }}>{inv.vin || '-'}</td>
-                    {/* DONE: Step 4 — open the French invoice in a new tab; user prints with Ctrl+P */}
+                    {/* v1.2 — opens InvoiceActionModal: download PDF or share via WhatsApp.
+                        PDF is generated client-side (html2pdf.js) from the existing
+                        /api/invoices/[id]/pdf HTML so no server change was needed. */}
                     <td>
                       <button
                         className="btn btn-sm"
                         style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`/api/invoices/${inv.ref_code}/pdf`, '_blank');
+                          setPdfRefCode(inv.ref_code);
                         }}
-                        title="Télécharger la facture PDF"
+                        title="تحميل أو مشاركة الفاتورة"
                       >
                         📄 PDF
                       </button>
@@ -195,6 +199,14 @@ function InvoicesContent() {
         <Link href="/sales">المبيعات &rarr;</Link>
         <Link href="/clients">العملاء &rarr;</Link>
       </div>
+
+      {pdfRefCode && (
+        <InvoiceActionModal
+          refCode={pdfRefCode}
+          onClose={() => setPdfRefCode(null)}
+          onError={(msg) => addToast(msg, 'error')}
+        />
+      )}
 
       <DetailModal
         isOpen={!!selectedInvoice}
