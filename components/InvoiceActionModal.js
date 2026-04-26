@@ -23,13 +23,44 @@ export default function InvoiceActionModal({ refCode, onClose, onError }) {
     return res.text();
   };
 
+  // Promote the document's own `@media print { ... }` block to unconditional
+  // CSS rules. html2canvas always captures the SCREEN media, so without this
+  // step the invoice gets sized for a 794px screen (padding 40px, font 13px,
+  // max-width 794px) which then has to be squeezed into A4 — totals get
+  // orphaned, the footer overlaps the stamp, page breaks land mid-cell.
+  // The invoice generator already ships the right print rules; we just need
+  // them to apply during the html2canvas pass.
+  const flattenPrintMediaRules = (idoc) => {
+    const styleEls = idoc.querySelectorAll('style');
+    styleEls.forEach((styleEl) => {
+      const text = styleEl.textContent;
+      const idx = text.indexOf('@media print');
+      if (idx === -1) return;
+      // Walk balanced braces to find the matching close of the @media block
+      let depth = 0;
+      let innerStart = -1;
+      for (let i = idx; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '{') {
+          if (depth === 0) innerStart = i + 1;
+          depth++;
+        } else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            const innerRules = text.substring(innerStart, i);
+            // Append the inner rules as unconditional. They land later in the
+            // cascade so they win over the screen rules — same precedence the
+            // browser would give them when actually printing.
+            styleEl.textContent = text + '\n/* promoted-from-@media-print */\n' + innerRules + '\n';
+            break;
+          }
+        }
+      }
+    });
+  };
+
   // Render the invoice HTML inside an off-screen <iframe> so the document's
   // own `body { padding:40px; max-width:794px; ... }` rules apply correctly.
-  // First attempt used innerHTML on a div, but a wrapper-div has no <body>
-  // element, so the body-targeted rules never matched and html2canvas
-  // captured an unstyled (effectively empty) DOM. Iframe fully isolates
-  // the document context, so the page renders the same way it does when
-  // opened directly in a browser tab.
   const generatePdfBlob = async () => {
     const html = await fetchInvoiceHtml();
     const html2pdf = (await import('html2pdf.js')).default;
@@ -60,6 +91,10 @@ export default function InvoiceActionModal({ refCode, onClose, onError }) {
         );
       });
 
+      // Apply print-media rules unconditionally so the on-screen layout
+      // matches what the user gets in a "Save as PDF" browser print.
+      flattenPrintMediaRules(iframe.contentDocument);
+
       // One extra rAF tick so layout + font swaps settle before capture.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -76,9 +111,12 @@ export default function InvoiceActionModal({ refCode, onClose, onError }) {
       const blob = await html2pdf()
         .from(ibody)
         .set({
-          margin: 8,
+          // 0 margins — the invoice's own padding/margin (now in mm thanks to
+          // the promoted print rules) handles the page edges. A non-zero
+          // outer margin would double-up.
+          margin: 0,
           filename: `facture-${refCode}.pdf`,
-          image: { type: 'jpeg', quality: 0.95 },
+          image: { type: 'jpeg', quality: 0.98 },
           html2canvas: {
             scale: 2,
             useCORS: true,
@@ -88,6 +126,21 @@ export default function InvoiceActionModal({ refCode, onClose, onError }) {
             windowHeight: ibody.scrollHeight,
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          // Respect page-break-inside:avoid on .totals-wrap, .footer, etc.
+          // (set in invoice-generator.js) and use the legacy single-canvas
+          // splitter as a fallback for browsers that don't honor CSS rules.
+          pagebreak: {
+            mode: ['css', 'legacy'],
+            avoid: [
+              '.totals-wrap',
+              '.footer',
+              '.stamp-container',
+              '.payments-history',
+              '.state-footer',
+              'thead',
+              'tr',
+            ],
+          },
         })
         .outputPdf('blob');
       return blob;
