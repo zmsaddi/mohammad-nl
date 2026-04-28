@@ -85,6 +85,25 @@ function SalesContent() {
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
 
+  // v1.2 UX-1: derive isNewClient at component scope so it can drive both
+  // the address-required warning (existing behaviour) AND the new
+  // showDetails auto-expand (so the seller can fill phone for WhatsApp on
+  // a fresh client). Computed from the typed name + loaded clients list,
+  // identical semantics to the inline check that was previously inside
+  // the address block's IIFE.
+  const isNewClient = Boolean(form.clientName) && !clients.some((c) => c.name === form.clientName);
+
+  // v1.2 UX-1: collapsible "تفاصيل إضافية" (phone, email, notes). One-way
+  // auto-expand — opens when there's content to surface or the client is
+  // new, never auto-closes during typing so the user doesn't lose their
+  // input mid-edit. Manual toggle remains available either direction.
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => {
+    if (form.clientPhone || form.clientEmail || form.notes || isNewClient) {
+      setShowDetails(true);
+    }
+  }, [form.clientPhone, form.clientEmail, form.notes, isNewClient]);
+
   // FEAT-04: reactive default for down_payment_expected.
   //
   // v1.0.3 Bug A hardening: cash/بنك sales now FORCE dpe = total
@@ -410,23 +429,17 @@ function SalesContent() {
                 ℹ️ اسم العميل بالأحرف اللاتينية (مثال: Ahmad, Samir)
               </div>
             </div>
-            <div className="form-group">
-              <label htmlFor="sale-phone">هاتف العميل</label>
-              <input id="sale-phone" type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+31612345678 أو +966501234567" style={{ direction: 'ltr', textAlign: 'right' }} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="sale-email">إيميل العميل</label>
-              <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
-            </div>
+            {/* v1.2 UX-1: phone + email moved into "تفاصيل إضافية" section
+                below. They auto-expand into view when either has a value
+                (e.g. SmartSelect filled them from an existing client) or
+                when isNewClient is true (so the seller can add a phone
+                for the WhatsApp post-sale prompt). */}
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
               {/* BUG-6 hotfix 2026-04-14: delivery address is required when
                   the sale creates a new client. Existing clients inherit
-                  their stored address. `isNewClient` is true whenever the
-                  typed client name doesn't match any row in the clients
-                  list fetched at page load. Amber border + warning only
-                  when (new client AND empty address). */}
+                  their stored address. Amber border + warning only when
+                  (new client AND empty address). */}
               {(() => {
-                const isNewClient = form.clientName && !clients.some((c) => c.name === form.clientName);
                 const addressMissing = isNewClient && !form.clientAddress?.trim();
                 return (
                   <>
@@ -587,54 +600,99 @@ function SalesContent() {
                 </div>
               )}
             </div>
-            {/* FEAT-04: down_payment_expected with reactive default + validation
-                v1.0.3 Bug A: input is now disabled for cash/bank sales and locked
-                to the computed total. Only آجل (credit) sales allow editing dpe. */}
-            <div className="form-group">
-              <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
-              <input
-                id="sale-dpe"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.downPaymentExpected}
-                disabled={form.paymentType !== 'آجل'}
-                onChange={(e) => {
-                  // Defensive: shouldn't fire when disabled, but ignore the value
-                  // if the user somehow gets one through (browser autofill, etc.)
-                  if (form.paymentType !== 'آجل') return;
-                  setDownPaymentTouched(true);
-                  setForm({ ...form, downPaymentExpected: e.target.value });
-                }}
-                placeholder={form.paymentType === 'آجل' ? '0 (اختياري — لفرض دفعة مقدمة على الدين)' : String(total)}
-                style={{
-                  border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
-                  background: dpeError ? '#fef2f2' : (form.paymentType !== 'آجل' ? '#f1f5f9' : undefined),
-                  cursor: form.paymentType !== 'آجل' ? 'not-allowed' : undefined,
-                }}
-              />
-              {form.paymentType !== 'آجل' && (
-                <div style={{
-                  marginTop: '6px',
-                  padding: '8px 12px',
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  color: '#92400e',
-                  fontWeight: 600,
-                }}>
-                  ⚠️ البيع النقدي/البنكي يُحصَّل بالكامل عند التوصيل — لا يمكن تعديل المبلغ
+            {/* FEAT-04: down_payment_expected.
+                v1.0.3 Bug A: cash/bank sales force dpe = total (auto-synced
+                in the useEffect above; do NOT touch that). v1.2 UX-1: when
+                paymentType is cash/bank we hide the input entirely and
+                show a one-line confirmation instead — the sync logic
+                continues to set form.downPaymentExpected behind the
+                scenes, so submit still receives the correct value. Only
+                آجل (credit) sales render the editable DPE input. */}
+            {form.paymentType === 'آجل' ? (
+              <div className="form-group">
+                <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
+                <input
+                  id="sale-dpe"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.downPaymentExpected}
+                  onChange={(e) => {
+                    setDownPaymentTouched(true);
+                    setForm({ ...form, downPaymentExpected: e.target.value });
+                  }}
+                  placeholder="0 (اختياري — لفرض دفعة مقدمة على الدين)"
+                  style={{
+                    border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
+                    background: dpeError ? '#fef2f2' : undefined,
+                  }}
+                />
+                <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
+                  {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
                 </div>
-              )}
-              <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
-                {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
               </div>
+            ) : (
+              total > 0 && (
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <div style={{
+                    padding: '10px 14px',
+                    background: '#dcfce7',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: '#166534',
+                    fontWeight: 600,
+                  }}>
+                    ✓ سيتم تحصيل كامل المبلغ ({formatNumber(total)} €) عند التوصيل
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* v1.2 UX-1: collapsible details section. Phone is critical
+                for the WhatsApp post-sale prompt in handleSubmit (line ~320),
+                so the auto-expand effect above opens this section whenever
+                phone/email/notes have values OR the client is new. Manual
+                toggle stays available; auto-expand is one-way (never
+                auto-collapses while the user is typing). */}
+            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                style={{
+                  background: 'transparent',
+                  border: '1px dashed #cbd5e1',
+                  borderRadius: '8px',
+                  color: '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  width: '100%',
+                  textAlign: 'right',
+                  fontFamily: "'Cairo', sans-serif",
+                }}
+                aria-expanded={showDetails}
+              >
+                {showDetails ? '▲' : '▼'} تفاصيل إضافية (هاتف للواتساب، إيميل، ملاحظات)
+              </button>
             </div>
-            <div className="form-group">
-              <label htmlFor="sale-notes">ملاحظات</label>
-              <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
-            </div>
+            {showDetails && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="sale-phone">هاتف العميل (للمشاركة عبر WhatsApp بعد البيع)</label>
+                  <input id="sale-phone" type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="06 12 34 56 78" style={{ direction: 'ltr', textAlign: 'right' }} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="sale-email">إيميل العميل</label>
+                  <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
+                </div>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label htmlFor="sale-notes">ملاحظات</label>
+                  <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
