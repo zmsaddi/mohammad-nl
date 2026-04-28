@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -37,13 +37,37 @@ function SalesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  // Item 2 — filter state for /sales list
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterClient, setFilterClient] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterPayStatus, setFilterPayStatus] = useState('all');
-  const [filterSeller, setFilterSeller] = useState('all');
+  // v1.2 UX-1: filter state hydrated from URL on first render so
+  // refresh + sharing a link both preserve the view. Date/select/seller
+  // filters write to URL immediately on change; the client text-search
+  // is debounced 300ms (see useEffect below) to avoid flooding history.
+  // The `?new=1` flag is preserved across all filter mutations.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('from') || '');
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('to') || '');
+  const [filterClient, setFilterClient] = useState(searchParams.get('client') || '');
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all');
+  const [filterPayStatus, setFilterPayStatus] = useState(searchParams.get('pay') || 'all');
+  const [filterSeller, setFilterSeller] = useState(searchParams.get('seller') || 'all');
+
+  // Helper: write a filter value into the URL while preserving every
+  // other query param (notably `new=1` from /summary's "بيع جديد" link).
+  // Skips the router.replace if the URL would be unchanged — prevents
+  // history-stack noise + render loops on every keystroke.
+  const setUrlParam = (key, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === '' || value === 'all' || value == null) {
+      if (!params.has(key)) return; // no change, no replace
+      params.delete(key);
+    } else {
+      if (params.get(key) === value) return; // no change, no replace
+      params.set(key, value);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
   // FEAT-05: cancellation dialog state. Admin "حذف" on a sale row opens the
   // CancelSaleDialog with invoiceMode='delete' — the dialog forces 'remove'
   // for both bonuses (keep option hidden) because of FK cascade rules.
@@ -51,7 +75,8 @@ function SalesContent() {
   const [whatsappShare, setWhatsappShare] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [editSale, setEditSale] = useState(null);
-  const searchParams = useSearchParams();
+  // searchParams already declared above with the filter state; reuse it
+  // to seed showForm from `?new=1`.
   const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
 
   const [form, setForm] = useState({
@@ -70,6 +95,18 @@ function SalesContent() {
   // FEAT-04: track whether user manually edited down_payment_expected so
   // we don't clobber their input on subsequent paymentType/total changes.
   const [downPaymentTouched, setDownPaymentTouched] = useState(false);
+
+  // v1.2 UX-1: debounce the client text-search before pushing to URL.
+  // Date and select filters write immediately on change; only the typed
+  // text search needs debouncing to avoid a router.replace per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setUrlParam('client', filterClient), 300);
+    return () => clearTimeout(t);
+    // setUrlParam reads searchParams/router/pathname which are stable
+    // hook returns; no need to include them in deps. filterClient is
+    // the only meaningful trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterClient]);
 
   // Smart auto-fill: when client name matches, fill all their info
   const handleClientChange = (name) => {
@@ -720,18 +757,25 @@ function SalesContent() {
           </h3>
         </div>
 
-        {/* Item 2 — filter bar */}
+        {/* v1.2 UX-1: filter bar with URL-synced state.
+            - date / select / seller filters write to URL immediately on
+              change (instant feedback, no debounce required for picker
+              UX)
+            - filterClient is debounced 300ms via the useEffect above
+              (text input → avoid history flooding per keystroke)
+            - "✕ مسح" preserves `?new=1` because setUrlParam reads
+              searchParams and only mutates the targeted key */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateFrom} onChange={(e) => { setFilterDateFrom(e.target.value); setUrlParam('from', e.target.value); }} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateTo} onChange={(e) => { setFilterDateTo(e.target.value); setUrlParam('to', e.target.value); }} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <input type="text" placeholder="بحث عميل..." value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setUrlParam('status', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل الحالات</option>
             <option value="محجوز">محجوز</option>
             <option value="مؤكد">مؤكد</option>
             <option value="ملغي">ملغي</option>
           </select>
-          <select value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={filterPayStatus} onChange={(e) => { setFilterPayStatus(e.target.value); setUrlParam('pay', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
             <option value="partial">جزئي</option>
@@ -739,7 +783,7 @@ function SalesContent() {
             <option value="cancelled">ملغي</option>
           </select>
           {canSeeCosts && (
-            <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <select value={filterSeller} onChange={(e) => { setFilterSeller(e.target.value); setUrlParam('seller', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
               <option value="all">كل البائعين</option>
               {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -748,7 +792,18 @@ function SalesContent() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterClient(''); setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all'); }}
+              onClick={() => {
+                setFilterDateFrom(''); setFilterDateTo(''); setFilterClient('');
+                setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all');
+                // Clear all filter params at once but preserve `?new=1` if
+                // present. We only delete the keys we own; setUrlParam's
+                // single-key approach would do 6 sequential router.replace
+                // calls — coalesce into one here.
+                const params = new URLSearchParams(searchParams.toString());
+                ['from', 'to', 'client', 'status', 'pay', 'seller'].forEach((k) => params.delete(k));
+                const qs = params.toString();
+                router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+              }}
             >
               ✕ مسح
             </button>
