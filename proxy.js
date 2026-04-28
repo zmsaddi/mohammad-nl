@@ -25,7 +25,11 @@ const PAGE_ROLES = {
 const DEFAULT_PAGE = {
   admin: '/summary',
   manager: '/summary',
-  seller: '/sales',
+  // v1.2 UX-1: sellers land on /summary (which includes a personal seller
+  // dashboard — sales count, revenue, reserved, bonuses) instead of a raw
+  // table of historical sales. The "بيع جديد" CTA on /summary still uses
+  // /sales?new=1 so the create-sale flow is one click away.
+  seller: '/summary',
   driver: '/deliveries',
 };
 

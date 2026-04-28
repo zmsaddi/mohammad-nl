@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -37,13 +37,37 @@ function SalesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  // Item 2 — filter state for /sales list
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterClient, setFilterClient] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterPayStatus, setFilterPayStatus] = useState('all');
-  const [filterSeller, setFilterSeller] = useState('all');
+  // v1.2 UX-1: filter state hydrated from URL on first render so
+  // refresh + sharing a link both preserve the view. Date/select/seller
+  // filters write to URL immediately on change; the client text-search
+  // is debounced 300ms (see useEffect below) to avoid flooding history.
+  // The `?new=1` flag is preserved across all filter mutations.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('from') || '');
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('to') || '');
+  const [filterClient, setFilterClient] = useState(searchParams.get('client') || '');
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all');
+  const [filterPayStatus, setFilterPayStatus] = useState(searchParams.get('pay') || 'all');
+  const [filterSeller, setFilterSeller] = useState(searchParams.get('seller') || 'all');
+
+  // Helper: write a filter value into the URL while preserving every
+  // other query param (notably `new=1` from /summary's "بيع جديد" link).
+  // Skips the router.replace if the URL would be unchanged — prevents
+  // history-stack noise + render loops on every keystroke.
+  const setUrlParam = (key, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === '' || value === 'all' || value == null) {
+      if (!params.has(key)) return; // no change, no replace
+      params.delete(key);
+    } else {
+      if (params.get(key) === value) return; // no change, no replace
+      params.set(key, value);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
   // FEAT-05: cancellation dialog state. Admin "حذف" on a sale row opens the
   // CancelSaleDialog with invoiceMode='delete' — the dialog forces 'remove'
   // for both bonuses (keep option hidden) because of FK cascade rules.
@@ -51,7 +75,8 @@ function SalesContent() {
   const [whatsappShare, setWhatsappShare] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [editSale, setEditSale] = useState(null);
-  const searchParams = useSearchParams();
+  // searchParams already declared above with the filter state; reuse it
+  // to seed showForm from `?new=1`.
   const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
 
   const [form, setForm] = useState({
@@ -71,6 +96,18 @@ function SalesContent() {
   // we don't clobber their input on subsequent paymentType/total changes.
   const [downPaymentTouched, setDownPaymentTouched] = useState(false);
 
+  // v1.2 UX-1: debounce the client text-search before pushing to URL.
+  // Date and select filters write immediately on change; only the typed
+  // text search needs debouncing to avoid a router.replace per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setUrlParam('client', filterClient), 300);
+    return () => clearTimeout(t);
+    // setUrlParam reads searchParams/router/pathname which are stable
+    // hook returns; no need to include them in deps. filterClient is
+    // the only meaningful trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterClient]);
+
   // Smart auto-fill: when client name matches, fill all their info
   const handleClientChange = (name) => {
     const client = clients.find((c) => c.name === name);
@@ -84,6 +121,25 @@ function SalesContent() {
   };
 
   const total = (parseFloat(form.quantity) || 0) * (parseFloat(form.unitPrice) || 0);
+
+  // v1.2 UX-1: derive isNewClient at component scope so it can drive both
+  // the address-required warning (existing behaviour) AND the new
+  // showDetails auto-expand (so the seller can fill phone for WhatsApp on
+  // a fresh client). Computed from the typed name + loaded clients list,
+  // identical semantics to the inline check that was previously inside
+  // the address block's IIFE.
+  const isNewClient = Boolean(form.clientName) && !clients.some((c) => c.name === form.clientName);
+
+  // v1.2 UX-1: collapsible "تفاصيل إضافية" (phone, email, notes). One-way
+  // auto-expand — opens when there's content to surface or the client is
+  // new, never auto-closes during typing so the user doesn't lose their
+  // input mid-edit. Manual toggle remains available either direction.
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => {
+    if (form.clientPhone || form.clientEmail || form.notes || isNewClient) {
+      setShowDetails(true);
+    }
+  }, [form.clientPhone, form.clientEmail, form.notes, isNewClient]);
 
   // FEAT-04: reactive default for down_payment_expected.
   //
@@ -410,23 +466,17 @@ function SalesContent() {
                 ℹ️ اسم العميل بالأحرف اللاتينية (مثال: Ahmad, Samir)
               </div>
             </div>
-            <div className="form-group">
-              <label htmlFor="sale-phone">هاتف العميل</label>
-              <input id="sale-phone" type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+31612345678 أو +966501234567" style={{ direction: 'ltr', textAlign: 'right' }} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="sale-email">إيميل العميل</label>
-              <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
-            </div>
+            {/* v1.2 UX-1: phone + email moved into "تفاصيل إضافية" section
+                below. They auto-expand into view when either has a value
+                (e.g. SmartSelect filled them from an existing client) or
+                when isNewClient is true (so the seller can add a phone
+                for the WhatsApp post-sale prompt). */}
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
               {/* BUG-6 hotfix 2026-04-14: delivery address is required when
                   the sale creates a new client. Existing clients inherit
-                  their stored address. `isNewClient` is true whenever the
-                  typed client name doesn't match any row in the clients
-                  list fetched at page load. Amber border + warning only
-                  when (new client AND empty address). */}
+                  their stored address. Amber border + warning only when
+                  (new client AND empty address). */}
               {(() => {
-                const isNewClient = form.clientName && !clients.some((c) => c.name === form.clientName);
                 const addressMissing = isNewClient && !form.clientAddress?.trim();
                 return (
                   <>
@@ -587,54 +637,99 @@ function SalesContent() {
                 </div>
               )}
             </div>
-            {/* FEAT-04: down_payment_expected with reactive default + validation
-                v1.0.3 Bug A: input is now disabled for cash/bank sales and locked
-                to the computed total. Only آجل (credit) sales allow editing dpe. */}
-            <div className="form-group">
-              <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
-              <input
-                id="sale-dpe"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.downPaymentExpected}
-                disabled={form.paymentType !== 'آجل'}
-                onChange={(e) => {
-                  // Defensive: shouldn't fire when disabled, but ignore the value
-                  // if the user somehow gets one through (browser autofill, etc.)
-                  if (form.paymentType !== 'آجل') return;
-                  setDownPaymentTouched(true);
-                  setForm({ ...form, downPaymentExpected: e.target.value });
-                }}
-                placeholder={form.paymentType === 'آجل' ? '0 (اختياري — لفرض دفعة مقدمة على الدين)' : String(total)}
-                style={{
-                  border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
-                  background: dpeError ? '#fef2f2' : (form.paymentType !== 'آجل' ? '#f1f5f9' : undefined),
-                  cursor: form.paymentType !== 'آجل' ? 'not-allowed' : undefined,
-                }}
-              />
-              {form.paymentType !== 'آجل' && (
-                <div style={{
-                  marginTop: '6px',
-                  padding: '8px 12px',
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  color: '#92400e',
-                  fontWeight: 600,
-                }}>
-                  ⚠️ البيع النقدي/البنكي يُحصَّل بالكامل عند التوصيل — لا يمكن تعديل المبلغ
+            {/* FEAT-04: down_payment_expected.
+                v1.0.3 Bug A: cash/bank sales force dpe = total (auto-synced
+                in the useEffect above; do NOT touch that). v1.2 UX-1: when
+                paymentType is cash/bank we hide the input entirely and
+                show a one-line confirmation instead — the sync logic
+                continues to set form.downPaymentExpected behind the
+                scenes, so submit still receives the correct value. Only
+                آجل (credit) sales render the editable DPE input. */}
+            {form.paymentType === 'آجل' ? (
+              <div className="form-group">
+                <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
+                <input
+                  id="sale-dpe"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.downPaymentExpected}
+                  onChange={(e) => {
+                    setDownPaymentTouched(true);
+                    setForm({ ...form, downPaymentExpected: e.target.value });
+                  }}
+                  placeholder="0 (اختياري — لفرض دفعة مقدمة على الدين)"
+                  style={{
+                    border: dpeError ? '2px solid #dc2626' : '1.5px solid #d1d5db',
+                    background: dpeError ? '#fef2f2' : undefined,
+                  }}
+                />
+                <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
+                  {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
                 </div>
-              )}
-              <div style={{ fontSize: '0.75rem', color: dpeError ? '#dc2626' : '#64748b', marginTop: '4px' }}>
-                {dpeError || (total > 0 ? `المتبقي بعد التوصيل: ${formatNumber(remainingPreview)}` : 'أدخل الكمية والسعر لرؤية المتبقي')}
               </div>
+            ) : (
+              total > 0 && (
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <div style={{
+                    padding: '10px 14px',
+                    background: '#dcfce7',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: '#166534',
+                    fontWeight: 600,
+                  }}>
+                    ✓ سيتم تحصيل كامل المبلغ ({formatNumber(total)} €) عند التوصيل
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* v1.2 UX-1: collapsible details section. Phone is critical
+                for the WhatsApp post-sale prompt in handleSubmit (line ~320),
+                so the auto-expand effect above opens this section whenever
+                phone/email/notes have values OR the client is new. Manual
+                toggle stays available; auto-expand is one-way (never
+                auto-collapses while the user is typing). */}
+            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                style={{
+                  background: 'transparent',
+                  border: '1px dashed #cbd5e1',
+                  borderRadius: '8px',
+                  color: '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  width: '100%',
+                  textAlign: 'right',
+                  fontFamily: "'Cairo', sans-serif",
+                }}
+                aria-expanded={showDetails}
+              >
+                {showDetails ? '▲' : '▼'} تفاصيل إضافية (هاتف للواتساب، إيميل، ملاحظات)
+              </button>
             </div>
-            <div className="form-group">
-              <label htmlFor="sale-notes">ملاحظات</label>
-              <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
-            </div>
+            {showDetails && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="sale-phone">هاتف العميل (للمشاركة عبر WhatsApp بعد البيع)</label>
+                  <input id="sale-phone" type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="06 12 34 56 78" style={{ direction: 'ltr', textAlign: 'right' }} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="sale-email">إيميل العميل</label>
+                  <input id="sale-email" type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="email@example.com" style={{ direction: 'ltr', textAlign: 'right' }} />
+                </div>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label htmlFor="sale-notes">ملاحظات</label>
+                  <input id="sale-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات اختيارية" />
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -662,18 +757,25 @@ function SalesContent() {
           </h3>
         </div>
 
-        {/* Item 2 — filter bar */}
+        {/* v1.2 UX-1: filter bar with URL-synced state.
+            - date / select / seller filters write to URL immediately on
+              change (instant feedback, no debounce required for picker
+              UX)
+            - filterClient is debounced 300ms via the useEffect above
+              (text input → avoid history flooding per keystroke)
+            - "✕ مسح" preserves `?new=1` because setUrlParam reads
+              searchParams and only mutates the targeted key */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateFrom} onChange={(e) => { setFilterDateFrom(e.target.value); setUrlParam('from', e.target.value); }} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={filterDateTo} onChange={(e) => { setFilterDateTo(e.target.value); setUrlParam('to', e.target.value); }} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <input type="text" placeholder="بحث عميل..." value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setUrlParam('status', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل الحالات</option>
             <option value="محجوز">محجوز</option>
             <option value="مؤكد">مؤكد</option>
             <option value="ملغي">ملغي</option>
           </select>
-          <select value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={filterPayStatus} onChange={(e) => { setFilterPayStatus(e.target.value); setUrlParam('pay', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
             <option value="partial">جزئي</option>
@@ -681,7 +783,7 @@ function SalesContent() {
             <option value="cancelled">ملغي</option>
           </select>
           {canSeeCosts && (
-            <select value={filterSeller} onChange={(e) => setFilterSeller(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <select value={filterSeller} onChange={(e) => { setFilterSeller(e.target.value); setUrlParam('seller', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
               <option value="all">كل البائعين</option>
               {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -690,7 +792,18 @@ function SalesContent() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterClient(''); setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all'); }}
+              onClick={() => {
+                setFilterDateFrom(''); setFilterDateTo(''); setFilterClient('');
+                setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all');
+                // Clear all filter params at once but preserve `?new=1` if
+                // present. We only delete the keys we own; setUrlParam's
+                // single-key approach would do 6 sequential router.replace
+                // calls — coalesce into one here.
+                const params = new URLSearchParams(searchParams.toString());
+                ['from', 'to', 'client', 'status', 'pay', 'seller'].forEach((k) => params.delete(k));
+                const qs = params.toString();
+                router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+              }}
             >
               ✕ مسح
             </button>
