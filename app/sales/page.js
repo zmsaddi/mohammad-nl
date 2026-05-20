@@ -33,6 +33,7 @@ function SalesContent() {
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [bonusSettings, setBonusSettings] = useState({});
+  const [categoryRates, setCategoryRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -197,7 +198,10 @@ function SalesContent() {
         fetch('/api/clients', { cache: 'no-store' }),
         fetch('/api/products', { cache: 'no-store' }),
       ];
-      if (isSeller) fetches.push(fetch('/api/settings', { cache: 'no-store' }));
+      if (isSeller) {
+        fetches.push(fetch('/api/settings', { cache: 'no-store' }));
+        fetches.push(fetch('/api/category-bonus-rates', { cache: 'no-store' }));
+      }
       const results = await Promise.all(fetches);
       const salesData = await results[0].json();
       const clientsData = await results[1].json();
@@ -206,6 +210,10 @@ function SalesContent() {
       setClients(Array.isArray(clientsData) ? clientsData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
       if (isSeller && results[3]) setBonusSettings(await results[3].json());
+      if (isSeller && results[4] && results[4].ok) {
+        const cr = await results[4].json();
+        setCategoryRates(Array.isArray(cr) ? cr : []);
+      }
     } catch {
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
@@ -566,8 +574,11 @@ function SalesContent() {
               const recommended = p?.sell_price || 0;
               const price = parseFloat(form.unitPrice) || 0;
               const qty = parseFloat(form.quantity) || 0;
-              const fixedBonus = parseFloat(bonusSettings.seller_bonus_fixed) || 0;
-              const pct = parseFloat(bonusSettings.seller_bonus_percentage) || 0;
+              // Resolve the rate by the product's category (category > global),
+              // matching calculateBonusInTx so the preview reflects reality.
+              const catRate = (categoryRates || []).find((r) => r.category === (p?.category || ''));
+              const fixedBonus = parseFloat(catRate?.seller_fixed ?? bonusSettings.seller_bonus_fixed) || 0;
+              const pct = parseFloat(catRate?.seller_percentage ?? bonusSettings.seller_bonus_percentage) || 0;
               const extra = Math.max(0, price - recommended) * qty;
               const extraBonus = extra * pct / 100;
               const totalBonus = fixedBonus + extraBonus;

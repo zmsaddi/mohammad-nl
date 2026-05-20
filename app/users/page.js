@@ -10,6 +10,7 @@ import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { PRODUCT_CATEGORIES } from '@/lib/utils';
 
 const ROLES = [
   { value: 'admin', label: 'مدير عام', color: '#dc2626', bg: '#fee2e2' },
@@ -36,6 +37,9 @@ function UsersContent() {
   const [bonusRates, setBonusRates] = useState([]);
   const [rateForm, setRateForm] = useState({ username: '', seller_fixed: '', seller_percentage: '', driver_fixed: '' });
   const [editingRate, setEditingRate] = useState(null);
+  // Per-category bonus rates — categoryForm is keyed by category name.
+  const [categoryRates, setCategoryRates] = useState([]);
+  const [categoryForm, setCategoryForm] = useState({});
 
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'seller' });
   const [settingsForm, setSettingsForm] = useState({ seller_bonus_fixed: '10', seller_bonus_percentage: '50', driver_bonus_fixed: '5' });
@@ -45,16 +49,30 @@ function UsersContent() {
 
   const fetchData = async () => {
     try {
-      const [usersRes, settingsRes, ratesRes] = await Promise.all([
+      const [usersRes, settingsRes, ratesRes, catRatesRes] = await Promise.all([
         fetch('/api/users', { cache: 'no-store' }),
         fetch('/api/settings', { cache: 'no-store' }),
         fetch('/api/users/bonus-rates', { cache: 'no-store' }),
+        fetch('/api/category-bonus-rates', { cache: 'no-store' }),
       ]);
       setUsers(await usersRes.json());
       const s = await settingsRes.json();
       setSettings(s);
       setSettingsForm({ seller_bonus_fixed: s.seller_bonus_fixed || '10', seller_bonus_percentage: s.seller_bonus_percentage || '50', driver_bonus_fixed: s.driver_bonus_fixed || '5' });
       if (ratesRes.ok) setBonusRates(await ratesRes.json());
+      if (catRatesRes.ok) {
+        const catRows = await catRatesRes.json();
+        setCategoryRates(Array.isArray(catRows) ? catRows : []);
+        const cf = {};
+        (Array.isArray(catRows) ? catRows : []).forEach((r) => {
+          cf[r.category] = {
+            seller_fixed: r.seller_fixed ?? '',
+            seller_percentage: r.seller_percentage ?? '',
+            driver_fixed: r.driver_fixed ?? '',
+          };
+        });
+        setCategoryForm(cf);
+      }
     } catch { addToast('خطأ في جلب البيانات', 'error'); }
     finally { setLoading(false); }
   };
@@ -124,6 +142,30 @@ function UsersContent() {
     try {
       const res = await fetch(`/api/users/bonus-rates?username=${encodeURIComponent(username)}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) { addToast('تم حذف المعدل المخصص — يستخدم الإعدادات العامة الآن'); fetchData(); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ', 'error'); }
+  };
+
+  // Per-category bonus rate handlers
+  const setCatField = (category, field, value) =>
+    setCategoryForm((prev) => ({ ...prev, [category]: { ...(prev[category] || {}), [field]: value } }));
+  const handleSaveCategoryRate = async (category) => {
+    const v = categoryForm[category] || {};
+    try {
+      const res = await fetch('/api/category-bonus-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, ...v }),
+        cache: 'no-store',
+      });
+      if (res.ok) { addToast(`تم حفظ عمولة فئة: ${category}`); fetchData(); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+  const handleResetCategoryRate = async (category) => {
+    try {
+      const res = await fetch(`/api/category-bonus-rates?category=${encodeURIComponent(category)}`, { method: 'DELETE', cache: 'no-store' });
+      if (res.ok) { addToast('تمت إعادة الفئة للإعدادات العامة'); fetchData(); }
       else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
     } catch { addToast('خطأ', 'error'); }
   };
@@ -311,6 +353,55 @@ function UsersContent() {
               </div>
             </div>
             <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
+          </div>
+
+          {/* Per-category bonus rates — same formula, one rate row per category */}
+          <div className="card" style={{ marginTop: '24px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '8px' }}>معدلات العمولة حسب الفئة</h3>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
+              نفس طريقة الحساب، لكن لكل فئة معدّلها الخاص. الحقل الفارغ = استخدام الإعدادات العامة أعلاه.
+              مفيد لجعل عمولة الإكسسوارات/قطع التبديل أقل من سعرها.
+            </p>
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>الفئة</th>
+                    <th>ثابت بائع</th>
+                    <th>نسبة بائع %</th>
+                    <th>ثابت سائق</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRODUCT_CATEGORIES.map((cat) => {
+                    const v = categoryForm[cat] || {};
+                    const hasRow = (categoryRates || []).some((r) => r.category === cat);
+                    return (
+                      <tr key={cat}>
+                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{cat}</td>
+                        <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                          placeholder={settingsForm.seller_bonus_fixed}
+                          value={v.seller_fixed ?? ''}
+                          onChange={(e) => setCatField(cat, 'seller_fixed', e.target.value)} /></td>
+                        <td><input type="number" min="0" max="100" style={{ width: 90 }}
+                          placeholder={settingsForm.seller_bonus_percentage}
+                          value={v.seller_percentage ?? ''}
+                          onChange={(e) => setCatField(cat, 'seller_percentage', e.target.value)} /></td>
+                        <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                          placeholder={settingsForm.driver_bonus_fixed}
+                          value={v.driver_fixed ?? ''}
+                          onChange={(e) => setCatField(cat, 'driver_fixed', e.target.value)} /></td>
+                        <td style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveCategoryRate(cat)}>حفظ</button>
+                          {hasRow && <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleResetCategoryRate(cat)}>إعادة</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* v1.1 F-007 — per-user bonus rate overrides */}

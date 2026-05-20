@@ -27,11 +27,13 @@ vi.mock('@vercel/postgres', () => ({
 // Build a mock `client` whose `.sql` is a tagged-template-like function that
 // returns canned rows keyed by the order of calls. `calculateBonusInTx` makes,
 // in order for the BUG-08 trigger scenario:
-//   1. SELECT * FROM settings          → []    (fall back to hardcoded defaults)
-//   2. SELECT * FROM sales WHERE id=?  → one sale row with empty created_by
-//   3. (seller block skipped because created_by is empty)
-//   4. SELECT assigned_driver FROM deliveries WHERE id=?  → []  ← the trigger
-// At step 4, the function must throw.
+//   1. SELECT * FROM settings              → []  (fall back to hardcoded defaults)
+//   2. SELECT * FROM sales WHERE id=?      → one sale row with empty created_by
+//   3. SELECT category FROM products       → []  (per-category rate lookup)
+//   4. SELECT * FROM category_bonus_rates  → []  (falls back to global rate)
+//   5. (seller block skipped because created_by is empty)
+//   6. SELECT assigned_driver FROM deliveries WHERE id=?  → []  ← the trigger
+// At the deliveries step, the function must throw.
 function buildMockClient(responses) {
   let callIndex = 0;
   return {
@@ -57,6 +59,8 @@ describe('BUG-08: calculateBonusInTx driver fallback is now an explicit throw', 
         unit_price: 1000,
         recommended_price: 1000,
       }] },                          // sales
+      { rows: [] },                  // products (category lookup)
+      { rows: [] },                  // category_bonus_rates (fallback to global)
       { rows: [] },                  // deliveries — BUG-08 trigger: empty
     ]);
 
@@ -78,6 +82,8 @@ describe('BUG-08: calculateBonusInTx driver fallback is now an explicit throw', 
         unit_price: 1000,
         recommended_price: 1000,
       }] },
+      { rows: [] },                        // products (category lookup)
+      { rows: [] },                        // category_bonus_rates (fallback to global)
       { rows: [{ assigned_driver: '' }] }, // BUG-08 trigger: empty string
     ]);
 
