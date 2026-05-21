@@ -27,6 +27,7 @@ function buildMockClient({ boxRows = [], dupRows = [] } = {}) {
     sql: async (strings, ...values) => {
       const text = strings.join('?');
       calls.push({ text, values });
+      if (/to_regclass\('cash_boxes'\)/.test(text)) return { rows: [{ t: 'cash_boxes' }] };
       if (/FROM cash_boxes WHERE owner_username/.test(text)) return { rows: boxRows };
       if (/FROM cash_boxes WHERE type = 'main'/.test(text)) return { rows: boxRows };
       if (/FROM cash_movements/.test(text)) return { rows: dupRows };
