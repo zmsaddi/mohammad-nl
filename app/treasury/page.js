@@ -108,6 +108,21 @@ function TreasuryContent() {
     if (ok) { addToast('تم رفض العملية'); fetchData(); } else addToast(d.error || 'خطأ', 'error');
   };
 
+  // Master switch (admin). Toggling NEVER deletes data — it only starts/stops
+  // recording money movements; balances and all records are preserved.
+  const toggleTreasury = async () => {
+    const turningOn = !enabled;
+    const msg = turningOn
+      ? 'تفعيل نظام الصناديق؟ سيبدأ تسجيل حركة الأموال من الآن. لا تُفقد أي بيانات حالية. تذكّر إدخال الأرصدة الافتتاحية (عدّ فعلي) بعد التفعيل.'
+      : 'إيقاف نظام الصناديق؟ يتوقّف تسجيل الحركات الجديدة، وتبقى كل الأرصدة والبيانات كما هي.';
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
+    try {
+      const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ treasury_enabled: turningOn ? 'true' : 'false' }), cache: 'no-store' });
+      if (res.ok) { addToast(turningOn ? 'تم تفعيل نظام الصناديق' : 'تم إيقاف نظام الصناديق'); fetchData(); }
+      else { const d = await res.json().catch(() => ({})); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+
   const partyLabel = (type, name, owner) => type === 'main' ? 'الصندوق العام' : (name || owner || '—');
 
   return (
@@ -120,6 +135,28 @@ function TreasuryContent() {
       {!enabled && (
         <div className="card" style={{ marginBottom: 16, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: '0.9rem' }}>
           ⏳ نظام الصناديق قيد التهيئة — العرض للاطّلاع فقط، والإجراءات تظهر عند التفعيل.
+        </div>
+      )}
+
+      {/* Master switch — admin only. Toggling never deletes data. */}
+      {role === 'admin' && (
+        <div className="card" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <strong>نظام الصناديق:</strong>{' '}
+            {enabled
+              ? <span style={{ color: '#16a34a', fontWeight: 700 }}>مُفعَّل</span>
+              : <span style={{ color: '#9a3412', fontWeight: 700 }}>متوقّف</span>}
+            <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 4 }}>
+              التفعيل أو الإيقاف لا يحذف أي بيانات — الأرصدة والسجلّات تبقى كما هي.
+            </div>
+          </div>
+          <button
+            className="btn"
+            style={{ background: enabled ? '#fee2e2' : '#16a34a', color: enabled ? '#dc2626' : '#fff', border: 'none', whiteSpace: 'nowrap' }}
+            onClick={toggleTreasury}
+          >
+            {enabled ? 'إيقاف النظام' : 'تفعيل النظام'}
+          </button>
         </div>
       )}
 

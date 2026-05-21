@@ -4,7 +4,9 @@
 // calls to record a shadow cash movement + update a box balance. These tests
 // inject a mock `client` (no real DB, same approach as the bug08 test) and
 // verify the behaviours that matter for money correctness:
-//   1. STRICT no-op when TREASURY_ENABLED is not 'true' (zero queries).
+//   1. No-op when the treasury is off (no movement inserted, no balance changed).
+//      The flag is now settings-backed, so a single read may probe `settings`,
+//      but nothing is ever recorded.
 //   2. Box resolution: owner's custody box, the shared general box, or skip.
 //   3. Idempotency: a movement already recorded for (source,kind,box) is skipped.
 //   4. On a fresh emit: inserts the movement AND updates the box balance by
@@ -40,15 +42,19 @@ const inserted = (calls) => calls.filter((c) => /INSERT INTO cash_movements/.tes
 const balanceUpdates = (calls) => calls.filter((c) => /UPDATE cash_boxes SET balance/.test(c.text));
 
 describe('emitCashMovement', () => {
-  it('is a strict no-op when TREASURY_ENABLED is off (zero queries)', async () => {
+  it('records nothing when the treasury is off (no insert, no balance change)', async () => {
     delete process.env.TREASURY_ENABLED;
     const { emitCashMovement } = await import('../lib/db.js');
+    // settings read returns no row → treasury_enabled is not 'true' → off.
     const { client, calls } = buildMockClient({ boxRows: [{ id: 5 }] });
     await emitCashMovement(client, {
       ownerUsername: 'driver1', signedAmount: 100, kind: 'collection',
       sourceTable: 'payments', sourceId: 1,
     });
-    expect(calls).toHaveLength(0);
+    // It may probe `settings` once, but it must never record a movement…
+    expect(inserted(calls)).toHaveLength(0);
+    // …nor touch any box balance.
+    expect(balanceUpdates(calls)).toHaveLength(0);
   });
 
   it('skips when sourceId is missing (no stable idempotency key)', async () => {

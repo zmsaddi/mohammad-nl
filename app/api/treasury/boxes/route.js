@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCashBoxesForViewer, getBoxRef } from '@/lib/db';
+import { getCashBoxesForViewer, getBoxRef, isTreasuryEnabled } from '@/lib/db';
 import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
@@ -18,7 +18,7 @@ export async function GET(request) {
     const general = await getBoxRef({ general: true });
     const mine = token.username ? await getBoxRef({ owner: token.username }) : null;
     return NextResponse.json({
-      enabled: process.env.TREASURY_ENABLED === 'true',
+      enabled: await isTreasuryEnabled(),
       boxes,
       generalBoxId: general?.id ?? null,
       myBoxId: mine?.id ?? null,
