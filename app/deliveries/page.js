@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -10,9 +10,13 @@ import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
+
+const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '' }, to: { default: '' }, driver: { default: 'all' }, bank: { default: '' } };
 
 // Three workflow states the user picks from: قيد الانتظار / تم التسليم / إلغاء.
 // 'جاري التوصيل' is kept here ONLY so legacy rows that still have it render with
@@ -158,11 +162,9 @@ function DeliveriesContent() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [confirmDelivery, setConfirmDelivery] = useState(null); // {row, step: 'amount'|'vin'}
   const [vinInput, setVinInput] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterDriver, setFilterDriver] = useState('all');
-  const [bankPendingOnly, setBankPendingOnly] = useState(false);
+  // Filters URL-synced via the shared hook. bankPendingOnly is encoded as bank==='1'.
+  const { values: f, set: setF, reset: resetFilters, isActive: filtersActive } = useUrlFilters(DELIVERY_FILTERS);
+  const bankPendingOnly = f.bank === '1';
   const [showForm, setShowForm] = useState(false);
   // FEAT-05: cancellation dialog state. When an admin clicks the status
   // dropdown to 'ملغي' OR the delete button, we open the CancelSaleDialog
@@ -360,15 +362,14 @@ function DeliveriesContent() {
     r.sale_payment_type === 'بنك' && !r.bank_received_by &&
     r.status !== 'ملغي' && r.status !== 'تم التوصيل';
 
-  // Item 2 — extend existing status filter with date range + driver
-  const filtered = rows.filter((r) => {
+  // Item 2 — status + date range + driver + bank-pending toggle (shared engine)
+  const filtered = useMemo(() => rows.filter((r) => {
     if (bankPendingOnly && !isBankPending(r)) return false;
-    if (filterStatus && r.status !== filterStatus) return false;
-    if (filterDateFrom && r.date < filterDateFrom) return false;
-    if (filterDateTo && r.date > filterDateTo) return false;
-    if (filterDriver !== 'all' && (r.assigned_driver || '') !== filterDriver) return false;
+    if (f.status && r.status !== f.status) return false;
+    if (!dateInRange(r.date, f.from, f.to)) return false;
+    if (f.driver !== 'all' && (r.assigned_driver || '') !== f.driver) return false;
     return true;
-  });
+  }), [rows, f.status, f.from, f.to, f.driver, bankPendingOnly]);
   // Smart sort: pending/in-transit first, then by date newest
   const STATUS_PRIORITY = { 'قيد الانتظار': 0, 'جاري التوصيل': 1, 'تم التوصيل': 2, 'ملغي': 3 };
   const smartFiltered = [...filtered].sort((a, b) => {
@@ -383,7 +384,9 @@ function DeliveriesContent() {
     { key: null, direction: null }
   );
   // PA-03: Pagination
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.status, f.from, f.to, f.driver, f.bank]);
 
   // Driver dropdown options derived from row data
   const driverOptions = Array.from(
@@ -440,7 +443,7 @@ function DeliveriesContent() {
         <div
           className="summary-card"
           style={{ cursor: 'pointer', outline: bankPendingOnly ? '2px solid #ea580c' : 'none' }}
-          onClick={() => setBankPendingOnly((v) => !v)}
+          onClick={() => setF('bank', bankPendingOnly ? '' : '1')}
           title="بيوع بنكية تنتظر تأكيد استلام المبلغ قبل التسليم"
         >
           <div className="summary-card-icon" style={{ background: '#ffedd5' }}>
@@ -544,30 +547,28 @@ function DeliveriesContent() {
 
         {/* Item 2 — filter bar */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            value={f.status}
+            onChange={(e) => setF('status', e.target.value)}
+            aria-label="تصفية حسب الحالة"
             style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
           >
             <option value="">كل الحالات</option>
             {SELECTABLE_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <select
-            value={filterDriver}
-            onChange={(e) => setFilterDriver(e.target.value)}
+            value={f.driver}
+            onChange={(e) => setF('driver', e.target.value)}
+            aria-label="تصفية حسب السائق"
             style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
           >
             <option value="all">كل السائقين</option>
             {driverOptions.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-          {(filterDateFrom || filterDateTo || filterStatus || filterDriver !== 'all') && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterStatus(''); setFilterDriver('all'); }}
-            >
+          {filtersActive && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={resetFilters}>
               ✕ مسح
             </button>
           )}
@@ -578,8 +579,11 @@ function DeliveriesContent() {
         ) : paginatedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />
-            <h3>{rows.length === 0 ? 'لا توجد توصيلات بعد' : 'لا توجد نتائج'}</h3>
-            <p>{rows.length === 0 ? 'أضف أول توصيلة بالضغط على الزر أعلاه' : 'جرّب تعديل الفلاتر'}</p>
+            <h3>{rows.length === 0 ? 'لا توجد توصيلات بعد' : 'لا توجد نتائج مطابقة'}</h3>
+            <p>{rows.length === 0 ? 'أضف أول توصيلة بالضغط على الزر أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
+            {rows.length > 0 && filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
@@ -935,7 +939,9 @@ function DeliveriesContent() {
 export default function DeliveriesPage() {
   return (
     <ToastProvider>
-      <DeliveriesContent />
+      <Suspense fallback={null}>
+        <DeliveriesContent />
+      </Suspense>
     </ToastProvider>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -13,6 +13,10 @@ import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText } from '@/lib/filter-engine';
+
+const STOCK_FILTERS = { q: { default: '', debounce: 300 }, status: { default: 'all' }, category: { default: 'all' } };
 
 function StockContent() {
   const { data: session } = useSession();
@@ -34,10 +38,8 @@ function StockContent() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // all, in-stock, low, out
-  // DONE: Step 2 — category filter
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  // Filters (q / status / category) URL-synced via the shared hook.
+  const { values: f, set: setF, reset: resetFilters, isActive: filtersActive } = useUrlFilters(STOCK_FILTERS);
 
   // UX-02: pending sell_price change for confirmation
   const [pendingPrice, setPendingPrice] = useState(null);
@@ -121,20 +123,17 @@ function StockContent() {
     setPendingPrice(null);
   };
 
-  let filtered = products.filter((p) =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.category?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // DONE: Step 2 — status filter now uses product-specific threshold via getStatus()
-  if (filter === 'in-stock') filtered = filtered.filter((p) => getStatus(p) === 'ok');
-  else if (filter === 'low') filtered = filtered.filter((p) => getStatus(p) === 'low');
-  else if (filter === 'out') filtered = filtered.filter((p) => getStatus(p) === 'out');
-
-  // DONE: Step 2 — category filter
-  if (categoryFilter !== 'all') {
-    filtered = filtered.filter((p) => p.category === categoryFilter);
-  }
+  // Status filter ('in-stock'→ok / 'low' / 'out') uses the per-product threshold
+  // via getStatus — a derived predicate kept inline (the shared engine handles
+  // search + the simple category equality).
+  const filtered = useMemo(() => products.filter((p) => {
+    if (!matchesText([p.name, p.category, p.description_ar], f.q)) return false;
+    if (f.status === 'in-stock' && getStatus(p) !== 'ok') return false;
+    if (f.status === 'low' && getStatus(p) !== 'low') return false;
+    if (f.status === 'out' && getStatus(p) !== 'out') return false;
+    if (f.category !== 'all' && p.category !== f.category) return false;
+    return true;
+  }), [products, f.q, f.status, f.category]);
 
   // Item 3 — click-to-sort on column headers, default name ascending
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -143,7 +142,9 @@ function StockContent() {
   );
 
   // PA-03: pagination
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.q, f.status, f.category]);
 
   const totalProducts = products.length;
   // ARC-06: parseFloat on every NUMERIC read so reducers don't string-concat.
@@ -273,7 +274,7 @@ function StockContent() {
             </div>
           </div>
           <button
-            onClick={() => setFilter(outOfStock > 0 ? 'out' : 'low')}
+            onClick={() => setF('status', outOfStock > 0 ? 'out' : 'low')}
             style={{
               marginRight: 'auto',
               padding: '6px 14px',
@@ -296,19 +297,21 @@ function StockContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            جرد المخزون ({filtered.length})
+            جرد المخزون ({filtered.length === products.length ? products.length : `${filtered.length} من ${products.length}`})
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
+              aria-label="بحث في المخزون"
               placeholder="بحث بالاسم أو الفئة..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={f.q}
+              onChange={(e) => setF('q', e.target.value)}
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             />
             <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              value={f.status}
+              onChange={(e) => setF('status', e.target.value)}
+              aria-label="تصفية حسب حالة المخزون"
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             >
               <option value="all">الكل</option>
@@ -318,8 +321,9 @@ function StockContent() {
             </select>
             {/* DONE: Step 2 — category filter dropdown */}
             <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              value={f.category}
+              onChange={(e) => setF('category', e.target.value)}
+              aria-label="تصفية حسب الفئة"
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             >
               <option value="all">كل الفئات</option>
@@ -327,6 +331,9 @@ function StockContent() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            {filtersActive && (
+              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+            )}
           </div>
         </div>
 
@@ -334,8 +341,11 @@ function StockContent() {
           <PageSkeleton rows={6} showStats={false} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>{search || filter !== 'all' ? 'لا توجد نتائج' : 'لا توجد منتجات بعد'}</h3>
-            <p>المنتجات تُضاف تلقائياً عند الشراء</p>
+            <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا توجد منتجات بعد'}</h3>
+            <p>{filtersActive ? 'جرّب تعديل الفلاتر أو مسحها' : 'المنتجات تُضاف تلقائياً عند الشراء'}</p>
+            {filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
@@ -579,7 +589,9 @@ function StockContent() {
 export default function StockPage() {
   return (
     <ToastProvider>
-      <StockContent />
+      <Suspense fallback={null}>
+        <StockContent />
+      </Suspense>
     </ToastProvider>
   );
 }
