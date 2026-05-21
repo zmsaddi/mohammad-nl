@@ -20,16 +20,18 @@ function InvoicesContent() {
   const addToast = useToast();
   const role = session?.user?.role;
   const canSeeCosts = role === 'admin' || role === 'manager';
+  const canEditVin = role === 'admin' || role === 'manager';
   // DONE: Bug 6 — drivers may now reach this page; the API filters their invoices
   // by joining on deliveries.assigned_driver. No client-side gating needed beyond auth.
-  // eslint-disable-next-line no-unused-vars
-  const canView = ['admin', 'manager', 'seller', 'driver'].includes(role);
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [pdfRefCode, setPdfRefCode] = useState(null);
   const [search, setSearch] = useState('');
+  const [vinEdit, setVinEdit] = useState(null);   // the invoice row being VIN-edited
+  const [vinValue, setVinValue] = useState('');
+  const [vinSaving, setVinSaving] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -75,6 +77,39 @@ function InvoicesContent() {
       return 'معلق';
     }
     return 'مدفوع'; // كاش / بنك → paid
+  };
+
+  // VIN correction — the ONLY post-delivery edit allowed on an invoice. Opening
+  // the modal is the deliberate first step; saving then requires an explicit
+  // old→new confirmation so it can never happen by a stray click.
+  const openVinEdit = (inv) => { setVinEdit(inv); setVinValue(inv.vin || ''); };
+  const closeVinEdit = () => { if (vinSaving) return; setVinEdit(null); setVinValue(''); };
+
+  const saveVin = async () => {
+    if (!vinEdit) return;
+    const newVal = vinValue.trim();
+    const oldVal = (vinEdit.vin || '').trim();
+    if (newVal === oldVal) { addToast('لا يوجد تغيير على رقم الهيكل', 'error'); return; }
+    const ok = typeof window !== 'undefined' && window.confirm(
+      `تأكيد تعديل رقم الهيكل (VIN) للفاتورة ${vinEdit.ref_code}:\n\n` +
+      `من:  ${oldVal || '—'}\n` +
+      `إلى: ${newVal || '—'}\n\n` +
+      `لن يتغيّر أي بيان آخر في الفاتورة. متابعة؟`
+    );
+    if (!ok) return;
+    setVinSaving(true);
+    try {
+      const res = await fetch(`/api/invoices/${vinEdit.id}/vin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vin: newVal }),
+        cache: 'no-store',
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) { addToast('تم تعديل رقم الهيكل ✓'); setVinEdit(null); setVinValue(''); fetchData(); }
+      else addToast(d.error || 'خطأ في التعديل', 'error');
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+    finally { setVinSaving(false); }
   };
 
   return (
@@ -130,6 +165,15 @@ function InvoicesContent() {
                 >
                   PDF
                 </button>
+                {canEditVin && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: '#4f46e5', color: '#fff', padding: '4px 10px' }}
+                    onClick={() => openVinEdit(row)}
+                  >
+                    ✎ VIN
+                  </button>
+                )}
               </>
             )}
             emptyMessage="لا توجد فواتير"
@@ -167,17 +211,32 @@ function InvoicesContent() {
                         /api/invoices/[id]/pdf is still used as a graceful fallback
                         if the PDF service ever fails. */}
                     <td>
-                      <button
-                        className="btn btn-sm"
-                        style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPdfRefCode(inv.ref_code);
-                        }}
-                        title="تحميل أو مشاركة الفاتورة"
-                      >
-                        📄 PDF
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: '#1a3a2a', color: 'white', padding: '4px 10px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPdfRefCode(inv.ref_code);
+                          }}
+                          title="تحميل أو مشاركة الفاتورة"
+                        >
+                          📄 PDF
+                        </button>
+                        {canEditVin && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#4f46e5', color: '#fff', padding: '4px 10px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openVinEdit(inv);
+                            }}
+                            title="تعديل رقم الهيكل (VIN)"
+                          >
+                            ✎ VIN
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -207,6 +266,41 @@ function InvoicesContent() {
           onClose={() => setPdfRefCode(null)}
           onError={(msg) => addToast(msg, 'error')}
         />
+      )}
+
+      {vinEdit && (
+        <div
+          onClick={closeVinEdit}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ maxWidth: 440, width: '100%', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 4 }}>تعديل رقم الهيكل (VIN)</h3>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 16 }}>
+              الفاتورة <strong>{vinEdit.ref_code}</strong> — {vinEdit.item}. هذا التعديل يصحّح رقم الهيكل فقط، ولن يغيّر أي بيان آخر في الفاتورة.
+            </p>
+            <div className="form-group" style={{ margin: 0, marginBottom: 10 }}>
+              <label>الرقم الحالي</label>
+              <input value={vinEdit.vin || '—'} disabled style={{ direction: 'ltr', textAlign: 'right', background: '#f1f5f9', color: '#64748b' }} />
+            </div>
+            <div className="form-group" style={{ margin: 0, marginBottom: 18 }}>
+              <label>الرقم الجديد</label>
+              <input
+                value={vinValue}
+                onChange={(e) => setVinValue(e.target.value)}
+                maxLength={64}
+                autoFocus
+                style={{ direction: 'ltr', textAlign: 'right' }}
+                placeholder="أدخل رقم الهيكل الصحيح"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={closeVinEdit} disabled={vinSaving} style={{ background: '#e2e8f0', color: '#334155' }}>إلغاء</button>
+              <button className="btn btn-primary" onClick={saveVin} disabled={vinSaving}>
+                {vinSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <DetailModal
