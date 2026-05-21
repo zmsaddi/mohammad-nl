@@ -12,6 +12,7 @@ const PAGE_ROLES = {
   '/invoices': ['admin', 'manager', 'seller', 'driver'],
   '/my-bonus': ['seller', 'driver'],
   '/deliveries': ['admin', 'manager', 'seller', 'driver'],
+  '/treasury': ['admin', 'manager', 'driver'],
   '/users': ['admin'],
   '/settlements': ['admin'],
   // v1.0.2 Feature 2 — profit distribution page. Admin + manager can

@@ -25,6 +25,7 @@ const navLinks = [
   { href: '/invoices', label: 'الفواتير', group: 'financial', roles: ['admin', 'manager', 'seller', 'driver'], icon: '🧾' },
   { href: '/clients', label: 'العملاء', group: 'data', roles: ['admin', 'manager'], icon: '👥' },
   { href: '/suppliers', label: 'الموردين', group: 'data', roles: ['admin', 'manager'], icon: '🏭' },
+  { href: '/treasury', label: 'إدارة المال', group: 'financial', roles: ['admin', 'manager', 'driver'], icon: '🏦' },
   { href: '/settlements', label: 'التسويات', group: 'financial', roles: ['admin'], icon: '⚖️' },
   { href: '/profit-distributions', label: 'توزيع الأرباح', group: 'financial', roles: ['admin', 'manager'], icon: '💸' },
   { href: '/settings', label: 'الإعدادات', group: 'system', roles: ['admin'], icon: '⚙️' },
