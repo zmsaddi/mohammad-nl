@@ -29,11 +29,11 @@ vi.mock('@vercel/postgres', () => ({
 // in order for the BUG-08 trigger scenario:
 //   1. SELECT * FROM settings              → []  (fall back to hardcoded defaults)
 //   2. SELECT * FROM sales WHERE id=?      → one sale row with empty created_by
-//   3. SELECT category FROM products              → []  (per-category rate lookup)
-//   4. SELECT to_regclass('category_bonus_rates') → []  (table-exists guard;
-//        absent here, so the category-rate SELECT is skipped → global rate)
-//   5. (seller block skipped because created_by is empty)
-//   6. SELECT assigned_driver FROM deliveries WHERE id=?  → []  ← the trigger
+//   3. SELECT category FROM products                   → []   (per-category rate lookup)
+//   4. SELECT to_regclass('category_bonus_rates')      → null (absent → skip cat rate)
+//   5. SELECT to_regclass('user_category_bonus_rates') → null (absent → no user-cat layer)
+//   6. (seller block skipped because created_by is empty)
+//   7. SELECT assigned_driver FROM deliveries WHERE id=?  → []  ← the trigger
 // At the deliveries step, the function must throw.
 function buildMockClient(responses) {
   let callIndex = 0;
@@ -61,7 +61,8 @@ describe('BUG-08: calculateBonusInTx driver fallback is now an explicit throw', 
         recommended_price: 1000,
       }] },                          // sales
       { rows: [] },                  // products (category lookup)
-      { rows: [{ t: null }] },       // to_regclass guard → table absent → skip category rate
+      { rows: [{ t: null }] },       // to_regclass(category_bonus_rates) → absent → skip
+      { rows: [{ t: null }] },       // to_regclass(user_category_bonus_rates) → absent
       { rows: [] },                  // deliveries — BUG-08 trigger: empty
     ]);
 
@@ -84,7 +85,8 @@ describe('BUG-08: calculateBonusInTx driver fallback is now an explicit throw', 
         recommended_price: 1000,
       }] },
       { rows: [] },                        // products (category lookup)
-      { rows: [{ t: null }] },             // to_regclass guard → table absent → skip category rate
+      { rows: [{ t: null }] },             // to_regclass(category_bonus_rates) → absent → skip
+      { rows: [{ t: null }] },             // to_regclass(user_category_bonus_rates) → absent
       { rows: [{ assigned_driver: '' }] }, // BUG-08 trigger: empty string
     ]);
 

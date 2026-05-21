@@ -40,6 +40,10 @@ function UsersContent() {
   // Per-category bonus rates — categoryForm is keyed by category name.
   const [categoryRates, setCategoryRates] = useState([]);
   const [categoryForm, setCategoryForm] = useState({});
+  // Per-user × per-category overrides (most specific layer).
+  const [ucSelectedUser, setUcSelectedUser] = useState('');
+  const [ucForm, setUcForm] = useState({});
+  const [ucRows, setUcRows] = useState([]);
 
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'seller' });
   const [settingsForm, setSettingsForm] = useState({ seller_bonus_fixed: '10', seller_bonus_percentage: '50', driver_bonus_fixed: '5' });
@@ -166,6 +170,54 @@ function UsersContent() {
     try {
       const res = await fetch(`/api/category-bonus-rates?category=${encodeURIComponent(category)}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) { addToast('تمت إعادة الفئة للإعدادات العامة'); fetchData(); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ', 'error'); }
+  };
+
+  // Per-user × per-category override handlers
+  const loadUserCatRates = async (username) => {
+    setUcSelectedUser(username);
+    setUcForm({});
+    setUcRows([]);
+    if (!username) return;
+    try {
+      const res = await fetch(`/api/users/category-bonus-rates?username=${encodeURIComponent(username)}`, { cache: 'no-store' });
+      if (res.ok) {
+        const rows = await res.json();
+        const arr = Array.isArray(rows) ? rows : [];
+        setUcRows(arr);
+        const f = {};
+        arr.forEach((r) => {
+          f[r.category] = {
+            seller_fixed: r.seller_fixed ?? '',
+            seller_percentage: r.seller_percentage ?? '',
+            driver_fixed: r.driver_fixed ?? '',
+          };
+        });
+        setUcForm(f);
+      }
+    } catch { addToast('خطأ في جلب البيانات', 'error'); }
+  };
+  const setUcField = (category, field, value) =>
+    setUcForm((prev) => ({ ...prev, [category]: { ...(prev[category] || {}), [field]: value } }));
+  const handleSaveUserCatRate = async (category) => {
+    if (!ucSelectedUser) { addToast('اختر مستخدماً أولاً', 'error'); return; }
+    const v = ucForm[category] || {};
+    try {
+      const res = await fetch('/api/users/category-bonus-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: ucSelectedUser, category, ...v }),
+        cache: 'no-store',
+      });
+      if (res.ok) { addToast(`تم الحفظ: ${category}`); loadUserCatRates(ucSelectedUser); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+  const handleResetUserCatRate = async (category) => {
+    try {
+      const res = await fetch(`/api/users/category-bonus-rates?username=${encodeURIComponent(ucSelectedUser)}&category=${encodeURIComponent(category)}`, { method: 'DELETE', cache: 'no-store' });
+      if (res.ok) { addToast('تمت الإزالة'); loadUserCatRates(ucSelectedUser); }
       else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
     } catch { addToast('خطأ', 'error'); }
   };
@@ -528,6 +580,70 @@ function UsersContent() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Per-user × per-category overrides (most specific layer) */}
+          <div className="card" style={{ marginTop: '24px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '8px' }}>معدلات المستخدم حسب الفئة</h3>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
+              الأكثر تحديداً: معدّل خاص لمستخدم في فئة معيّنة. الأولوية: (مستخدم + فئة) ← المستخدم ← الفئة ← العام.
+              الحقل الفارغ = يرجع للمستوى الأدنى.
+            </p>
+            <div className="form-group" style={{ maxWidth: 360, marginBottom: 12 }}>
+              <label>المستخدم</label>
+              <select value={ucSelectedUser} onChange={(e) => loadUserCatRates(e.target.value)}>
+                <option value="">-- اختر بائعاً أو سائقاً --</option>
+                {safeUsers.filter((u) => u.role === 'seller' || u.role === 'driver').map((u) => (
+                  <option key={u.username} value={u.username}>
+                    {u.name || u.username} ({u.role === 'seller' ? 'بائع' : 'سائق'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {ucSelectedUser && (() => {
+              const u = safeUsers.find((x) => x.username === ucSelectedUser);
+              const isSel = u?.role === 'seller';
+              const isDrv = u?.role === 'driver';
+              return (
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>الفئة</th>
+                        {isSel && <th>ثابت بائع</th>}
+                        {isSel && <th>نسبة بائع %</th>}
+                        {isDrv && <th>ثابت سائق</th>}
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PRODUCT_CATEGORIES.map((cat) => {
+                        const v = ucForm[cat] || {};
+                        const hasRow = (ucRows || []).some((r) => r.category === cat);
+                        return (
+                          <tr key={cat}>
+                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{cat}</td>
+                            {isSel && <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                              value={v.seller_fixed ?? ''}
+                              onChange={(e) => setUcField(cat, 'seller_fixed', e.target.value)} /></td>}
+                            {isSel && <td><input type="number" min="0" max="100" style={{ width: 90 }}
+                              value={v.seller_percentage ?? ''}
+                              onChange={(e) => setUcField(cat, 'seller_percentage', e.target.value)} /></td>}
+                            {isDrv && <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                              value={v.driver_fixed ?? ''}
+                              onChange={(e) => setUcField(cat, 'driver_fixed', e.target.value)} /></td>}
+                            <td style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveUserCatRate(cat)}>حفظ</button>
+                              {hasRow && <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleResetUserCatRate(cat)}>إزالة</button>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         </>
       )}
