@@ -63,3 +63,51 @@ describe('validTransferPair (no same-role custody↔custody; same box invalid)',
     expect(validTransferPair(null, { id: 2, type: 'main' })).toBe(false);
   });
 });
+
+// "Request settlement" (مطالبة بتسليم العهدة): an admin/manager INITIATES a
+// handover OUT OF a holder's box, and the holder CONFIRMS it. This locks the
+// composed authority the feature relies on. Initiate rule = manages EITHER side
+// (mFrom || mTo); confirm rule = manages a side AND is not the initiator.
+describe('request settlement — admin/manager asks a holder to hand over', () => {
+  const generalBox = { id: 1, type: 'main' };
+  const driverBox = { id: 2, type: 'custody', owner_username: 'd1', owner_role: 'driver' };
+  const managerBox = { id: 3, type: 'custody', owner_username: 'm1', owner_role: 'manager' };
+  const canInitiate = (managesBox, role, user, from, to) =>
+    managesBox(role, user, from) || managesBox(role, user, to);
+
+  it('admin can initiate driver → general (manages the destination, not the source)', async () => {
+    const { managesBox, validTransferPair } = await import('../lib/db.js');
+    expect(managesBox('admin', 'a1', driverBox)).toBe(false);   // does NOT own the source
+    expect(canInitiate(managesBox, 'admin', 'a1', driverBox, generalBox)).toBe(true); // …but manages general
+    expect(validTransferPair(driverBox, generalBox)).toBe(true);
+  });
+
+  it('admin can also request a MANAGER to hand over to general', async () => {
+    const { managesBox, validTransferPair } = await import('../lib/db.js');
+    expect(canInitiate(managesBox, 'admin', 'a1', managerBox, generalBox)).toBe(true);
+    expect(validTransferPair(managerBox, generalBox)).toBe(true);
+  });
+
+  it('manager can initiate driver → own box (manages both sides)', async () => {
+    const { managesBox, validTransferPair } = await import('../lib/db.js');
+    expect(managesBox('manager', 'm1', driverBox)).toBe(true);
+    expect(canInitiate(managesBox, 'manager', 'm1', driverBox, managerBox)).toBe(true);
+    expect(validTransferPair(driverBox, managerBox)).toBe(true);
+  });
+
+  it('the holder (driver) can CONFIRM — manages the source and is not the initiator', async () => {
+    const { managesBox } = await import('../lib/db.js');
+    const initiator = 'a1';                       // admin initiated the request
+    const confirmer = 'd1';                       // the driver confirms
+    const managesASide = managesBox('driver', confirmer, driverBox); // owns the source
+    expect(managesASide).toBe(true);
+    expect(confirmer === initiator).toBe(false);  // dual-confirm: not the initiator
+  });
+
+  it('a manager CANNOT request settlement from another manager (no same-role custody pair)', async () => {
+    const { managesBox, validTransferPair } = await import('../lib/db.js');
+    const otherManagerBox = { id: 4, type: 'custody', owner_username: 'm2', owner_role: 'manager' };
+    expect(managesBox('manager', 'm1', otherManagerBox)).toBe(false);          // can't manage their box
+    expect(validTransferPair(otherManagerBox, managerBox)).toBe(false);        // and the pair is invalid
+  });
+});

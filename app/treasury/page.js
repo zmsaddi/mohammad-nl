@@ -25,6 +25,7 @@ function TreasuryContent() {
   const [loading, setLoading] = useState(true);
   const [handAmount, setHandAmount] = useState('');
   const [fundForm, setFundForm] = useState({ toBoxId: '', amount: '' });
+  const [reqForm, setReqForm] = useState({ fromBoxId: '', amount: '' });
   const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
   const [capitalOps, setCapitalOps] = useState([]);
 
@@ -78,6 +79,27 @@ function TreasuryContent() {
     if (!fromBoxId) { addToast('صندوق المصدر غير مهيّأ', 'error'); return; }
     const { ok, d } = await post('/api/treasury/handovers', { kind: 'funding', fromBoxId, toBoxId: Number(fundForm.toBoxId), amount: fundForm.amount });
     if (ok) { addToast('تم إنشاء طلب تمويل — بانتظار تأكيد المستلم'); setFundForm({ toBoxId: '', amount: '' }); fetchData(); }
+    else addToast(d.error || 'خطأ', 'error');
+  };
+
+  // Request a person to settle their custody (مطالبة بتسليم العهدة). The money
+  // moves FROM their box TO the requester's collection point (admin → general
+  // box; manager → own box) — but ONLY after the holder confirms. Initiator is
+  // the admin/manager, so the holder (not the initiator) is the one who confirms.
+  // Prefill the amount with the holder's full balance (editable for partials).
+  const pickRequestPerson = (boxId) => {
+    const b = boxes.find((x) => String(x.id) === String(boxId));
+    const bal = b ? (parseFloat(b.balance) || 0) : 0;
+    setReqForm({ fromBoxId: boxId, amount: boxId && bal > 0 ? String(bal) : '' });
+  };
+
+  const handleRequestSettlement = async () => {
+    if (!reqForm.fromBoxId) { addToast('اختر الشخص', 'error'); return; }
+    if (!(parseFloat(reqForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+    const toBoxId = role === 'admin' ? generalBoxId : myBoxId; // hierarchy: admin → general, manager → own
+    if (!toBoxId) { addToast('صندوق الوجهة غير مهيّأ', 'error'); return; }
+    const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: Number(reqForm.fromBoxId), toBoxId, amount: reqForm.amount });
+    if (ok) { addToast('تم إرسال طلب التسليم — بانتظار تأكيد حامل العهدة'); setReqForm({ fromBoxId: '', amount: '' }); fetchData(); }
     else addToast(d.error || 'خطأ', 'error');
   };
 
@@ -286,6 +308,32 @@ function TreasuryContent() {
                   <input type="number" min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
                 </div>
                 <button className="btn btn-primary" onClick={handleFund}>إنشاء طلب تمويل</button>
+              </div>
+            </div>
+          )}
+
+          {/* Request settlement (admin/manager) — ask a holder to hand over their custody */}
+          {canFund && fundTargets.length > 0 && (
+            <div className="card" style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 8 }}>طلب تسليم عهدة</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+                اطلب من شخص تسليم عهدته{role === 'admin' ? ' إلى الصندوق العام' : ' إلى صندوقك'}. لا يتحرّك المال حتى يؤكّد حامل العهدة التسليم فعلياً.
+              </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div className="form-group" style={{ maxWidth: 280, margin: 0 }}>
+                  <label>الشخص</label>
+                  <select value={reqForm.fromBoxId} onChange={(e) => pickRequestPerson(e.target.value)}>
+                    <option value="">-- اختر --</option>
+                    {fundTargets.map((b) => (
+                      <option key={b.id} value={b.id}>{boxName(b)} ({ROLE_LABEL[b.owner_role] || b.owner_role}) — رصيد: {formatNumber(parseFloat(b.balance) || 0)} €</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
+                  <label>المبلغ المطلوب (€)</label>
+                  <input type="number" min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
+                </div>
+                <button className="btn btn-primary" onClick={handleRequestSettlement}>إرسال الطلب</button>
               </div>
             </div>
           )}
