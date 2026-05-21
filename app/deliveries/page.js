@@ -667,7 +667,7 @@ function DeliveriesContent() {
                   <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem' }}>بنك: بانتظار التأكيد</span>
                 )}
                 {canAssignDriver && isBankPending(row) && (
-                  <button className="btn btn-primary btn-sm" onClick={() => handleConfirmBank(row.sale_id)}>تأكيد استلام البنك</button>
+                  <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
                 )}
                 <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
                 {isAdmin && row.status !== 'ملغي' && row.sale_id && (
@@ -765,11 +765,11 @@ function DeliveriesContent() {
                     <td onClick={(e) => e.stopPropagation()}>
                       {canAssignDriver && isBankPending(row) && (
                         <button
-                          className="btn btn-primary btn-sm"
-                          style={{ marginLeft: 4 }}
+                          className="btn btn-sm"
+                          style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap', marginLeft: 4 }}
                           onClick={() => handleConfirmBank(row.sale_id)}
                         >
-                          تأكيد استلام البنك
+                          ✓ تأكيد البنك
                         </button>
                       )}
                       {isAdmin && row.status !== 'ملغي' && (

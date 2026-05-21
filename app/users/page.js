@@ -586,8 +586,9 @@ function UsersContent() {
           <div className="card" style={{ marginTop: '24px' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '8px' }}>معدلات المستخدم حسب الفئة</h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '12px' }}>
-              الأكثر تحديداً: معدّل خاص لمستخدم في فئة معيّنة. الأولوية: (مستخدم + فئة) ← المستخدم ← الفئة ← العام.
-              الحقل الفارغ = يرجع للمستوى الأدنى.
+              معدّل خاص لمستخدم في فئة معيّنة (الأكثر تحديداً). اترك الحقل فارغاً ليرث القيمة الافتراضية —{' '}
+              <strong>الرقم الباهت داخل الحقل هو القيمة المطبَّقة حالياً</strong> (معدّل الفئة، وإلا الإعداد العام).
+              املأ فقط ما تريد تخصيصه ثم اضغط «حفظ».
             </p>
             <div className="form-group" style={{ maxWidth: 360, marginBottom: 12 }}>
               <label>المستخدم</label>
@@ -619,17 +620,26 @@ function UsersContent() {
                     <tbody>
                       {PRODUCT_CATEGORIES.map((cat) => {
                         const v = ucForm[cat] || {};
+                        // Placeholder = the value inherited if this field is left blank
+                        // (the category rate if set, otherwise the global default).
+                        const cr = (categoryRates || []).find((r) => r.category === cat) || {};
+                        const phSeller = cr.seller_fixed ?? settingsForm.seller_bonus_fixed;
+                        const phPct = cr.seller_percentage ?? settingsForm.seller_bonus_percentage;
+                        const phDriver = cr.driver_fixed ?? settingsForm.driver_bonus_fixed;
                         const hasRow = (ucRows || []).some((r) => r.category === cat);
                         return (
                           <tr key={cat}>
                             <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{cat}</td>
-                            {isSel && <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                            {isSel && <td><input type="number" min="0" step="any" style={{ width: 110 }}
+                              placeholder={phSeller}
                               value={v.seller_fixed ?? ''}
                               onChange={(e) => setUcField(cat, 'seller_fixed', e.target.value)} /></td>}
-                            {isSel && <td><input type="number" min="0" max="100" style={{ width: 90 }}
+                            {isSel && <td><input type="number" min="0" max="100" style={{ width: 110 }}
+                              placeholder={phPct}
                               value={v.seller_percentage ?? ''}
                               onChange={(e) => setUcField(cat, 'seller_percentage', e.target.value)} /></td>}
-                            {isDrv && <td><input type="number" min="0" step="any" style={{ width: 90 }}
+                            {isDrv && <td><input type="number" min="0" step="any" style={{ width: 110 }}
+                              placeholder={phDriver}
                               value={v.driver_fixed ?? ''}
                               onChange={(e) => setUcField(cat, 'driver_fixed', e.target.value)} /></td>}
                             <td style={{ display: 'flex', gap: 6 }}>
