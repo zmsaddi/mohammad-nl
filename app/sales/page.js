@@ -382,6 +382,7 @@ function SalesContent() {
         if (form.clientPhone) {
           const shareData = {
             phone: form.clientPhone.replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, ''),
+            clientName: form.clientName,
             refCode: result.refCode || '',
             item: form.item,
             quantity: form.quantity,
@@ -847,6 +848,7 @@ function SalesContent() {
                     if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
                     const msg = encodeURIComponent(
 `*Vitesse Eco*
+*العميل:* ${row.client_name}
 *الكود:* ${row.ref_code || row.id}
 *المنتج:* ${row.item}
 *الكمية:* ${row.quantity}
@@ -950,6 +952,7 @@ function SalesContent() {
                             if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
                             const msg = encodeURIComponent(
 `*Vitesse Eco*
+*العميل:* ${row.client_name}
 *الكود:* ${row.ref_code || row.id}
 *المنتج:* ${row.item}
 *الكمية:* ${row.quantity}
@@ -1047,6 +1050,7 @@ function SalesContent() {
             <h3>تم تسجيل البيع بنجاح!</h3>
             <p>هل تريد مشاركة تفاصيل الطلب مع العميل عبر واتساب؟</p>
             <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', margin: '16px 0', textAlign: 'right', fontSize: '0.85rem', lineHeight: 1.8 }}>
+              <div><strong>العميل:</strong> {whatsappShare.clientName || '-'}</div>
               <div><strong>الكود:</strong> {whatsappShare.refCode}</div>
               <div><strong>المنتج:</strong> {whatsappShare.item}</div>
               <div><strong>الكمية:</strong> {whatsappShare.quantity}</div>
@@ -1061,6 +1065,7 @@ function SalesContent() {
                   const msg = encodeURIComponent(
 `*Vitesse Eco - تأكيد طلب*
 ━━━━━━━━━━━━━━━━━
+*العميل:* ${s.clientName || '-'}
 *الكود:* ${s.refCode}
 *المنتج:* ${s.item}
 *الكمية:* ${s.quantity}
