@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
@@ -9,8 +9,12 @@ import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText } from '@/lib/filter-engine';
 import PageSkeleton from '@/components/PageSkeleton';
 import DataCardList from '@/components/DataCardList';
+
+const CLIENT_FILTERS = { q: { default: '', debounce: 300 }, debt: { default: 'all' } };
 
 function ClientsContent() {
   const { data: session } = useSession();
@@ -21,8 +25,7 @@ function ClientsContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [search, setSearch] = useState('');
-  const [hasDebtFilter, setHasDebtFilter] = useState('all'); // 'all' | 'debt' | 'clear'
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(CLIENT_FILTERS);
   const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
@@ -104,13 +107,13 @@ function ClientsContent() {
     setDeleteId(null);
   };
 
-  const filtered = clients.filter((c) => {
-    if (search && !(c.name?.includes(search) || c.description_ar?.includes(search) || c.phone?.includes(search))) return false;
+  const filtered = useMemo(() => clients.filter((c) => {
+    if (!matchesText([c.name, c.description_ar, c.phone], f.q)) return false;
     const debt = parseFloat(c.remainingDebt) || 0;
-    if (hasDebtFilter === 'debt' && debt <= 0.005) return false;
-    if (hasDebtFilter === 'clear' && debt > 0.005) return false;
+    if (f.debt === 'debt' && debt <= 0.005) return false;
+    if (f.debt === 'clear' && debt > 0.005) return false;
     return true;
-  });
+  }), [clients, f.q, f.debt]);
 
   // Item 3 — click-to-sort, default to name ascending
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -211,26 +214,30 @@ function ClientsContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            قائمة العملاء
+            قائمة العملاء ({filtered.length === clients.length ? clients.length : `${filtered.length} من ${clients.length}`})
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
+              aria-label="بحث في العملاء"
               placeholder="بحث بالاسم أو الهاتف..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={f.q}
+              onChange={(e) => setFilter('q', e.target.value)}
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             />
             <select
-              value={hasDebtFilter}
-              onChange={(e) => setHasDebtFilter(e.target.value)}
+              value={f.debt}
+              onChange={(e) => setFilter('debt', e.target.value)}
               style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
-              title="تصفية حسب الدين"
+              aria-label="تصفية حسب الدين"
             >
               <option value="all">الكل</option>
               <option value="debt">عليه دين</option>
               <option value="clear">بدون دين</option>
             </select>
+            {filtersActive && (
+              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+            )}
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة عميل
@@ -243,8 +250,11 @@ function ClientsContent() {
           <PageSkeleton rows={5} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <h3>{search ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}</h3>
-            <p>{search ? 'جرب كلمة بحث مختلفة' : 'أضف أول عميل بالضغط على زر الإضافة'}</p>
+            <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد عملاء بعد'}</h3>
+            <p>{filtersActive ? 'جرّب تعديل البحث أو مسح الفلاتر' : 'أضف أول عميل بالضغط على زر الإضافة'}</p>
+            {filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
@@ -354,7 +364,9 @@ function ClientsContent() {
 export default function ClientsPage() {
   return (
     <ToastProvider>
-      <ClientsContent />
+      <Suspense fallback={null}>
+        <ClientsContent />
+      </Suspense>
     </ToastProvider>
   );
 }

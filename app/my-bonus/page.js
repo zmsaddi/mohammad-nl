@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
+
+const BONUS_FILTERS = { from: { default: '' }, to: { default: '' }, settled: { default: 'all' } };
 
 function MyBonusContent() {
   const { data: session } = useSession();
@@ -20,10 +24,8 @@ function MyBonusContent() {
   const [bonuses, setBonuses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // UX-09: filter state
-  const [filterFrom, setFilterFrom] = useState('');
-  const [filterTo, setFilterTo] = useState('');
-  const [filterSettled, setFilterSettled] = useState('all'); // 'all' | 'settled' | 'unsettled'
+  // UX-09: filter state (URL-synced via the shared hook)
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(BONUS_FILTERS);
 
   const fetchData = async () => {
     try {
@@ -55,14 +57,13 @@ function MyBonusContent() {
   })();
   const count = bonuses.length;
 
-  // UX-09: client-side filter pipeline
-  const filtered = bonuses.filter((b) => {
-    if (filterFrom && b.date < filterFrom) return false;
-    if (filterTo && b.date > filterTo) return false;
-    if (filterSettled === 'settled' && !b.settled) return false;
-    if (filterSettled === 'unsettled' && b.settled) return false;
+  // UX-09: client-side filter pipeline (shared engine)
+  const filtered = useMemo(() => bonuses.filter((b) => {
+    if (!dateInRange(b.date, f.from, f.to)) return false;
+    if (f.settled === 'settled' && !b.settled) return false;
+    if (f.settled === 'unsettled' && b.settled) return false;
     return true;
-  });
+  }), [bonuses, f.from, f.to, f.settled]);
 
   // Sort: default newest first
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -70,7 +71,9 @@ function MyBonusContent() {
     { key: 'date', direction: 'desc' }
   );
   // PA-03: Pagination
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.from, f.to, f.settled]);
 
   return (
     <AppLayout>
@@ -122,35 +125,50 @@ function MyBonusContent() {
       {/* History Table */}
       <div className="card">
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
-          سجل العمولات ({count} عملية)
+          سجل العمولات ({filtered.length === count ? `${count} عملية` : `${filtered.length} من ${count}`})
         </h3>
 
         {/* UX-09: Filters */}
         <div className="form-grid" style={{ marginBottom: '16px', gap: '12px' }}>
           <div className="form-group">
             <label>من تاريخ</label>
-            <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+            <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} />
           </div>
           <div className="form-group">
             <label>إلى تاريخ</label>
-            <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+            <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} />
           </div>
           <div className="form-group">
             <label>الحالة</label>
-            <select value={filterSettled} onChange={(e) => setFilterSettled(e.target.value)}>
+            <select value={f.settled} onChange={(e) => setFilter('settled', e.target.value)}>
               <option value="all">الكل</option>
               <option value="settled">تم الصرف</option>
               <option value="unsettled">مستحق</option>
             </select>
           </div>
+          {filtersActive && (
+            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+            </div>
+          )}
         </div>
 
         {loading ? (
           <PageSkeleton rows={6} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>لا توجد عمولات بعد</h3>
-            <p>{role === 'driver' ? 'العمولة تُحسب عند تأكيد التوصيل' : 'العمولة تُحسب بعد تأكيد توصيل المبيعات'}</p>
+            {bonuses.length === 0 ? (
+              <>
+                <h3>لا توجد عمولات بعد</h3>
+                <p>{role === 'driver' ? 'العمولة تُحسب عند تأكيد التوصيل' : 'العمولة تُحسب بعد تأكيد توصيل المبيعات'}</p>
+              </>
+            ) : (
+              <>
+                <h3>لا توجد نتائج مطابقة</h3>
+                <p>جرّب تعديل الفلاتر أو مسحها</p>
+                <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -219,5 +237,11 @@ function MyBonusContent() {
 }
 
 export default function MyBonusPage() {
-  return <ToastProvider><MyBonusContent /></ToastProvider>;
+  return (
+    <ToastProvider>
+      <Suspense fallback={null}>
+        <MyBonusContent />
+      </Suspense>
+    </ToastProvider>
+  );
 }

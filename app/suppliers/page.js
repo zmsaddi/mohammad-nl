@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { formatNumber } from '@/lib/utils';
@@ -11,6 +11,10 @@ import DataCardList from '@/components/DataCardList';
 import Pagination, { usePagination } from '@/components/Pagination';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText } from '@/lib/filter-engine';
+
+const SUPPLIER_FILTERS = { q: { default: '', debounce: 300 } };
 
 function SuppliersContent() {
   const addToast = useToast();
@@ -18,7 +22,7 @@ function SuppliersContent() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [search, setSearch] = useState('');
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(SUPPLIER_FILTERS);
   const [form, setForm] = useState({ name: '', phone: '', address: '', notes: '' });
 
   const fetchData = async () => {
@@ -82,9 +86,9 @@ function SuppliersContent() {
     setDeleteId(null);
   };
 
-  const filtered = suppliers.filter((s) =>
-    s.name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.phone?.includes(search)
+  const filtered = useMemo(
+    () => suppliers.filter((s) => matchesText([s.name, s.phone, s.address], f.q)),
+    [suppliers, f.q]
   );
 
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -92,7 +96,11 @@ function SuppliersContent() {
     { key: 'name', direction: 'asc' }
   );
 
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows, resetPage } = usePagination(sortedRows);
+  // Snap back to page 1 whenever the filter changes (avoids a stale/empty page).
+  // resetPage is a fresh closure each render, so depend only on the filter value.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.q]);
 
   return (
     <AppLayout>
@@ -138,16 +146,20 @@ function SuppliersContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-            قائمة الموردين ({filtered.length})
+            قائمة الموردين ({filtered.length === suppliers.length ? suppliers.length : `${filtered.length} من ${suppliers.length}`})
           </h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
+              aria-label="بحث في الموردين"
               placeholder="بحث بالاسم أو الهاتف..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={f.q}
+              onChange={(e) => setFilter('q', e.target.value)}
               style={{ padding: '8px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             />
+            {filtersActive && (
+              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+            )}
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة مورد
@@ -160,11 +172,13 @@ function SuppliersContent() {
           <PageSkeleton rows={5} showStats={false} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <h3>{search ? 'لا توجد نتائج' : 'لا يوجد موردين بعد'}</h3>
-            <p>{search ? 'جرب كلمة بحث مختلفة' : 'أضف أول مورد بالضغط على زر الإضافة'}</p>
-            {!search && !showForm && (
+            <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد موردين بعد'}</h3>
+            <p>{filtersActive ? 'جرّب تعديل البحث أو مسح الفلاتر' : 'أضف أول مورد بالضغط على زر الإضافة'}</p>
+            {filtersActive ? (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            ) : (!showForm && (
               <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setShowForm(true)}>+ أضف أول مورد</button>
-            )}
+            ))}
           </div>
         ) : (
           <>
@@ -232,5 +246,11 @@ function SuppliersContent() {
 }
 
 export default function SuppliersPage() {
-  return <ToastProvider><SuppliersContent /></ToastProvider>;
+  return (
+    <ToastProvider>
+      <Suspense fallback={null}>
+        <SuppliersContent />
+      </Suspense>
+    </ToastProvider>
+  );
 }
