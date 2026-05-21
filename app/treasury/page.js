@@ -25,6 +25,8 @@ function TreasuryContent() {
   const [loading, setLoading] = useState(true);
   const [handAmount, setHandAmount] = useState('');
   const [fundForm, setFundForm] = useState({ toBoxId: '', amount: '' });
+  const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
+  const [capitalOps, setCapitalOps] = useState([]);
 
   const fetchData = async () => {
     try {
@@ -37,6 +39,10 @@ function TreasuryContent() {
       if (data?.enabled !== false) {
         const hres = await fetch('/api/treasury/handovers', { cache: 'no-store' });
         if (hres.ok) setPending(await hres.json());
+        if (role === 'admin') {
+          const cres = await fetch('/api/treasury/capital', { cache: 'no-store' });
+          if (cres.ok) setCapitalOps(await cres.json());
+        }
       }
     } catch { addToast('خطأ في جلب البيانات', 'error'); }
     finally { setLoading(false); }
@@ -82,6 +88,24 @@ function TreasuryContent() {
   const handleReject = async (id) => {
     const { ok, d } = await post(`/api/treasury/handovers/${id}/reject`);
     if (ok) { addToast('تم رفض الطلب'); fetchData(); } else addToast(d.error || 'خطأ', 'error');
+  };
+
+  const handleInitCapital = async () => {
+    if (!(parseFloat(capForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+    const { ok, d } = await post('/api/treasury/capital', capForm);
+    if (ok) {
+      addToast(d.status === 'approved' ? 'تمّ تنفيذ العملية' : 'تمّ إنشاء العملية — بانتظار موافقة بقية المدراء');
+      setCapForm({ kind: 'injection', amount: '', method: 'كاش' });
+      fetchData();
+    } else addToast(d.error || 'خطأ', 'error');
+  };
+  const handleApproveCapital = async (id) => {
+    const { ok, d } = await post(`/api/treasury/capital/${id}/approve`);
+    if (ok) { addToast(d.status === 'approved' ? 'تمّ التنفيذ ✓' : 'تمّت موافقتك — بانتظار البقية'); fetchData(); } else addToast(d.error || 'خطأ', 'error');
+  };
+  const handleRejectCapital = async (id) => {
+    const { ok, d } = await post(`/api/treasury/capital/${id}/reject`);
+    if (ok) { addToast('تم رفض العملية'); fetchData(); } else addToast(d.error || 'خطأ', 'error');
   };
 
   const partyLabel = (type, name, owner) => type === 'main' ? 'الصندوق العام' : (name || owner || '—');
@@ -226,6 +250,58 @@ function TreasuryContent() {
                 </div>
                 <button className="btn btn-primary" onClick={handleFund}>إنشاء طلب تمويل</button>
               </div>
+            </div>
+          )}
+
+          {/* Capital in/out (admin only) — requires all admins to approve */}
+          {role === 'admin' && (
+            <div className="card" style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 8 }}>رأس المال (إدخال / سحب)</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+                إدخال رأسمال خارجي أو سحبه من الصندوق العام. يتطلّب موافقة كل المدراء العامين (إن وُجد أكثر من مدير).
+              </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
+                <div className="form-group" style={{ maxWidth: 170, margin: 0 }}>
+                  <label>النوع</label>
+                  <select value={capForm.kind} onChange={(e) => setCapForm({ ...capForm, kind: e.target.value })}>
+                    <option value="injection">إدخال رأسمال</option>
+                    <option value="withdrawal">سحب رأسمال</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ maxWidth: 150, margin: 0 }}>
+                  <label>المبلغ (€)</label>
+                  <input type="number" min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
+                </div>
+                <div className="form-group" style={{ maxWidth: 120, margin: 0 }}>
+                  <label>الطريقة</label>
+                  <select value={capForm.method} onChange={(e) => setCapForm({ ...capForm, method: e.target.value })}>
+                    <option value="كاش">كاش</option>
+                    <option value="بنك">بنك</option>
+                  </select>
+                </div>
+                <button className="btn btn-primary" onClick={handleInitCapital}>إنشاء</button>
+              </div>
+              {capitalOps.length > 0 && (
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead><tr><th>النوع</th><th>المبلغ</th><th>الموافقات</th><th>المُبادِر</th><th>إجراء</th></tr></thead>
+                    <tbody>
+                      {capitalOps.map((o) => (
+                        <tr key={o.id}>
+                          <td>{o.kind === 'injection' ? 'إدخال' : 'سحب'}</td>
+                          <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(o.amount)} €</td>
+                          <td>{o.approvals} / {o.admin_count}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{o.initiated_by}</td>
+                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleApproveCapital(o.id)}>✓ موافقة</button>
+                            <button className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleRejectCapital(o.id)}>رفض</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </>
