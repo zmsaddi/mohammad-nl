@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -13,9 +13,13 @@ import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText, dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
+
+const SALES_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -41,32 +45,9 @@ function SalesContent() {
   // filters write to URL immediately on change; the client text-search
   // is debounced 300ms (see useEffect below) to avoid flooding history.
   // The `?new=1` flag is preserved across all filter mutations.
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('from') || '');
-  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('to') || '');
-  const [filterClient, setFilterClient] = useState(searchParams.get('client') || '');
-  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all');
-  const [filterPayStatus, setFilterPayStatus] = useState(searchParams.get('pay') || 'all');
-  const [filterSeller, setFilterSeller] = useState(searchParams.get('seller') || 'all');
-
-  // Helper: write a filter value into the URL while preserving every
-  // other query param (notably `new=1` from /summary's "بيع جديد" link).
-  // Skips the router.replace if the URL would be unchanged — prevents
-  // history-stack noise + render loops on every keystroke.
-  const setUrlParam = (key, value) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value === '' || value === 'all' || value == null) {
-      if (!params.has(key)) return; // no change, no replace
-      params.delete(key);
-    } else {
-      if (params.get(key) === value) return; // no change, no replace
-      params.set(key, value);
-    }
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  };
+  const searchParams = useSearchParams(); // still needed to seed showForm from ?new=1
+  // Filters URL-synced via the shared hook (preserves ?new=1).
+  const { values: f, set: setF, reset: resetFilters, isActive: filtersActive } = useUrlFilters(SALES_FILTERS);
   // FEAT-05: cancellation dialog state. Admin "حذف" on a sale row opens the
   // CancelSaleDialog with invoiceMode='delete' — the dialog forces 'remove'
   // for both bonuses (keep option hidden) because of FK cascade rules.
@@ -94,18 +75,6 @@ function SalesContent() {
   // FEAT-04: track whether user manually edited down_payment_expected so
   // we don't clobber their input on subsequent paymentType/total changes.
   const [downPaymentTouched, setDownPaymentTouched] = useState(false);
-
-  // v1.2 UX-1: debounce the client text-search before pushing to URL.
-  // Date and select filters write immediately on change; only the typed
-  // text search needs debouncing to avoid a router.replace per keystroke.
-  useEffect(() => {
-    const t = setTimeout(() => setUrlParam('client', filterClient), 300);
-    return () => clearTimeout(t);
-    // setUrlParam reads searchParams/router/pathname which are stable
-    // hook returns; no need to include them in deps. filterClient is
-    // the only meaningful trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterClient]);
 
   // Smart auto-fill: when client name matches, fill all their info
   const handleClientChange = (name) => {
@@ -226,15 +195,14 @@ function SalesContent() {
   // Item 2 — filter pipeline. Client-side because row volumes are small
   // (Phase 0.5 production shows ~200 rows). Server-side can come later
   // if the list grows past ~500 rows.
-  const filteredRows = rows.filter((r) => {
-    if (filterDateFrom && r.date < filterDateFrom) return false;
-    if (filterDateTo && r.date > filterDateTo) return false;
-    if (filterClient && !r.client_name?.toLowerCase().includes(filterClient.toLowerCase())) return false;
-    if (filterStatus !== 'all' && (r.status || 'محجوز') !== filterStatus) return false;
-    if (filterPayStatus !== 'all' && r.payment_status !== filterPayStatus) return false;
-    if (filterSeller !== 'all' && r.created_by !== filterSeller) return false;
+  const filteredRows = useMemo(() => rows.filter((r) => {
+    if (!dateInRange(r.date, f.from, f.to)) return false;
+    if (!matchesText([r.client_name, r.item, r.ref_code], f.q)) return false;
+    if (f.status !== 'all' && (r.status || 'محجوز') !== f.status) return false;
+    if (f.pay !== 'all' && r.payment_status !== f.pay) return false;
+    if (f.seller !== 'all' && r.created_by !== f.seller) return false;
     return true;
-  });
+  }), [rows, f.from, f.to, f.q, f.status, f.pay, f.seller]);
 
   // Item 3 — click-to-sort, defaulting to newest first
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -242,7 +210,9 @@ function SalesContent() {
     { key: 'date', direction: 'desc' }
   );
 
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows: paginationTotal } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows: paginationTotal, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.from, f.to, f.q, f.status, f.pay, f.seller]);
 
   // Seller list for the filter dropdown (derived from row data)
   const sellerOptions = Array.from(
@@ -746,29 +716,23 @@ function SalesContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المبيعات ({sortedRows.length}/{rows.length})
+            سجل المبيعات ({filteredRows.length === rows.length ? rows.length : `${filteredRows.length} من ${rows.length}`})
           </h3>
         </div>
 
-        {/* v1.2 UX-1: filter bar with URL-synced state.
-            - date / select / seller filters write to URL immediately on
-              change (instant feedback, no debounce required for picker
-              UX)
-            - filterClient is debounced 300ms via the useEffect above
-              (text input → avoid history flooding per keystroke)
-            - "✕ مسح" preserves `?new=1` because setUrlParam reads
-              searchParams and only mutates the targeted key */}
+        {/* Filter bar — URL-synced via the shared useUrlFilters hook. Text search
+            is debounced; selects/dates apply immediately; "✕ مسح" preserves ?new=1. */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => { setFilterDateFrom(e.target.value); setUrlParam('from', e.target.value); }} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => { setFilterDateTo(e.target.value); setUrlParam('to', e.target.value); }} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث عميل..." value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setUrlParam('status', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل الحالات</option>
             <option value="محجوز">محجوز</option>
             <option value="مؤكد">مؤكد</option>
             <option value="ملغي">ملغي</option>
           </select>
-          <select value={filterPayStatus} onChange={(e) => { setFilterPayStatus(e.target.value); setUrlParam('pay', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
             <option value="partial">جزئي</option>
@@ -776,28 +740,13 @@ function SalesContent() {
             <option value="cancelled">ملغي</option>
           </select>
           {canSeeCosts && (
-            <select value={filterSeller} onChange={(e) => { setFilterSeller(e.target.value); setUrlParam('seller', e.target.value); }} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <select value={f.seller} onChange={(e) => setF('seller', e.target.value)} aria-label="تصفية حسب البائع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
               <option value="all">كل البائعين</option>
               {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
-          {(filterDateFrom || filterDateTo || filterClient || filterStatus !== 'all' || filterPayStatus !== 'all' || filterSeller !== 'all') && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => {
-                setFilterDateFrom(''); setFilterDateTo(''); setFilterClient('');
-                setFilterStatus('all'); setFilterPayStatus('all'); setFilterSeller('all');
-                // Clear all filter params at once but preserve `?new=1` if
-                // present. We only delete the keys we own; setUrlParam's
-                // single-key approach would do 6 sequential router.replace
-                // calls — coalesce into one here.
-                const params = new URLSearchParams(searchParams.toString());
-                ['from', 'to', 'client', 'status', 'pay', 'seller'].forEach((k) => params.delete(k));
-                const qs = params.toString();
-                router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-              }}
-            >
+          {filtersActive && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={resetFilters}>
               ✕ مسح
             </button>
           )}
@@ -807,8 +756,11 @@ function SalesContent() {
           <PageSkeleton rows={8} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج'}</h3>
-            <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر'}</p>
+            <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج مطابقة'}</h3>
+            <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
+            {rows.length > 0 && filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
