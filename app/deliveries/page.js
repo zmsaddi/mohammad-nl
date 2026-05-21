@@ -157,6 +157,7 @@ function DeliveriesContent() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterDriver, setFilterDriver] = useState('all');
+  const [bankPendingOnly, setBankPendingOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   // FEAT-05: cancellation dialog state. When an admin clicks the status
   // dropdown to 'ملغي' OR the delete button, we open the CancelSaleDialog
@@ -285,6 +286,17 @@ function DeliveriesContent() {
     }
   };
 
+  // Admin/manager confirms bank funds arrived → records the bank payment
+  // (attributed to the confirmer) and unblocks delivery for this sale.
+  const handleConfirmBank = async (saleId) => {
+    if (!saleId) { addToast('لا يوجد بيع مرتبط', 'error'); return; }
+    try {
+      const res = await fetch(`/api/sales/${saleId}/confirm-bank`, { method: 'POST', cache: 'no-store' });
+      if (res.ok) { addToast('تم تأكيد استلام المبلغ البنكي'); fetchData(); }
+      else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
+    } catch { addToast('خطأ في الاتصال', 'error'); }
+  };
+
   const handleStatusChange = async (row, newStatus) => {
     // If confirming delivery, show confirmation flow
     if (newStatus === 'تم التوصيل') {
@@ -361,8 +373,14 @@ function DeliveriesContent() {
     setDeleteId(null);
   };
 
+  // A بنك sale awaiting admin/manager bank-receipt confirmation (blocks delivery).
+  const isBankPending = (r) =>
+    r.sale_payment_type === 'بنك' && !r.bank_received_by &&
+    r.status !== 'ملغي' && r.status !== 'تم التوصيل';
+
   // Item 2 — extend existing status filter with date range + driver
   const filtered = rows.filter((r) => {
+    if (bankPendingOnly && !isBankPending(r)) return false;
     if (filterStatus && r.status !== filterStatus) return false;
     if (filterDateFrom && r.date < filterDateFrom) return false;
     if (filterDateTo && r.date > filterDateTo) return false;
@@ -395,6 +413,7 @@ function DeliveriesContent() {
   const inTransit = rows.filter((r) => r.status === 'جاري التوصيل').length;
   const delivered = rows.filter((r) => r.status === 'تم التوصيل').length;
   const cancelled = rows.filter((r) => r.status === 'ملغي').length;
+  const bankPendingCount = rows.filter(isBankPending).length;
 
   return (
     <AppLayout>
@@ -434,6 +453,22 @@ function DeliveriesContent() {
           <div className="summary-card-content">
             <h3>تم التوصيل</h3>
             <div className="value" style={{ color: '#16a34a' }}>{delivered}</div>
+          </div>
+        </div>
+        <div
+          className="summary-card"
+          style={{ cursor: 'pointer', outline: bankPendingOnly ? '2px solid #ea580c' : 'none' }}
+          onClick={() => setBankPendingOnly((v) => !v)}
+          title="بيوع بنكية تنتظر تأكيد استلام المبلغ قبل التسليم"
+        >
+          <div className="summary-card-icon" style={{ background: '#ffedd5' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#ea580c" width="24" height="24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+            </svg>
+          </div>
+          <div className="summary-card-content">
+            <h3>بنك: بانتظار التأكيد</h3>
+            <div className="value" style={{ color: '#ea580c' }}>{bankPendingCount}</div>
           </div>
         </div>
         <div className="summary-card">
@@ -628,6 +663,12 @@ function DeliveriesContent() {
                     ))}
                   </select>
                 )}
+                {isBankPending(row) && (
+                  <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem' }}>بنك: بانتظار التأكيد</span>
+                )}
+                {canAssignDriver && isBankPending(row) && (
+                  <button className="btn btn-primary btn-sm" onClick={() => handleConfirmBank(row.sale_id)}>تأكيد استلام البنك</button>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
                 {isAdmin && row.status !== 'ملغي' && row.sale_id && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' })}>إلغاء</button>
@@ -722,6 +763,15 @@ function DeliveriesContent() {
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
+                      {canAssignDriver && isBankPending(row) && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ marginLeft: 4 }}
+                          onClick={() => handleConfirmBank(row.sale_id)}
+                        >
+                          تأكيد استلام البنك
+                        </button>
+                      )}
                       {isAdmin && row.status !== 'ملغي' && (
                         <button
                           className="btn btn-danger btn-sm"
