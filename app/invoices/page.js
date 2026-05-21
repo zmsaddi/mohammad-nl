@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
@@ -10,10 +10,15 @@ import InvoiceActionModal from '@/components/InvoiceActionModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
 import Pagination, { usePagination } from '@/components/Pagination';
+
+// Shared URL-synced filter spec (stable module constant — see useUrlFilters).
+const INVOICE_FILTERS = { q: { default: '', debounce: 300 } };
 
 function InvoicesContent() {
   const { data: session } = useSession();
@@ -28,7 +33,7 @@ function InvoicesContent() {
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [pdfRefCode, setPdfRefCode] = useState(null);
-  const [search, setSearch] = useState('');
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(INVOICE_FILTERS);
   const [vinEdit, setVinEdit] = useState(null);   // the invoice row being VIN-edited
   const [vinValue, setVinValue] = useState('');
   const [vinSaving, setVinSaving] = useState(false);
@@ -49,8 +54,10 @@ function InvoicesContent() {
   useEffect(() => { fetchData(); }, []);
   useAutoRefresh(fetchData);
 
-  const filtered = invoices.filter((inv) =>
-    inv.client_name?.includes(search) || inv.ref_code?.includes(search) || inv.item?.includes(search) || inv.vin?.includes(search)
+  // Arabic-aware, case-insensitive, multi-field search via the shared engine.
+  const filtered = useMemo(
+    () => invoices.filter((inv) => matchesText([inv.client_name, inv.ref_code, inv.item, inv.vin], f.q)),
+    [invoices, f.q]
   );
 
   // Item 3 — click-to-sort, default newest first
@@ -122,23 +129,39 @@ function InvoicesContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            الفواتير ({filtered.length})
+            الفواتير ({filtered.length === invoices.length ? invoices.length : `${filtered.length} من ${invoices.length}`})
           </h3>
-          <input
-            type="text"
-            placeholder="بحث بالاسم أو الكود أو VIN..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', width: '100%' }}
-          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 240px' }}>
+            <input
+              type="text"
+              aria-label="بحث في الفواتير"
+              placeholder="بحث بالاسم أو الكود أو VIN..."
+              value={f.q}
+              onChange={(e) => setFilter('q', e.target.value)}
+              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', flex: 1 }}
+            />
+            {filtersActive && (
+              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+            )}
+          </div>
         </div>
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <h3>لا توجد فواتير</h3>
-            <p>الفواتير تُنشأ تلقائياً عند تأكيد التوصيل</p>
+            {invoices.length === 0 ? (
+              <>
+                <h3>لا توجد فواتير بعد</h3>
+                <p>الفواتير تُنشأ تلقائياً عند تأكيد التوصيل</p>
+              </>
+            ) : (
+              <>
+                <h3>لا توجد نتائج مطابقة</h3>
+                <p>جرّب تعديل البحث أو مسح الفلاتر</p>
+                <button className="btn btn-sm" onClick={resetFilters} style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -334,5 +357,13 @@ function InvoicesContent() {
 }
 
 export default function InvoicesPage() {
-  return <ToastProvider><InvoicesContent /></ToastProvider>;
+  // Suspense boundary required because InvoicesContent uses useSearchParams
+  // (via useUrlFilters) — Next prerender bails out without it.
+  return (
+    <ToastProvider>
+      <Suspense fallback={null}>
+        <InvoicesContent />
+      </Suspense>
+    </ToastProvider>
+  );
 }
