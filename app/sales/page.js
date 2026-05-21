@@ -6,7 +6,6 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import ConfirmModal from '@/components/ConfirmModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
@@ -36,7 +35,6 @@ function SalesContent() {
   const [categoryRates, setCategoryRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
 
   // v1.2 UX-1: filter state hydrated from URL on first render so
   // refresh + sharing a link both preserve the view. Date/select/seller
@@ -407,23 +405,6 @@ function SalesContent() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      const res = await fetch(`/api/sales?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
-      if (res.ok) {
-        addToast('تم الحذف بنجاح');
-        fetchData();
-      } else {
-        const data = await res.json();
-        addToast(data.error || 'خطأ في الحذف', 'error');
-      }
-    } catch {
-      addToast('خطأ في الاتصال', 'error');
-    }
-    setDeleteId(null);
   };
 
   return (
@@ -885,17 +866,21 @@ function SalesContent() {
                     تعديل
                   </button>
                 )}
-                {canCancelSale(row, currentUser) && isAdmin && (
+                {canCancelSale(row, currentUser) && (
                   <button
                     className="btn btn-danger btn-sm"
-                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
+                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}
                   >
-                    حذف
+                    إلغاء
                   </button>
                 )}
-                {canCancelSale(row, currentUser) && !isAdmin && (
-                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                    حذف
+                {canCancelSale(row, currentUser) && isAdmin && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: '#7f1d1d', color: '#fff' }}
+                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
+                  >
+                    حذف نهائي
                   </button>
                 )}
               </>
@@ -990,17 +975,21 @@ function SalesContent() {
                             handles bonuses/refunds). Manager + seller reach this branch only for
                             reserved sales and use the simple DELETE path (no bonuses/payments on
                             reserved). Driver never sees a cancel button. */}
-                        {canCancelSale(row, currentUser) && isAdmin && (
+                        {canCancelSale(row, currentUser) && (
                           <button
                             className="btn btn-danger btn-sm"
-                            onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
+                            onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}
                           >
-                            حذف
+                            إلغاء
                           </button>
                         )}
-                        {canCancelSale(row, currentUser) && !isAdmin && (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                            حذف
+                        {canCancelSale(row, currentUser) && isAdmin && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#7f1d1d', color: '#fff' }}
+                            onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
+                          >
+                            حذف نهائي
                           </button>
                         )}
                       </div>
@@ -1096,26 +1085,16 @@ function SalesContent() {
         </div>
       )}
 
-      <ConfirmModal
-        isOpen={!!deleteId}
-        title="حذف عملية بيع"
-        message="هل أنت متأكد من حذف هذه العملية؟ لا يمكن التراجع عن هذا الإجراء."
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
-      />
-
-      {/* FEAT-05: cancellation dialog for admin-initiated sale deletion.
-          The dialog runs in invoiceMode='delete' which hides the "keep"
-          option for bonuses and forces 'remove' (FK cascade rule). The
-          actual DELETE of the sale row happens inside cancelSale's
-          deleteSale wrapper. */}
+      {/* Cancellation dialog. invoiceMode='soft' (manager/seller + admin) keeps
+          the sale visible as 'ملغي'; invoiceMode='delete' (admin only) hard-
+          deletes after the same reason+confirm flow. */}
       <div className="cross-nav"><Link href="/clients">العملاء &rarr;</Link><Link href="/deliveries">التوصيل &rarr;</Link><Link href="/invoices">الفواتير &rarr;</Link></div>
 
       {cancelSale && (
         <CancelSaleDialog
           saleId={cancelSale.saleId}
-          invoiceMode={cancelSale.invoiceMode || 'delete'}
-          title="إلغاء عملية البيع"
+          invoiceMode={cancelSale.invoiceMode || 'soft'}
+          title={cancelSale.invoiceMode === 'delete' ? 'حذف نهائي للطلب' : 'إلغاء عملية البيع'}
           onSuccess={() => {
             setCancelSale(null);
             addToast('تم إلغاء عملية البيع بنجاح');

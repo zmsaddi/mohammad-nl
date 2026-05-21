@@ -24,7 +24,10 @@ import { apiError } from '@/lib/api-errors';
  *     On BONUS_CHOICE_REQUIRED → 428 with preview payload.
  *     On success → 200 with { cancellationId, refundAmount, preview }.
  *
- * Auth: admin + manager only. Sellers and drivers cannot cancel.
+ * Auth: admin + manager + seller (the canCancelSale matrix decides who may
+ * cancel which sale). invoiceMode='delete' (hard delete) is ADMIN-ONLY and is
+ * forced down to 'soft' for everyone else — a cancellation must keep the row
+ * (status='ملغي'), never destroy it. Drivers cannot cancel.
  */
 
 function parseId(params) {
@@ -35,7 +38,7 @@ function parseId(params) {
 }
 
 export async function GET(request, { params }) {
-  const auth = await requireAuth(request, ['admin', 'manager']);
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
   if (auth.error) return auth.error;
   const { token } = auth;
 
@@ -51,7 +54,7 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const auth = await requireAuth(request, ['admin', 'manager']);
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
   if (auth.error) return auth.error;
   const { token } = auth;
 
@@ -85,7 +88,9 @@ export async function POST(request, { params }) {
   if (!reason) {
     return NextResponse.json({ error: 'سبب الإلغاء مطلوب' }, { status: 400 });
   }
-  const invoiceMode = body?.invoiceMode === 'delete' ? 'delete' : 'soft';
+  // Hard delete is admin-only; everyone else is forced to a soft cancel that
+  // keeps the row visible as 'ملغي'.
+  const invoiceMode = (token.role === 'admin' && body?.invoiceMode === 'delete') ? 'delete' : 'soft';
   const bonusActions = body?.bonusActions || null;
   const notes = body?.notes || null;
 

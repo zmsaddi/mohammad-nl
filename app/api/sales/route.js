@@ -110,7 +110,10 @@ export async function PUT(request) {
 }
 
 export async function DELETE(request) {
-  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  // Hard delete (physically removes the sale + delivery) is ADMIN-ONLY.
+  // Managers/sellers cancel via POST /api/sales/[id]/cancel (soft — keeps the
+  // row as 'ملغي'); they can no longer destroy data through this route.
+  const auth = await requireAuth(request, ['admin']);
   if (auth.error) return auth.error;
   const { token } = auth;
   try {
