@@ -14,12 +14,18 @@ import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 
+// Three workflow states the user picks from: قيد الانتظار / تم التسليم / إلغاء.
+// 'جاري التوصيل' is kept here ONLY so legacy rows that still have it render with
+// a style (it stays valid in the schema + driver-assignment logic), but it is
+// `legacy` so it is never offered as a selectable option anymore.
 const DELIVERY_STATUSES = [
   { value: 'قيد الانتظار', label: 'قيد الانتظار', color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'جاري التوصيل', label: 'جاري التوصيل', color: '#3b82f6', bg: '#dbeafe' },
-  { value: 'تم التوصيل', label: 'تم التوصيل', color: '#16a34a', bg: '#dcfce7' },
-  { value: 'ملغي', label: 'ملغي', color: '#dc2626', bg: '#fee2e2' },
+  { value: 'جاري التوصيل', label: 'جاري التوصيل', color: '#3b82f6', bg: '#dbeafe', legacy: true },
+  { value: 'تم التوصيل', label: 'تم التسليم', color: '#16a34a', bg: '#dcfce7' },
+  { value: 'ملغي', label: 'إلغاء', color: '#dc2626', bg: '#fee2e2' },
 ];
+// Selectable subset (the 3 states) used for every dropdown.
+const SELECTABLE_STATUSES = DELIVERY_STATUSES.filter((s) => !s.legacy);
 
 function getStatusStyle(status) {
   const s = DELIVERY_STATUSES.find((d) => d.value === status);
@@ -149,7 +155,6 @@ function DeliveriesContent() {
   const [loading, setLoading] = useState(true);
   const canAssignDriver = ['admin', 'manager'].includes(userRole);
   const [submitting, setSubmitting] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [confirmDelivery, setConfirmDelivery] = useState(null); // {row, step: 'amount'|'vin'}
   const [vinInput, setVinInput] = useState('');
@@ -349,29 +354,6 @@ function DeliveriesContent() {
     }
   };
 
-  // FEAT-05: the old delete button is no longer used — admin-initiated
-  // deletion now goes through the CancelSaleDialog. This handler remains
-  // as a safety net in case some legacy UI path still sets deleteId.
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      const res = await fetch(`/api/deliveries?id=${deleteId}`, { method: 'DELETE', cache: 'no-store' });
-      if (res.ok) {
-        addToast('تم الحذف بنجاح');
-        fetchData();
-      } else {
-        // cancelDelivery calls cancelSale internally, which throws
-        // BONUS_CHOICE_REQUIRED when bonuses exist without bonusActions.
-        // In that case the route returns 400 with the Arabic error. Route
-        // the admin to the dialog as a fallback.
-        const data = await res.json().catch(() => ({}));
-        addToast(data?.error || 'خطأ في الحذف — استخدم خيار الإلغاء بدلاً منه', 'error');
-      }
-    } catch {
-      addToast('خطأ في الحذف', 'error');
-    }
-    setDeleteId(null);
-  };
 
   // A بنك sale awaiting admin/manager bank-receipt confirmation (blocks delivery).
   const isBankPending = (r) =>
@@ -570,7 +552,7 @@ function DeliveriesContent() {
             style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
           >
             <option value="">كل الحالات</option>
-            {DELIVERY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {SELECTABLE_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <select
             value={filterDriver}
@@ -645,7 +627,7 @@ function DeliveriesContent() {
                       ...getStatusStyle(row.status),
                     }}
                   >
-                    {DELIVERY_STATUSES.map((s) => (
+                    {SELECTABLE_STATUSES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
@@ -754,7 +736,7 @@ function DeliveriesContent() {
                           ...getStatusStyle(row.status),
                         }}
                       >
-                        {DELIVERY_STATUSES.map((s) => (
+                        {SELECTABLE_STATUSES.map((s) => (
                           <option key={s.value} value={s.value}>{s.label}</option>
                         ))}
                       </select>
@@ -913,14 +895,6 @@ function DeliveriesContent() {
           onBack={() => setConfirmDelivery({ ...confirmDelivery, step: 'amount' })}
         />
       )}
-
-      <ConfirmModal
-        isOpen={!!deleteId}
-        title="حذف توصيلة"
-        message="هل أنت متأكد من حذف هذه التوصيلة؟"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
-      />
 
       {/* UX-03: Confirm generic status changes (not تم التوصيل / ملغي) */}
       <ConfirmModal
