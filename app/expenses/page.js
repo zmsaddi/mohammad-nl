@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -13,6 +13,10 @@ import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText, dateInRange } from '@/lib/filter-engine';
+
+const EXPENSE_FILTERS = { from: { default: '' }, to: { default: '' }, category: { default: '' }, q: { default: '', debounce: 300 } };
 
 function ExpensesContent() {
   const { data: session } = useSession();
@@ -27,11 +31,8 @@ function ExpensesContent() {
   const [editExpense, setEditExpense] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  // UX-05: filter states
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
+  // UX-05: filter states (URL-synced via the shared hook)
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(EXPENSE_FILTERS);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -58,14 +59,13 @@ function ExpensesContent() {
   useEffect(() => { fetchData(); }, []);
   useAutoRefresh(fetchData);
 
-  // UX-05: filter pipeline
-  const filtered = rows.filter((r) => {
-    if (filterDateFrom && r.date < filterDateFrom) return false;
-    if (filterDateTo && r.date > filterDateTo) return false;
-    if (filterCategory && r.category !== filterCategory) return false;
-    if (filterSearch && !(r.description || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
+  // UX-05: filter pipeline (shared engine)
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (!dateInRange(r.date, f.from, f.to)) return false;
+    if (f.category && r.category !== f.category) return false;
+    if (!matchesText([r.description, r.notes], f.q)) return false;
     return true;
-  });
+  }), [rows, f.from, f.to, f.category, f.q]);
 
   // Item 3 — click-to-sort, default newest first
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -74,7 +74,9 @@ function ExpensesContent() {
   );
 
   // PA-03: pagination
-  const { paginatedRows, page, totalPages, totalRows, perPage, setPerPage, goTo } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, totalRows, perPage, setPerPage, goTo, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.from, f.to, f.category, f.q]);
 
   const startEditExpense = (row) => {
     setEditExpense(row);
@@ -245,7 +247,7 @@ function ExpensesContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المصاريف ({sortedRows.length}/{rows.length}) - الإجمالي: {formatNumber(totalExpenses)}
+            سجل المصاريف ({filtered.length === rows.length ? rows.length : `${filtered.length} من ${rows.length}`}) - الإجمالي: {formatNumber(totalExpenses)}
           </h3>
           {!showForm && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
@@ -256,11 +258,12 @@ function ExpensesContent() {
 
         {/* UX-05: filter bar */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            value={f.category}
+            onChange={(e) => setFilter('category', e.target.value)}
+            aria-label="تصفية حسب الفئة"
             style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
           >
             <option value="">كل الفئات</option>
@@ -268,17 +271,14 @@ function ExpensesContent() {
           </select>
           <input
             type="text"
-            value={filterSearch}
-            onChange={(e) => setFilterSearch(e.target.value)}
+            value={f.q}
+            onChange={(e) => setFilter('q', e.target.value)}
+            aria-label="بحث في المصاريف"
             placeholder="بحث بالوصف..."
             style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px', minWidth: '140px' }}
           />
-          {(filterDateFrom || filterDateTo || filterCategory || filterSearch) && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterCategory(''); setFilterSearch(''); }}
-            >
+          {filtersActive && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={resetFilters}>
               ✕ مسح
             </button>
           )}
@@ -288,8 +288,11 @@ function ExpensesContent() {
           <PageSkeleton rows={6} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>{rows.length === 0 ? 'لا توجد مصاريف بعد' : 'لا توجد نتائج'}</h3>
-            <p>{rows.length === 0 ? 'أضف أول مصروف من الزر أعلاه' : 'جرّب تعديل الفلاتر'}</p>
+            <h3>{rows.length === 0 ? 'لا توجد مصاريف بعد' : 'لا توجد نتائج مطابقة'}</h3>
+            <p>{rows.length === 0 ? 'أضف أول مصروف من الزر أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
+            {rows.length > 0 && filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
@@ -404,7 +407,9 @@ function ExpensesContent() {
 export default function ExpensesPage() {
   return (
     <ToastProvider>
-      <ExpensesContent />
+      <Suspense fallback={null}>
+        <ExpensesContent />
+      </Suspense>
     </ToastProvider>
   );
 }

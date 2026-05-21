@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
@@ -11,6 +11,10 @@ import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
+import { useUrlFilters } from '@/lib/use-url-filters';
+import { matchesText, dateInRange } from '@/lib/filter-engine';
+
+const PURCHASE_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -32,12 +36,8 @@ function PurchasesContent() {
   // PA-01: collapsible form
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(searchParams.get('new') === '1');
-  // UX-05: filter state
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterSupplier, setFilterSupplier] = useState('all');
-  const [filterPayStatus, setFilterPayStatus] = useState('all');
+  // UX-05: filter state (URL-synced via the shared hook; preserves ?new=1)
+  const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(PURCHASE_FILTERS);
 
   const [form, setForm] = useState({
     date: getTodayDate(),
@@ -100,17 +100,13 @@ function PurchasesContent() {
   useAutoRefresh(fetchData);
 
   // UX-05: filter pipeline (client-side)
-  const filteredRows = rows.filter((r) => {
-    if (filterDateFrom && r.date < filterDateFrom) return false;
-    if (filterDateTo && r.date > filterDateTo) return false;
-    if (filterSearch && !r.supplier?.toLowerCase().includes(filterSearch.toLowerCase()) && !r.item?.toLowerCase().includes(filterSearch.toLowerCase()) && !r.ref_code?.toLowerCase().includes(filterSearch.toLowerCase())) return false;
-    if (filterSupplier !== 'all' && r.supplier !== filterSupplier) return false;
-    if (filterPayStatus !== 'all') {
-      const ps = r.payment_status || 'paid';
-      if (ps !== filterPayStatus) return false;
-    }
+  const filteredRows = useMemo(() => rows.filter((r) => {
+    if (!dateInRange(r.date, f.from, f.to)) return false;
+    if (!matchesText([r.supplier, r.item, r.ref_code], f.q)) return false;
+    if (f.supplier !== 'all' && r.supplier !== f.supplier) return false;
+    if (f.pay !== 'all' && (r.payment_status || 'paid') !== f.pay) return false;
     return true;
-  });
+  }), [rows, f.from, f.to, f.q, f.supplier, f.pay]);
 
   // Item 3 — click-to-sort, default newest first
   const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
@@ -119,7 +115,9 @@ function PurchasesContent() {
   );
 
   // PA-03: Pagination
-  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows } = usePagination(sortedRows);
+  const { paginatedRows, page, totalPages, perPage, setPerPage, goTo, totalRows, resetPage } = usePagination(sortedRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetPage(); }, [f.from, f.to, f.q, f.supplier, f.pay]);
 
   // v1.2 — AC-02 supplier debt summary with safer NUMERIC handling.
   // Previous line used `parseFloat(r.paid_amount) ?? parseFloat(r.total)`
@@ -515,31 +513,27 @@ function PurchasesContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المشتريات ({sortedRows.length}/{rows.length})
+            سجل المشتريات ({filteredRows.length === rows.length ? rows.length : `${filteredRows.length} من ${rows.length}`})
           </h3>
         </div>
 
         {/* UX-05: filter bar */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} title="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} title="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث مورد / منتج / كود..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="text" placeholder="بحث مورد / منتج / كود..." aria-label="بحث في المشتريات" value={f.q} onChange={(e) => setFilter('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} aria-label="تصفية حسب المورد" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل الموردين</option>
             {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setFilter('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
             <option value="all">كل حالات الدفع</option>
             <option value="paid">مدفوع</option>
             <option value="partial">جزئي</option>
             <option value="pending">معلق</option>
           </select>
-          {(filterDateFrom || filterDateTo || filterSearch || filterSupplier !== 'all' || filterPayStatus !== 'all') && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterSearch(''); setFilterSupplier('all'); setFilterPayStatus('all'); }}
-            >
+          {filtersActive && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={resetFilters}>
               ✕ مسح
             </button>
           )}
@@ -549,8 +543,11 @@ function PurchasesContent() {
           <PageSkeleton rows={8} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
-            <h3>{rows.length === 0 ? 'لا توجد مشتريات بعد' : 'لا توجد نتائج'}</h3>
-            <p>{rows.length === 0 ? 'أضف أول عملية شراء من النموذج أعلاه' : 'جرّب تعديل الفلاتر'}</p>
+            <h3>{rows.length === 0 ? 'لا توجد مشتريات بعد' : 'لا توجد نتائج مطابقة'}</h3>
+            <p>{rows.length === 0 ? 'أضف أول عملية شراء من النموذج أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
+            {rows.length > 0 && filtersActive && (
+              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+            )}
           </div>
         ) : (
           <>
