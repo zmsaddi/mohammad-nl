@@ -28,6 +28,7 @@ function TreasuryContent() {
   const [reqForm, setReqForm] = useState({ fromBoxId: '', amount: '' });
   const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
   const [capitalOps, setCapitalOps] = useState([]);
+  const [openingInputs, setOpeningInputs] = useState({});
 
   const fetchData = async () => {
     try {
@@ -128,6 +129,23 @@ function TreasuryContent() {
   const handleRejectCapital = async (id) => {
     const { ok, d } = await post(`/api/treasury/capital/${id}/reject`);
     if (ok) { addToast('تم رفض العملية'); fetchData(); } else addToast(d.error || 'خطأ', 'error');
+  };
+
+  // Opening balance (admin go-live): set a box's starting cash by physical count.
+  // Deliberate, with an explicit confirm; re-entry replaces the prior opening.
+  const handleSetOpening = async (box) => {
+    const raw = openingInputs[box.id];
+    if (raw === undefined || raw === '') { addToast('أدخل المبلغ', 'error'); return; }
+    const amount = parseFloat(raw);
+    if (!Number.isFinite(amount) || amount < 0) { addToast('أدخل رصيداً صحيحاً (≥ 0)', 'error'); return; }
+    const hasOpening = box.opening != null;
+    const msg = `تعيين الرصيد الافتتاحي (عدّ فعلي) لصندوق «${boxName(box)}» = ${formatNumber(amount)} €؟` +
+      (hasOpening ? `\n\nيوجد رصيد افتتاحي سابق (${formatNumber(parseFloat(box.opening) || 0)} €) — سيُستبدل.` : '') +
+      `\n\nيُسجَّل كنقطة بداية لتتبّع النقد. متابعة؟`;
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
+    const { ok, d } = await post('/api/treasury/opening', { boxId: box.id, amount });
+    if (ok) { addToast('تم تعيين الرصيد الافتتاحي ✓'); setOpeningInputs((s) => ({ ...s, [box.id]: '' })); fetchData(); }
+    else addToast(d.error || 'خطأ', 'error');
   };
 
   // Master switch (admin). Toggling NEVER deletes data — it only starts/stops
@@ -237,6 +255,47 @@ function TreasuryContent() {
       {/* Actions — only when the treasury is live */}
       {enabled && (
         <>
+          {/* Opening balances (admin go-live): physical cash count per box */}
+          {role === 'admin' && (
+            <div className="card" style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 8 }}>الأرصدة الافتتاحية (عدّ فعلي)</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+                أدخل النقد الفعلي الموجود في كل صندوق الآن كنقطة بداية. يُسجَّل كرصيد افتتاحي، ويمكن تصحيحه بإعادة الإدخال (يستبدل السابق).
+              </p>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead><tr><th>الصندوق</th><th>الرصيد الحالي</th><th>الافتتاحي المُسجّل</th><th>تعيين رصيد افتتاحي</th></tr></thead>
+                  <tbody>
+                    {boxes.map((b) => (
+                      <tr key={b.id}>
+                        <td style={{ fontWeight: 600 }}>
+                          {boxName(b)}
+                          {b.type !== 'main' && b.owner_role && <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '0.8rem' }}> ({ROLE_LABEL[b.owner_role] || b.owner_role})</span>}
+                        </td>
+                        <td className="number-cell">{formatNumber(parseFloat(b.balance) || 0)} €</td>
+                        <td className="number-cell" style={{ color: b.opening != null ? '#16a34a' : '#94a3b8' }}>
+                          {b.opening != null ? `${formatNumber(parseFloat(b.opening) || 0)} €` : '—'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              type="number" min="0" step="any"
+                              value={openingInputs[b.id] ?? ''}
+                              onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
+                              placeholder="0.00"
+                              style={{ maxWidth: 120 }}
+                            />
+                            <button className="btn btn-sm btn-primary" onClick={() => handleSetOpening(b)}>تعيين</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Pending requests */}
           <div className="card" style={{ marginTop: 24 }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 12 }}>طلبات بانتظار التأكيد ({pending.length})</h3>
