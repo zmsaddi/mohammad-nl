@@ -29,6 +29,7 @@ function TreasuryContent() {
   const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
   const [capitalOps, setCapitalOps] = useState([]);
   const [openingInputs, setOpeningInputs] = useState({});
+  const [recon, setRecon] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -44,6 +45,8 @@ function TreasuryContent() {
         if (role === 'admin') {
           const cres = await fetch('/api/treasury/capital', { cache: 'no-store' });
           if (cres.ok) setCapitalOps(await cres.json());
+          const rres = await fetch('/api/treasury/reconciliation', { cache: 'no-store' });
+          if (rres.ok) setRecon(await rres.json());
         }
       }
     } catch { addToast('خطأ في جلب البيانات', 'error'); }
@@ -293,6 +296,58 @@ function TreasuryContent() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Reconciliation (admin): boxes vs ledgers — surfaces any untracked money */}
+          {role === 'admin' && recon?.available && (
+            <div className="card" style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 8 }}>المطابقة</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+                مقارنة أرصدة الصناديق بالدفاتر للتأكّد من عدم وجود حركة مال غير مسجّلة.
+              </p>
+              {(() => {
+                const okIntegrity = Math.abs(recon.integrityDiff) < 0.005;
+                const cov = recon.coverage;
+                const okCoverage = cov && Math.abs(cov.diff) < 0.005;
+                const pill = (ok, label) => (
+                  <span style={{ background: ok ? '#dcfce7' : '#fee2e2', color: ok ? '#16a34a' : '#dc2626', padding: '2px 10px', borderRadius: 999, fontWeight: 700, fontSize: '0.8rem' }}>
+                    {ok ? `✓ ${label}` : `⚠ ${label}`}
+                  </span>
+                );
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.88rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <span>تطابق الصناديق مع الحركات</span>
+                      {pill(okIntegrity, okIntegrity ? 'سليم' : `فرق ${formatNumber(recon.integrityDiff)} €`)}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      إجمالي الصناديق <strong>{formatNumber(recon.boxesTotal)} €</strong> = افتتاحي {formatNumber(recon.openingTotal)} + حركة {formatNumber(recon.movementsActivity)}
+                    </div>
+                    {cov ? (
+                      <>
+                        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span>تغطية الدفاتر (منذ {recon.cutoff})</span>
+                          {pill(okCoverage, okCoverage ? 'مطابق' : `فرق ${formatNumber(cov.diff)} €`)}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          صافي الدفاتر <strong>{formatNumber(cov.coreNet)} €</strong> · صافي الحركات <strong>{formatNumber(cov.movementsActivity)} €</strong>
+                          <div style={{ marginTop: 4 }}>
+                            تحصيلات {formatNumber(cov.collections)} − مورّدون {formatNumber(cov.supplierPaid)} − مصروفات {formatNumber(cov.expenses)} − عمولات {formatNumber(cov.payouts)} − أرباح {formatNumber(cov.distributions)} + رأس مال {formatNumber(cov.capitalNet)}
+                          </div>
+                        </div>
+                        {!okCoverage && (
+                          <div style={{ fontSize: '0.78rem', color: '#9a3412' }}>
+                            قد ينتج الفرق عن إدخال عملية بتاريخ سابق لتاريخ البداية — راجع الحركات قبل الاعتماد.
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>أدخل الأرصدة الافتتاحية لتفعيل فحص تغطية الدفاتر.</div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
