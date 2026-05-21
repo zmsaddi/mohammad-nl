@@ -73,8 +73,8 @@ describe('updateUser — box reactivation when returning to a cash role', () => 
   });
 });
 
-describe('getCashBoxesForViewer — hides deactivated boxes', () => {
-  it('admin / manager / driver queries all filter on COALESCE(active,true)', async () => {
+describe('getCashBoxesForViewer — hides deactivated / non-cash boxes', () => {
+  it('all three role queries filter on COALESCE(active,true)', async () => {
     const { getCashBoxesForViewer } = await import('../lib/db.js');
     for (const [role, user] of [['admin', 'a1'], ['manager', 'm1'], ['driver', 'd1']]) {
       h.calls = [];
@@ -83,5 +83,15 @@ describe('getCashBoxesForViewer — hides deactivated boxes', () => {
       expect(sel.length).toBeGreaterThan(0);
       expect(sel.some((c) => /COALESCE\(b\.active, true\)/.test(c.text))).toBe(true);
     }
+  });
+
+  it('admin query hides empty non-cash-role boxes but NEVER hides money', async () => {
+    const { getCashBoxesForViewer } = await import('../lib/db.js');
+    h.calls = [];
+    await getCashBoxesForViewer('admin', 'a1');
+    const q = find(/FROM cash_boxes b LEFT JOIN users/)[0].text;
+    expect(/u\.role IN \('admin','manager','driver'\)/.test(q)).toBe(true);   // only cash roles shown
+    expect(/ABS\(COALESCE\(b\.balance, 0\)\) > 0\.005/.test(q)).toBe(true);   // …unless the box holds money
+    expect(/b\.type = 'main'/.test(q)).toBe(true);                            // general box always shown
   });
 });
