@@ -343,12 +343,13 @@ function SummaryContent() {
               <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid)}</div>
             </div>
           </div>
-          {/* Dashboard revamp — the seller's actual reserved orders (was: a count
-              only). Lets the seller see WHICH orders await delivery. */}
+          {/* The seller's own orders awaiting delivery — for follow-up. Scoped
+              server-side to created_by = this seller, so each seller sees only
+              their own. Delivery status lets them track progress. */}
           {data.reservedList?.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#92400e', marginBottom: 10 }}>
-                طلباتي المحجوزة (بانتظار التوصيل) — {data.reservedList.length}
+                طلباتي بانتظار التسليم — {data.reservedList.length}
               </h4>
               <DataCardList
                 rows={data.reservedList}
@@ -357,8 +358,9 @@ function SummaryContent() {
                   { key: 'client_name', label: 'العميل' },
                   { key: 'item', label: 'المنتج' },
                   { key: 'total', label: 'القيمة', format: (v) => formatNumber(v) },
+                  { key: 'delivery_status', label: 'حالة التوصيل', format: (v) => v || 'قيد الانتظار' },
                 ]}
-                emptyMessage="لا توجد طلبات محجوزة"
+                emptyMessage="لا توجد طلبات بانتظار التسليم"
               />
             </div>
           )}
@@ -975,7 +977,8 @@ function SummaryContent() {
               remaining columns, mirroring the v1.0.1 supplier credit flow.
               Remaining is red when > 0 (outstanding debt to supplier),
               green when fully settled. */}
-          {isAdmin && data.topSuppliers?.length > 0 && (
+          {/* Manager sees suppliers too (owner's decision: manager = admin). */}
+          {canSeeCosts && data.topSuppliers?.length > 0 && (
             <details className="card" style={{ marginBottom: '24px' }}>
               <summary style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
                 أداء الموردين

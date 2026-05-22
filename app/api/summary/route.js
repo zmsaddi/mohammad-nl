@@ -67,6 +67,15 @@ export async function GET(request) {
       const confirmed = mySales.filter((s) => s.status === 'مؤكد');
       const reserved  = mySales.filter((s) => s.status === 'محجوز');
 
+      // Delivery status per reserved order so the seller can track follow-up
+      // (قيد الانتظار vs جاري التوصيل). Guarded: empty → skip the query.
+      const reservedIds = reserved.map((r) => r.id);
+      const deliveryStatusBySale = {};
+      if (reservedIds.length > 0) {
+        const { rows: dels } = await sql`SELECT sale_id, status FROM deliveries WHERE sale_id = ANY(${reservedIds})`;
+        dels.forEach((d) => { deliveryStatusBySale[d.sale_id] = d.status; });
+      }
+
       // ARC-06: parseFloat wrapping on every NUMERIC money reducer.
       return NextResponse.json({
         sellerView:       true,
@@ -80,6 +89,7 @@ export async function GET(request) {
         reservedList:     reserved.map((r) => ({
           id: r.id, date: r.date, client_name: r.client_name,
           item: r.item, total: parseFloat(r.total) || 0,
+          delivery_status: deliveryStatusBySale[r.id] || 'قيد الانتظار',
         })),
         totalBonusEarned: myBonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
         totalBonusPaid:   myBonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
