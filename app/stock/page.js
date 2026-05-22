@@ -14,6 +14,7 @@ import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
@@ -142,7 +143,7 @@ function StockContent() {
   }), [products, f.q, f.status, f.category]);
 
   // Item 3 — click-to-sort on column headers, default name ascending
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'name', direction: 'asc' }
   );
@@ -352,6 +353,16 @@ function StockContent() {
           </div>
           </FilterSheet>
         </div>
+
+        <SortControl
+          fields={[
+            { key: 'name', label: 'الاسم' },
+            { key: 'stock', label: 'المخزون' },
+            { key: 'category', label: 'الفئة' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />

@@ -1855,3 +1855,18 @@ html, body {
   background: #e2e8f0;
   color: #334155;
 }
+
+/* Always-visible sort control (mobile + desktop) — see components/SortControl. */
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sort-control-label {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 600;
+}
+.sort-control-dir { white-space: nowrap; }

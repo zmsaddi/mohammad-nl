@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
@@ -385,7 +386,7 @@ function DeliveriesContent() {
     if (a.date !== b.date) return a.date > b.date ? -1 : 1;
     return (b.id || 0) - (a.id || 0);
   });
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     smartFiltered,
     { key: null, direction: null }
   );
@@ -590,6 +591,17 @@ function DeliveriesContent() {
           )}
         </div>
         </FilterSheet>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'client_name', label: 'العميل' },
+            { key: 'total_amount', label: 'المبلغ' },
+            { key: 'status', label: 'الحالة' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={6} />

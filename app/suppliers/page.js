@@ -11,6 +11,7 @@ import ErrorState from '@/components/ErrorState';
 import DataCardList from '@/components/DataCardList';
 import Pagination, { usePagination } from '@/components/Pagination';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
@@ -96,7 +97,7 @@ function SuppliersContent() {
     [suppliers, f.q]
   );
 
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'name', direction: 'asc' }
   );
@@ -172,6 +173,16 @@ function SuppliersContent() {
             )}
           </div>
         </div>
+
+        <SortControl
+          fields={[
+            { key: 'name', label: 'الاسم' },
+            { key: 'remainingDebt', label: 'الدين' },
+            { key: 'totalPurchases', label: 'إجمالي المشتريات' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={5} showStats={false} />

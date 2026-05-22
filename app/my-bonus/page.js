@@ -6,6 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
@@ -71,7 +72,7 @@ function MyBonusContent() {
   }), [bonuses, f.from, f.to, f.settled]);
 
   // Sort: default newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'date', direction: 'desc' }
   );
@@ -167,6 +168,15 @@ function MyBonusContent() {
           )}
         </div>
         </FilterSheet>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'total_bonus', label: 'العمولة' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={6} />
