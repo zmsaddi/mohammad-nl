@@ -7,6 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
+import ConfirmModal from '@/components/ConfirmModal';
 
 const ROLE_LABEL = { admin: 'مدير عام', manager: 'مشرف', driver: 'سائق', seller: 'بائع' };
 
@@ -33,6 +34,9 @@ function TreasuryContent() {
   // Guards every money action below against a double-tap while the POST is
   // in flight (each one moves real money). Disables the action buttons.
   const [busy, setBusy] = useState(false);
+  // Branded confirm dialog (replaces window.confirm for the two money-sensitive
+  // admin actions: setting an opening balance + toggling the treasury system).
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -155,7 +159,7 @@ function TreasuryContent() {
 
   // Opening balance (admin go-live): set a box's starting cash by physical count.
   // Deliberate, with an explicit confirm; re-entry replaces the prior opening.
-  const handleSetOpening = async (box) => {
+  const handleSetOpening = (box) => {
     const raw = openingInputs[box.id];
     if (raw === undefined || raw === '') { addToast('أدخل المبلغ', 'error'); return; }
     const amount = parseFloat(raw);
@@ -164,25 +168,41 @@ function TreasuryContent() {
     const msg = `تعيين الرصيد الافتتاحي (عدّ فعلي) لصندوق «${boxName(box)}» = ${formatNumber(amount)} €؟` +
       (hasOpening ? `\n\nيوجد رصيد افتتاحي سابق (${formatNumber(parseFloat(box.opening) || 0)} €) — سيُستبدل.` : '') +
       `\n\nيُسجَّل كنقطة بداية لتتبّع النقد. متابعة؟`;
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
-    const { ok, d } = await post('/api/treasury/opening', { boxId: box.id, amount });
-    if (ok) { addToast('تم تعيين الرصيد الافتتاحي ✓'); setOpeningInputs((s) => ({ ...s, [box.id]: '' })); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    setConfirmDialog({
+      title: 'تأكيد الرصيد الافتتاحي',
+      message: msg,
+      confirmText: 'تأكيد',
+      confirmClass: 'btn-primary',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const { ok, d } = await post('/api/treasury/opening', { boxId: box.id, amount });
+        if (ok) { addToast('تم تعيين الرصيد الافتتاحي ✓'); setOpeningInputs((s) => ({ ...s, [box.id]: '' })); fetchData(); }
+        else addToast(d.error || 'خطأ', 'error');
+      },
+    });
   };
 
   // Master switch (admin). Toggling NEVER deletes data — it only starts/stops
   // recording money movements; balances and all records are preserved.
-  const toggleTreasury = async () => {
+  const toggleTreasury = () => {
     const turningOn = !enabled;
     const msg = turningOn
       ? 'تفعيل نظام الصناديق؟ سيبدأ تسجيل حركة الأموال من الآن. لا تُفقد أي بيانات حالية. تذكّر إدخال الأرصدة الافتتاحية (عدّ فعلي) بعد التفعيل.'
       : 'إيقاف نظام الصناديق؟ يتوقّف تسجيل الحركات الجديدة، وتبقى كل الأرصدة والبيانات كما هي.';
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
-    try {
-      const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ treasury_enabled: turningOn ? 'true' : 'false' }), cache: 'no-store' });
-      if (res.ok) { addToast(turningOn ? 'تم تفعيل نظام الصناديق' : 'تم إيقاف نظام الصناديق'); fetchData(); }
-      else { const d = await res.json().catch(() => ({})); addToast(d.error || 'خطأ', 'error'); }
-    } catch { addToast('خطأ في الاتصال', 'error'); }
+    setConfirmDialog({
+      title: turningOn ? 'تفعيل نظام الصناديق' : 'إيقاف نظام الصناديق',
+      message: msg,
+      confirmText: turningOn ? 'تفعيل' : 'إيقاف',
+      confirmClass: turningOn ? 'btn-success' : 'btn-danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ treasury_enabled: turningOn ? 'true' : 'false' }), cache: 'no-store' });
+          if (res.ok) { addToast(turningOn ? 'تم تفعيل نظام الصناديق' : 'تم إيقاف نظام الصناديق'); fetchData(); }
+          else { const d = await res.json().catch(() => ({})); addToast(d.error || 'خطأ', 'error'); }
+        } catch { addToast('خطأ في الاتصال', 'error'); }
+      },
+    });
   };
 
   const partyLabel = (type, name, owner) => type === 'main' ? 'الصندوق العام' : (name || owner || '—');
@@ -524,6 +544,19 @@ function TreasuryContent() {
           )}
         </>
       )}
+
+      <ConfirmModal
+        isOpen={!!confirmDialog}
+        title={confirmDialog?.title}
+        confirmText={confirmDialog?.confirmText}
+        confirmClass={confirmDialog?.confirmClass}
+        onConfirm={confirmDialog?.onConfirm}
+        onCancel={() => setConfirmDialog(null)}
+      >
+        <p style={{ whiteSpace: 'pre-line', color: '#64748b', fontSize: '0.9rem', marginBottom: 24 }}>
+          {confirmDialog?.message}
+        </p>
+      </ConfirmModal>
     </AppLayout>
   );
 }

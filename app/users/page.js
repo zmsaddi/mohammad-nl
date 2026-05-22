@@ -121,9 +121,15 @@ function UsersContent() {
     addToast('تم حفظ الإعدادات'); setConfirmSettings(false); fetchData();
   };
 
+  // Shared guard so a bonus-rate save can't be double-submitted; disables the
+  // save buttons while a PUT is in flight.
+  const [savingRates, setSavingRates] = useState(false);
+
   // v1.1 F-007 — per-user bonus rate override handlers
   const handleSaveRate = async () => {
     if (!rateForm.username) { addToast('اختر مستخدم', 'error'); return; }
+    if (savingRates) return;
+    setSavingRates(true);
     try {
       const res = await fetch('/api/users/bonus-rates', {
         method: 'PUT',
@@ -141,6 +147,7 @@ function UsersContent() {
         addToast(d.error || 'خطأ', 'error');
       }
     } catch { addToast('خطأ في الاتصال', 'error'); }
+    finally { setSavingRates(false); }
   };
   const handleDeleteRate = async (username) => {
     try {
@@ -155,6 +162,8 @@ function UsersContent() {
     setCategoryForm((prev) => ({ ...prev, [category]: { ...(prev[category] || {}), [field]: value } }));
   const handleSaveCategoryRate = async (category) => {
     const v = categoryForm[category] || {};
+    if (savingRates) return;
+    setSavingRates(true);
     try {
       const res = await fetch('/api/category-bonus-rates', {
         method: 'PUT',
@@ -165,6 +174,7 @@ function UsersContent() {
       if (res.ok) { addToast(`تم حفظ عمولة فئة: ${category}`); fetchData(); }
       else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
     } catch { addToast('خطأ في الاتصال', 'error'); }
+    finally { setSavingRates(false); }
   };
   const handleResetCategoryRate = async (category) => {
     try {
@@ -203,6 +213,8 @@ function UsersContent() {
   const handleSaveUserCatRate = async (category) => {
     if (!ucSelectedUser) { addToast('اختر مستخدماً أولاً', 'error'); return; }
     const v = ucForm[category] || {};
+    if (savingRates) return;
+    setSavingRates(true);
     try {
       const res = await fetch('/api/users/category-bonus-rates', {
         method: 'PUT',
@@ -213,6 +225,7 @@ function UsersContent() {
       if (res.ok) { addToast(`تم الحفظ: ${category}`); loadUserCatRates(ucSelectedUser); }
       else { const d = await res.json(); addToast(d.error || 'خطأ', 'error'); }
     } catch { addToast('خطأ في الاتصال', 'error'); }
+    finally { setSavingRates(false); }
   };
   const handleResetUserCatRate = async (category) => {
     try {
@@ -445,7 +458,7 @@ function UsersContent() {
                           value={v.driver_fixed ?? ''}
                           onChange={(e) => setCatField(cat, 'driver_fixed', e.target.value)} /></td>
                         <td style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveCategoryRate(cat)}>حفظ</button>
+                          <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveCategoryRate(cat)} disabled={savingRates}>حفظ</button>
                           {hasRow && <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleResetCategoryRate(cat)}>إعادة</button>}
                         </td>
                       </tr>
@@ -569,8 +582,8 @@ function UsersContent() {
                 })()}
               </div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                <button className="btn btn-primary btn-sm" onClick={handleSaveRate}>
-                  {editingRate ? 'تحديث' : 'إضافة'}
+                <button className="btn btn-primary btn-sm" onClick={handleSaveRate} disabled={savingRates}>
+                  {savingRates ? 'جارٍ الحفظ…' : (editingRate ? 'تحديث' : 'إضافة')}
                 </button>
                 {editingRate && (
                   <button className="btn btn-outline btn-sm" onClick={() => {
@@ -643,7 +656,7 @@ function UsersContent() {
                               value={v.driver_fixed ?? ''}
                               onChange={(e) => setUcField(cat, 'driver_fixed', e.target.value)} /></td>}
                             <td style={{ display: 'flex', gap: 6 }}>
-                              <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveUserCatRate(cat)}>حفظ</button>
+                              <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleSaveUserCatRate(cat)} disabled={savingRates}>حفظ</button>
                               {hasRow && <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={() => handleResetUserCatRate(cat)}>إزالة</button>}
                             </td>
                           </tr>
