@@ -88,6 +88,11 @@ const MAP = {
   '/api/settings': settings,
   '/api/treasury/boxes': treasuryBoxes,
   '/api/treasury/handovers': [],
+  '/api/treasury/movements': [
+    { id: 3, date: '2026-05-04', kind: 'handover', signed_amount: -200, method: 'كاش', counterparty_box_id: 1, counterparty_type: 'main', counterparty_name: null, counterparty_username: null, created_by: 'driver1', notes: 'تسليم للصندوق العام', running_balance: 320 },
+    { id: 2, date: '2026-05-02', kind: 'collection', signed_amount: 300, method: 'كاش', counterparty_box_id: null, created_by: 'driver1', notes: 'تحصيل من عميل', running_balance: 520 },
+    { id: 1, date: '2026-05-01', kind: 'opening', signed_amount: 220, method: 'كاش', counterparty_box_id: null, created_by: 'admin', notes: 'رصيد افتتاحي', running_balance: 220 },
+  ],
   '/api/treasury/capital': [],
   '/api/treasury/reconciliation': { available: false },
   '/api/profit-distributions': profitDistributions,

@@ -9,8 +9,25 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
 import ConfirmModal from '@/components/ConfirmModal';
 import MoneyInput from '@/components/MoneyInput';
+import DataCardList from '@/components/DataCardList';
+import ErrorState from '@/components/ErrorState';
 
 const ROLE_LABEL = { admin: 'مدير عام', manager: 'مشرف', driver: 'سائق', seller: 'بائع' };
+
+// Human labels for every cash_movements.kind (the per-box money-movement ledger).
+const KIND_LABEL = {
+  opening: 'رصيد افتتاحي',
+  capital_injection: 'إدخال رأس مال',
+  capital_withdrawal: 'سحب رأس مال',
+  collection: 'تحصيل',
+  refund: 'استرجاع',
+  supplier_payment: 'دفع مورّد',
+  expense: 'مصروف',
+  commission_payout: 'دفع عمولة',
+  profit_distribution: 'توزيع أرباح',
+  funding: 'تمويل',
+  handover: 'تسليم عهدة',
+};
 
 function TreasuryContent() {
   const { data: session } = useSession();
@@ -32,6 +49,11 @@ function TreasuryContent() {
   const [capitalOps, setCapitalOps] = useState([]);
   const [openingInputs, setOpeningInputs] = useState({});
   const [recon, setRecon] = useState(null);
+  // Money-movement ledger tabs: which box is selected + its movements.
+  const [movBoxId, setMovBoxId] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [movLoading, setMovLoading] = useState(false);
+  const [movError, setMovError] = useState(false);
   // Guards every money action below against a double-tap while the POST is
   // in flight (each one moves real money). Disables the action buttons.
   const [busy, setBusy] = useState(false);
@@ -65,7 +87,43 @@ function TreasuryContent() {
   useEffect(() => { fetchData(); }, []);
   useAutoRefresh(fetchData);
 
+  // Read-only per-box money-movement ledger. The API re-checks that this box is
+  // within the caller's scope, so a driver can never load another person's box.
+  const fetchMovements = async (boxId) => {
+    if (!boxId) return;
+    setMovLoading(true);
+    setMovError(false);
+    try {
+      const res = await fetch(`/api/treasury/movements?boxId=${boxId}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMovements(Array.isArray(data) ? data : []);
+    } catch {
+      setMovError(true);
+      addToast('خطأ في جلب الحركات', 'error');
+    } finally {
+      setMovLoading(false);
+    }
+  };
+  const selectMovTab = (id) => { setMovBoxId(id); fetchMovements(id); };
+
+  // When the boxes list (re)loads, keep the selected tab valid and refresh its
+  // movements. Defaults to the first visible box (general box leads the list).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!boxes.length) { setMovBoxId(null); setMovements([]); return; }
+    const target = boxes.some((b) => b.id === movBoxId) ? movBoxId : boxes[0].id;
+    setMovBoxId(target);
+    fetchMovements(target);
+  }, [boxes]);
+
   const boxName = (b) => b.type === 'main' ? 'الصندوق العام' : (b.owner_name || b.owner_username || '—');
+  // Counterparty label for a movement row (the box on the other side of a transfer).
+  const cpLabel = (m) => {
+    if (!m.counterparty_box_id) return '—';
+    if (m.counterparty_type === 'main') return 'الصندوق العام';
+    return m.counterparty_name || m.counterparty_username || '—';
+  };
   const total = boxes.reduce((s, b) => s + (parseFloat(b.balance) || 0), 0);
   // Funding recipients the caller may fund: manager → drivers; admin → any custody box.
   const fundTargets = boxes.filter((b) => b.type === 'custody' && (role === 'admin' || b.owner_role === 'driver') && b.owner_username !== username);
@@ -294,6 +352,85 @@ function TreasuryContent() {
           </div>
         )}
       </div>
+
+      {/* Money movements per box — a tab per box (general box first, then each
+          person within the viewer's scope). Admins follow every person's money
+          moves; each holder reviews their own. Read-only ledger from
+          cash_movements with a running balance; shown even when the system is
+          paused so history stays reviewable. */}
+      {boxes.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>حركات الأموال</h3>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+            سجلّ كل دخول/خروج لكل صندوق مع الرصيد الجاري — لمتابعة حركة المال لكل شخص.
+          </p>
+          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            {boxes.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={`tab ${b.id === movBoxId ? 'active' : ''}`}
+                onClick={() => selectMovTab(b.id)}
+              >
+                {boxName(b)}
+                {b.type !== 'main' && b.owner_role && (
+                  <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '0.72rem' }}> ({ROLE_LABEL[b.owner_role] || b.owner_role})</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {movLoading ? (
+            <PageSkeleton rows={5} showStats={false} />
+          ) : movError ? (
+            <ErrorState onRetry={() => fetchMovements(movBoxId)} />
+          ) : movements.length === 0 ? (
+            <div className="empty-state"><h3>لا توجد حركات</h3><p>لم تُسجَّل أي حركة على هذا الصندوق بعد.</p></div>
+          ) : (
+            <>
+              <DataCardList
+                rows={movements}
+                fields={[
+                  { key: 'date', label: 'التاريخ' },
+                  { key: 'kind', label: 'النوع', format: (v) => KIND_LABEL[v] || v },
+                  { key: 'signed_amount', label: 'المبلغ', format: (v) => `${Number(v) >= 0 ? '+' : ''}${formatNumber(v)} €` },
+                  { key: 'method', label: 'الطريقة' },
+                  { key: '_cp', label: 'الطرف الآخر', format: (_, r) => cpLabel(r) },
+                  { key: 'created_by', label: 'بواسطة', format: (v) => v || '—' },
+                  { key: 'running_balance', label: 'الرصيد', format: (v) => `${formatNumber(v)} €` },
+                ]}
+              />
+              <div className="table-container has-card-fallback">
+                <table className="data-table">
+                  <thead><tr>
+                    <th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th>
+                    <th>الطرف الآخر</th><th>بواسطة</th><th>ملاحظة</th><th>الرصيد</th>
+                  </tr></thead>
+                  <tbody>
+                    {movements.map((m) => {
+                      const amt = parseFloat(m.signed_amount) || 0;
+                      return (
+                        <tr key={m.id}>
+                          <td>{m.date}</td>
+                          <td>{KIND_LABEL[m.kind] || m.kind}</td>
+                          <td className="number-cell" style={{ fontWeight: 700, color: amt < 0 ? '#dc2626' : '#16a34a' }}>
+                            {amt >= 0 ? '+' : ''}{formatNumber(amt)} €
+                          </td>
+                          <td>{m.method}</td>
+                          <td>{cpLabel(m)}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{m.created_by || '—'}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{m.notes || '—'}</td>
+                          <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(m.running_balance)} €</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Actions — only when the treasury is live */}
       {enabled && (
