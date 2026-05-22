@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import { transformWithEsbuild } from 'vite';
 import path from 'path';
 
@@ -46,6 +46,9 @@ export default defineConfig({
   },
   test: {
     setupFiles: ['./tests/setup.test-env.js'],
+    // tests/vr/* are Playwright visual-regression specs (they import
+    // @playwright/test) — excluded from the Vitest run; use `npm run test:vr`.
+    exclude: [...configDefaults.exclude, 'tests/vr/**'],
     testTimeout: 30000,
     sequence: { hooks: 'list' },
     fileParallelism: false,

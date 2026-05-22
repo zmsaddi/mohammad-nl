@@ -1,0 +1,145 @@
+<!doctype html>
+<!--
+  Design-system gallery (Commit 7 — visual-regression safety net).
+
+  A static "living styleguide" rendered with the app's REAL compiled CSS
+  (tests/vr/app.css, produced from app/globals.css by the Tailwind CLI — see
+  scripts/build-vr-css.mjs). Playwright screenshots this page and compares it to
+  committed baselines, so a styling change (e.g. consolidating inline-styled
+  inputs into shared primitives) can be proven pixel-equivalent BEFORE it ships.
+
+  The markup here mirrors the class structures the components emit
+  (.btn, .form-group, .card, .data-table, .status-badge, .chip, .data-card, …).
+  When a component's classes/structure change, update this gallery in the same
+  commit and let the VR diff confirm the visual result is intended.
+-->
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Design System Gallery</title>
+  <link rel="stylesheet" href="./app.css" />
+  <style>
+    /* Gallery scaffolding only — not part of the design system under test. */
+    body { padding: 24px; }
+    .vr-section { margin-bottom: 28px; }
+    .vr-section > h2 { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+    .vr-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <main style="max-width: 980px; margin: 0 auto;">
+
+    <section class="vr-section" data-vr="buttons">
+      <h2>الأزرار (Buttons)</h2>
+      <div class="vr-row">
+        <button class="btn btn-primary">أساسي</button>
+        <button class="btn btn-success">نجاح</button>
+        <button class="btn btn-danger">خطر</button>
+        <button class="btn btn-outline">محدّد</button>
+        <button class="btn btn-primary btn-sm">صغير</button>
+        <button class="btn btn-primary" disabled>معطّل</button>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="form">
+      <h2>حقول النموذج (Form fields)</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>اسم العميل *</label>
+          <input type="text" value="أحمد المصري" />
+        </div>
+        <div class="form-group">
+          <label>المبلغ (€) *</label>
+          <input type="number" inputmode="decimal" value="1500" />
+        </div>
+        <div class="form-group">
+          <label>طريقة الدفع</label>
+          <select><option>كاش</option><option>بنك</option><option>آجل</option></select>
+        </div>
+        <div class="form-group">
+          <label>ملاحظات</label>
+          <textarea rows="2">ملاحظة تجريبية</textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="badges">
+      <h2>شارات الحالة (Status badges)</h2>
+      <div class="vr-row">
+        <span class="status-badge" style="background:#dcfce7;color:#16a34a">مؤكد</span>
+        <span class="status-badge" style="background:#fef3c7;color:#f59e0b">محجوز</span>
+        <span class="status-badge" style="background:#fee2e2;color:#dc2626">ملغي</span>
+        <span class="status-badge" style="background:#dbeafe;color:#1e40af">بنك</span>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="chips">
+      <h2>رقائق الفلاتر (Filter chips)</h2>
+      <div class="filter-chips">
+        <button class="chip">الكل</button>
+        <button class="chip active">مؤكد</button>
+        <button class="chip">محجوز</button>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="card">
+      <h2>البطاقات (Cards)</h2>
+      <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:1rem;font-weight:600;color:#374151;margin-bottom:8px">عنوان البطاقة</h3>
+        <p style="color:#64748b;font-size:0.9rem">محتوى بطاقة تجريبي لقياس الحشو والحدود والظل.</p>
+      </div>
+      <div class="summary-cards">
+        <div class="summary-card">
+          <div class="summary-card-icon" style="background:#dcfce7"></div>
+          <div class="summary-card-content"><h3>إجمالي المبيعات</h3><div class="value">12,450 €</div></div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-icon" style="background:#dbeafe"></div>
+          <div class="summary-card-content"><h3>الديون</h3><div class="value">3,200 €</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="table">
+      <h2>الجداول (Tables)</h2>
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>الكود</th><th>العميل</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+          <tbody>
+            <tr><td>INV-0001</td><td>أحمد</td><td class="number-cell">1,500</td><td><span class="status-badge" style="background:#dcfce7;color:#16a34a">مدفوع</span></td></tr>
+            <tr><td>INV-0002</td><td>سارة</td><td class="number-cell">980</td><td><span class="status-badge" style="background:#fef3c7;color:#d97706">جزئي</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="data-card">
+      <h2>بطاقة بيانات الموبايل (DataCardList)</h2>
+      <div class="data-card" style="display:block;max-width:360px">
+        <div class="data-card-status" style="color:#16a34a;border-color:#16a34a">مؤكد</div>
+        <div class="data-card-fields">
+          <div class="data-card-field"><span class="data-card-label">الكود</span><span class="data-card-value">INV-0001</span></div>
+          <div class="data-card-field"><span class="data-card-label">العميل</span><span class="data-card-value">أحمد</span></div>
+          <div class="data-card-field"><span class="data-card-label">المبلغ</span><span class="data-card-value">1,500 €</span></div>
+          <div class="data-card-field"><span class="data-card-label">الدفع</span><span class="data-card-value">كاش</span></div>
+        </div>
+        <div class="data-card-actions">
+          <button class="btn btn-primary btn-sm">تفاصيل</button>
+          <button class="btn btn-sm" style="background:#1a3a2a;color:#fff">PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="vr-section" data-vr="empty">
+      <h2>حالات الفراغ والخطأ (Empty / error states)</h2>
+      <div class="empty-state">
+        <h3>لا توجد نتائج مطابقة</h3>
+        <p>جرّب تعديل الفلاتر أو مسحها</p>
+        <button class="btn btn-sm" style="background:#e2e8f0;color:#334155">✕ مسح الفلاتر</button>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
