@@ -774,10 +774,10 @@ function SummaryContent() {
 
           {/* DONE: Step 8 — inventory breakdown by category (admin/manager only) */}
           {canSeeCosts && categoryBreakdown.length > 0 && (
-            <div className="card" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+            <details className="card" style={{ marginBottom: '24px' }}>
+              <summary style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
                 المخزون حسب الفئة
-              </h3>
+              </summary>
               <DataCardList
                 rows={categoryBreakdown}
                 fields={[
@@ -816,21 +816,26 @@ function SummaryContent() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           )}
 
-          {/* Top Debtors */}
+          {/* Top Debtors — actionable: tap a debtor to open the client and
+              collect (control-center: the dashboard navigates you to act). */}
           {data.topDebtors?.length > 0 && (
             <div className="card" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: '#374151' }}>
                 أعلى المدينين
               </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '14px' }}>اضغط «تحصيل» للانتقال إلى العميل ومتابعة دينه.</p>
               <DataCardList
                 rows={data.topDebtors}
                 fields={[
                   { key: 'name', label: 'اسم العميل' },
                   { key: 'debt', label: 'الدين المتبقي', format: (v) => formatNumber(v) },
                 ]}
+                actions={(row) => (
+                  <Link href={`/clients?q=${encodeURIComponent(row.name)}`} className="btn btn-sm btn-outline">تحصيل ←</Link>
+                )}
                 emptyMessage="لا يوجد مدينون"
               />
               <div className="table-container has-card-fallback">
@@ -840,6 +845,7 @@ function SummaryContent() {
                       <th>الترتيب</th>
                       <th>اسم العميل</th>
                       <th>الدين المتبقي</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -848,6 +854,7 @@ function SummaryContent() {
                         <td>{i + 1}</td>
                         <td style={{ fontWeight: 600 }}>{debtor.name}</td>
                         <td className="number-cell" style={{ color: '#dc2626', fontWeight: 600 }}>{formatNumber(debtor.debt)}</td>
+                        <td><Link href={`/clients?q=${encodeURIComponent(debtor.name)}`} className="btn btn-sm btn-outline">تحصيل ←</Link></td>
                       </tr>
                     ))}
                   </tbody>
@@ -915,10 +922,10 @@ function SummaryContent() {
               The legacy topClients field is still returned from the API for
               backward compat with any external consumer, just not rendered. */}
           {data.topSellers?.length > 0 && (
-            <div className="card" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+            <details className="card" style={{ marginBottom: '24px' }}>
+              <summary style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
                 أفضل البائعين
-              </h3>
+              </summary>
               <DataCardList
                 rows={data.topSellers}
                 fields={[
@@ -961,7 +968,7 @@ function SummaryContent() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           )}
 
           {/* v1.0.2 Feature 3 — supplier performance with total / paid /
@@ -969,10 +976,10 @@ function SummaryContent() {
               Remaining is red when > 0 (outstanding debt to supplier),
               green when fully settled. */}
           {isAdmin && data.topSuppliers?.length > 0 && (
-            <div className="card" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+            <details className="card" style={{ marginBottom: '24px' }}>
+              <summary style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
                 أداء الموردين
-              </h3>
+              </summary>
               <DataCardList
                 rows={data.topSuppliers}
                 fields={[
@@ -1023,7 +1030,7 @@ function SummaryContent() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           )}
             </>
           )}
