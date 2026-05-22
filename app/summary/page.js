@@ -439,6 +439,53 @@ function SummaryContent() {
           {/* ===== Tab 1: ملخص سريع — KPI cards & revenue breakdown ===== */}
           {activeTab === 'quick' && (
             <>
+              {/* Actions required now — placed FIRST per the owner's request: the
+                  operational queue (awaiting delivery, bank-receipt queue,
+                  reserved orders, out/low stock). Each tile shows only when it
+                  has items. */}
+              {((data.reservedCount || 0) > 0 || (data.awaitingDeliveryCount || 0) > 0 || (data.bankPendingCount || 0) > 0 || outStockItems.length > 0 || lowStockItems.length > 0) && (
+                <div className="card" style={{ marginBottom: 24, padding: 16, borderRight: '4px solid #f59e0b' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#92400e', marginBottom: 12 }}>⚡ إجراءات مطلوبة الآن</h3>
+                  <div className="action-tiles">
+                    {(data.awaitingDeliveryCount || 0) > 0 && (
+                      <Link href="/deliveries" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#d97706' }}>{data.awaitingDeliveryCount}</span>
+                        <span className="action-tile-label">طلبات بانتظار التسليم</span>
+                        <span className="action-tile-sub">بقيمة {formatNumber(data.awaitingDeliveryValue || 0)}</span>
+                      </Link>
+                    )}
+                    {(data.bankPendingCount || 0) > 0 && (
+                      <Link href="/sales" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#7c3aed' }}>{data.bankPendingCount}</span>
+                        <span className="action-tile-label">بنك بانتظار الاستلام</span>
+                        <span className="action-tile-sub">بقيمة {formatNumber(data.bankPendingValue || 0)}</span>
+                      </Link>
+                    )}
+                    {(data.reservedCount || 0) > 0 && (
+                      <button className="action-tile" onClick={() => setActiveTab('pnl')}>
+                        <span className="action-tile-num" style={{ color: '#8b5cf6' }}>{data.reservedCount}</span>
+                        <span className="action-tile-label">طلبات محجوزة</span>
+                        <span className="action-tile-sub">ربح متوقع {formatNumber(data.reservedProfit || 0)}</span>
+                      </button>
+                    )}
+                    {outStockItems.length > 0 && (
+                      <Link href="/stock" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#dc2626' }}>{outStockItems.length}</span>
+                        <span className="action-tile-label">منتجات نفدت</span>
+                        <span className="action-tile-sub">إعادة الطلب</span>
+                      </Link>
+                    )}
+                    {lowStockItems.length > 0 && (
+                      <Link href="/stock" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#d97706' }}>{lowStockItems.length}</span>
+                        <span className="action-tile-label">مخزون منخفض</span>
+                        <span className="action-tile-sub">قارب على النفاد</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* KPI Cards — the owner's morning questions: how much did I really
                   make (collected), how did the cash move, what's owed TO me, and
                   what I owe. The accrual net-profit KPI moved to the الأرباح
@@ -501,52 +548,6 @@ function SummaryContent() {
                       ))}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Actions required now — one place for the operational queue:
-                  orders awaiting delivery, bank-receipt queue, reserved orders,
-                  and out/low stock. Each tile appears only when it has items. */}
-              {((data.reservedCount || 0) > 0 || (data.awaitingDeliveryCount || 0) > 0 || (data.bankPendingCount || 0) > 0 || outStockItems.length > 0 || lowStockItems.length > 0) && (
-                <div className="card" style={{ marginBottom: 24, padding: 16, borderRight: '4px solid #f59e0b' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#92400e', marginBottom: 12 }}>⚡ إجراءات مطلوبة الآن</h3>
-                  <div className="action-tiles">
-                    {(data.awaitingDeliveryCount || 0) > 0 && (
-                      <Link href="/deliveries" className="action-tile">
-                        <span className="action-tile-num" style={{ color: '#d97706' }}>{data.awaitingDeliveryCount}</span>
-                        <span className="action-tile-label">طلبات بانتظار التسليم</span>
-                        <span className="action-tile-sub">بقيمة {formatNumber(data.awaitingDeliveryValue || 0)}</span>
-                      </Link>
-                    )}
-                    {(data.bankPendingCount || 0) > 0 && (
-                      <Link href="/sales" className="action-tile">
-                        <span className="action-tile-num" style={{ color: '#7c3aed' }}>{data.bankPendingCount}</span>
-                        <span className="action-tile-label">بنك بانتظار الاستلام</span>
-                        <span className="action-tile-sub">بقيمة {formatNumber(data.bankPendingValue || 0)}</span>
-                      </Link>
-                    )}
-                    {(data.reservedCount || 0) > 0 && (
-                      <button className="action-tile" onClick={() => setActiveTab('pnl')}>
-                        <span className="action-tile-num" style={{ color: '#8b5cf6' }}>{data.reservedCount}</span>
-                        <span className="action-tile-label">طلبات محجوزة</span>
-                        <span className="action-tile-sub">ربح متوقع {formatNumber(data.reservedProfit || 0)}</span>
-                      </button>
-                    )}
-                    {outStockItems.length > 0 && (
-                      <Link href="/stock" className="action-tile">
-                        <span className="action-tile-num" style={{ color: '#dc2626' }}>{outStockItems.length}</span>
-                        <span className="action-tile-label">منتجات نفدت</span>
-                        <span className="action-tile-sub">إعادة الطلب</span>
-                      </Link>
-                    )}
-                    {lowStockItems.length > 0 && (
-                      <Link href="/stock" className="action-tile">
-                        <span className="action-tile-num" style={{ color: '#d97706' }}>{lowStockItems.length}</span>
-                        <span className="action-tile-label">مخزون منخفض</span>
-                        <span className="action-tile-sub">قارب على النفاد</span>
-                      </Link>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -695,85 +696,75 @@ function SummaryContent() {
           {/* ===== Tab 2: الأرباح والخسائر — P&L detailed cards ===== */}
           {activeTab === 'pnl' && (
             <>
-          {/* v1.2 — PROJECTED (Pipeline) P&L. Reserved + confirmed. Shown
-              first because it's the most optimistic view — users see the
-              "big picture" then drill into realized (accrual) then in-hand
-              (cash-basis). Bonus line marked "لم تُحسب" for reserved
-              portion per decision A in the fix plan. */}
-          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #8b5cf6' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#6d28d9' }}>
-              📊 الأرباح والخسائر — المتوقعة (Pipeline)
-            </h3>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
-              محجوز + مؤكد — مؤشر تقديري، قابل للتغير مع الإلغاءات. عمولات الطلبات المحجوزة غير مدرجة (تُنشأ عند التوصيل).
-            </div>
-            {/* Headline first; the 6-figure breakdown is collapsed by default to
-                cut clutter — the projected net is only a tentative indicator. */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: '0.9rem', color: '#6d28d9', fontWeight: 600 }}>صافي الربح المتوقع</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</span>
-            </div>
-            <details>
-              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#6d28d9', fontWeight: 600, marginBottom: 8 }}>عرض التفاصيل</summary>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-              <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 500 }}>إيرادات متوقعة ({(data.confirmedCount || 0) + (data.reservedCount || 0)})</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#5b21b6' }}>{formatNumber(data.projectedRevenue || 0)}</div>
-                <div style={{ fontSize: '0.7rem', color: '#8b5cf6', marginTop: '4px' }}>
-                  محجوز: {formatNumber(data.reservedRevenue || 0)} • مؤكد: {formatNumber(data.totalRevenue || 0)}
-                </div>
-              </div>
-              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>COGS متوقع</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.projectedCOGS || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#f3e8ff', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#7e22ce', fontWeight: 500 }}>الربح الإجمالي المتوقع</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.projectedGrossProfit || 0) >= 0 ? '#7e22ce' : '#dc2626' }}>{formatNumber(data.projectedGrossProfit || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses || 0)}</div>
-              </div>
-              <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center', position: 'relative' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>عمولات (المؤكد فقط)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalBonusCost || 0)}</div>
-                <div style={{ fontSize: '0.65rem', color: '#dc2626', marginTop: '4px' }}>⚠ لا تشمل المحجوز</div>
-              </div>
-              <div style={{ padding: '16px', background: (data.projectedNetProfit || 0) >= 0 ? '#ede9fe' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>
-                <div style={{ fontSize: '0.8rem', color: (data.projectedNetProfit || 0) >= 0 ? '#6d28d9' : '#dc2626', fontWeight: 500 }}>صافي الربح المتوقع</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</div>
-              </div>
-            </div>
-            </details>
+          {/* Plain-language explainer up front so a non-accountant can tell the
+              three views apart at a glance (agents' decision: lead with cash). */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: '0.82rem', color: '#475569', lineHeight: 1.9 }}>
+            <strong>الفرق باختصار:</strong> المحصّل = ما قبضته فعلاً نقداً · الاستحقاق = ما بِعته وسلّمته (على الورق) · المتوقّع = لو سُلّمت كل الطلبات المحجوزة.
           </div>
 
-          {/* Accounting P&L Cards */}
+          {/* (1) Cash-basis P&L — what actually reached the till. Leads because
+              it's the most relevant view for the owner (agents' decision). */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #0ea5e9' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#0369a1' }}>
+              الأرباح والخسائر — المحصّل نقداً
+            </h3>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
+              المبيعات المدفوعة 100% فقط — الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 500 }}>إيرادات محصّلة ({data.paidSalesCount || 0})</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#075985' }}>{formatNumber(data.totalRevenueCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGSCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#ecfeff', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0891b2', fontWeight: 500 }}>الربح الإجمالي</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.grossProfitCashBasis || 0) >= 0 ? '#0891b2' : '#dc2626' }}>{formatNumber(data.grossProfitCashBasis || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: (data.netProfitCashBasis || 0) >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>
+                <div style={{ fontSize: '0.8rem', color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626', fontWeight: 500 }}>صافي الربح المحصّل</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>{formatNumber(data.netProfitCashBasis || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* (2) Accrual P&L — the accounting standard. Headline net + margin
+              shown; the 7-figure breakdown collapsed behind a toggle. */}
           <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #3b82f6' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#1e293b' }}>
-              📘 الأرباح والخسائر — بعد التسليم (استحقاق)
+              الأرباح والخسائر — بعد التسليم (استحقاق)
             </h3>
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400, marginBottom: '16px' }}>
-              اعتراف بالإيراد عند تسليم البضاعة — المعيار المحاسبي الدولي. يشمل المبيعات المؤكدة فقط.
+              اعتراف بالإيراد عند تسليم البضاعة — يشمل المبيعات المؤكدة فقط.
             </div>
             {(data.bonusSettledOutsideWindow || 0) > 0.005 && (
               <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, fontSize: '0.75rem', color: '#92400e' }}>
-                ℹ️ ملاحظة: عمولات بقيمة {formatNumber(data.bonusSettledOutsideWindow)}€ مستحقة في هذه الفترة لكن تسويتها تمت خارجها — غير مدرجة في هذا الحساب. اختر فترة أوسع لرؤية الصورة الكاملة.
+                ملاحظة: عمولات بقيمة {formatNumber(data.bonusSettledOutsideWindow)}€ مستحقة في هذه الفترة لكن تسويتها تمت خارجها — غير مدرجة هنا. اختر فترة أوسع لرؤية الصورة الكاملة.
               </div>
             )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 600 }}>صافي الربح (استحقاق)</span>
+              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
+                {formatNumber(data.netProfit)} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>· هامش {netMargin}%</span>
+              </span>
+            </div>
+            <details>
+              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#1e40af', fontWeight: 600, marginBottom: 8 }}>عرض التفاصيل</summary>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة (استحقاق) ({data.confirmedCount || 0})</div>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 500 }}>إيرادات مؤكدة ({data.confirmedCount || 0})</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalRevenue)}</div>
               </div>
               <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة (استحقاق)</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة المباعة</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGS)}</div>
               </div>
               <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي (استحقاق)</div>
+                <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 500 }}>الربح الإجمالي</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: data.grossProfit >= 0 ? '#1e40af' : '#dc2626' }}>{formatNumber(data.grossProfit)}</div>
-                {/* DONE: Fix 6 — gross profit margin */}
                 <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '4px' }}>هامش: {grossMargin}%</div>
               </div>
               <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
@@ -791,41 +782,58 @@ function SummaryContent() {
               <div style={{ padding: '16px', background: data.netProfit >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>
                 <div style={{ fontSize: '0.8rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', fontWeight: 500 }}>صافي الربح (استحقاق)</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: data.netProfit >= 0 ? '#16a34a' : '#dc2626' }}>{formatNumber(data.netProfit)}</div>
-                {/* DONE: Fix 6 — net profit margin */}
                 <div style={{ fontSize: '0.75rem', color: data.netProfit >= 0 ? '#16a34a' : '#dc2626', marginTop: '4px' }}>هامش: {netMargin}%</div>
               </div>
             </div>
+            </details>
           </div>
 
-          {/* FEAT-04: Cash-basis P&L card. Displays revenue/COGS/gross/net
-              computed ONLY from fully-paid sales (payment_status = 'paid').
-              Shown alongside the accrual P&L above so the user can see
-              both "what I booked" and "what I actually collected". */}
-          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #0ea5e9' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#0369a1' }}>
-              💰 الأرباح والخسائر — المحصّل نقداً
+          {/* (3) Projected (pipeline) P&L — tentative (reserved + confirmed);
+              least certain, so it comes last. Collapsed to its headline. */}
+          <div className="card" style={{ marginBottom: '24px', padding: '20px', borderRight: '4px solid #8b5cf6' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: '#6d28d9' }}>
+              الأرباح والخسائر — المتوقعة
             </h3>
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
-              اعتراف بالإيراد عند استلام المال كاملاً — المبيعات المدفوعة 100% فقط. الصفقات الجزئية لا تُحتسب حتى تُدفع بالكامل.
+              محجوز + مؤكد — مؤشر تقديري قابل للتغير مع الإلغاءات. عمولات الطلبات المحجوزة غير مدرجة (تُنشأ عند التوصيل).
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: '0.9rem', color: '#6d28d9', fontWeight: 600 }}>صافي الربح المتوقع</span>
+              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</span>
+            </div>
+            <details>
+              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#6d28d9', fontWeight: 600, marginBottom: 8 }}>عرض التفاصيل</summary>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-              <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 500 }}>إيرادات محصّلة (محصّل) ({data.paidSalesCount || 0})</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#075985' }}>{formatNumber(data.totalRevenueCashBasis || 0)}</div>
+              <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 500 }}>إيرادات متوقعة ({(data.confirmedCount || 0) + (data.reservedCount || 0)})</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#5b21b6' }}>{formatNumber(data.projectedRevenue || 0)}</div>
+                <div style={{ fontSize: '0.7rem', color: '#8b5cf6', marginTop: '4px' }}>
+                  محجوز: {formatNumber(data.reservedRevenue || 0)} • مؤكد: {formatNumber(data.totalRevenue || 0)}
+                </div>
               </div>
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة المحصّل (محصّل)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalCOGSCashBasis || 0)}</div>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>تكلفة البضاعة (متوقع)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.projectedCOGS || 0)}</div>
               </div>
-              <div style={{ padding: '16px', background: '#ecfeff', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#0891b2', fontWeight: 500 }}>الربح الإجمالي (محصّل)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.grossProfitCashBasis || 0) >= 0 ? '#0891b2' : '#dc2626' }}>{formatNumber(data.grossProfitCashBasis || 0)}</div>
+              <div style={{ padding: '16px', background: '#f3e8ff', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#7e22ce', fontWeight: 500 }}>الربح الإجمالي المتوقع</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (data.projectedGrossProfit || 0) >= 0 ? '#7e22ce' : '#dc2626' }}>{formatNumber(data.projectedGrossProfit || 0)}</div>
               </div>
-              <div style={{ padding: '16px', background: (data.netProfitCashBasis || 0) >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>
-                <div style={{ fontSize: '0.8rem', color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626', fontWeight: 500 }}>صافي الربح (محصّل)</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.netProfitCashBasis || 0) >= 0 ? '#0ea5e9' : '#dc2626' }}>{formatNumber(data.netProfitCashBasis || 0)}</div>
+              <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 500 }}>المصاريف</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b45309' }}>{formatNumber(data.totalExpenses || 0)}</div>
+              </div>
+              <div style={{ padding: '16px', background: '#fee2e2', borderRadius: '12px', textAlign: 'center', position: 'relative' }}>
+                <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 500 }}>عمولات (المؤكد فقط)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#b91c1c' }}>{formatNumber(data.totalBonusCost || 0)}</div>
+                <div style={{ fontSize: '0.65rem', color: '#dc2626', marginTop: '4px' }}>لا تشمل المحجوز</div>
+              </div>
+              <div style={{ padding: '16px', background: (data.projectedNetProfit || 0) >= 0 ? '#ede9fe' : '#fee2e2', borderRadius: '12px', textAlign: 'center', border: '2px solid', borderColor: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>
+                <div style={{ fontSize: '0.8rem', color: (data.projectedNetProfit || 0) >= 0 ? '#6d28d9' : '#dc2626', fontWeight: 500 }}>صافي الربح المتوقع</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</div>
               </div>
             </div>
+            </details>
           </div>
 
           {/* FEAT-04: Pending collections + period VAT widget */}
@@ -859,6 +867,26 @@ function SummaryContent() {
           {/* ===== Tab 3: التقارير — charts, category/stock breakdown, tables ===== */}
           {activeTab === 'reports' && (
             <>
+          {/* Period summary — quick headline numbers for the selected range,
+              so the Reports tab opens with the totals before the charts. */}
+          <div className="today-strip" style={{ marginBottom: 16 }}>
+            <div className="today-item" style={{ borderTop: '3px solid #16a34a' }}>
+              <span className="today-label">إجمالي المبيعات (مؤكد)</span>
+              <span className="today-value">{formatNumber(data.totalRevenue || 0)}</span>
+            </div>
+            <div className="today-item" style={{ borderTop: '3px solid #dc2626' }}>
+              <span className="today-label">إجمالي المشتريات</span>
+              <span className="today-value">{formatNumber(data.totalPurchases || 0)}</span>
+            </div>
+            <div className="today-item" style={{ borderTop: '3px solid #f59e0b' }}>
+              <span className="today-label">إجمالي المصاريف</span>
+              <span className="today-value">{formatNumber(data.totalExpenses || 0)}</span>
+            </div>
+            <div className="today-item" style={{ borderTop: '3px solid #6366f1' }}>
+              <span className="today-label">عدد المبيعات المؤكدة</span>
+              <span className="today-value">{data.confirmedCount || 0}</span>
+            </div>
+          </div>
           {/* Charts */}
           <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 8 }}>
             مخطّط «المبيعات مقابل المشتريات» يعرض آخر 6 شهور دائماً (مستقل عن الفلتر الزمني أعلى الصفحة).
@@ -892,9 +920,9 @@ function SummaryContent() {
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      labelLine={true}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={100}
+                      labelLine={false}
+                      label={false}
+                      outerRadius={90}
                       dataKey="value"
                     >
                       {pieData.map((_, index) => (
@@ -902,6 +930,8 @@ function SummaryContent() {
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => formatNumber(value)} />
+                    {/* Bottom legend instead of overlapping outer labels — readable on mobile */}
+                    <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
