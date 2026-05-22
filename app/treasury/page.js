@@ -11,6 +11,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import MoneyInput from '@/components/MoneyInput';
 import DataCardList from '@/components/DataCardList';
 import ErrorState from '@/components/ErrorState';
+import Pagination, { usePagination } from '@/components/Pagination';
 
 const ROLE_LABEL = { admin: 'مدير عام', manager: 'مشرف', driver: 'سائق', seller: 'بائع' };
 
@@ -70,6 +71,12 @@ function TreasuryContent() {
   // Branded confirm dialog (replaces window.confirm for the two money-sensitive
   // admin actions: setting an opening balance + toggling the treasury system).
   const [confirmDialog, setConfirmDialog] = useState(null);
+  // Page-level tab: the money-movement ledger ("حركة الصندوق") lives in its own
+  // tab so it doesn't make the page very long after many operations.
+  const [activeTab, setActiveTab] = useState('main');
+  // Paginate the movement ledger — bounded height regardless of how many
+  // operations a box accumulates.
+  const movPag = usePagination(movements);
 
   const fetchData = async () => {
     try {
@@ -126,7 +133,7 @@ function TreasuryContent() {
       setMovLoading(false);
     }
   };
-  const selectMovTab = (id) => { setMovBoxId(id); fetchMovements(id); };
+  const selectMovTab = (id) => { setMovBoxId(id); movPag.resetPage(); fetchMovements(id); };
 
   // When the boxes list (re)loads, keep the selected tab valid and refresh its
   // movements. Defaults to the first visible box (general box leads the list).
@@ -364,7 +371,15 @@ function TreasuryContent() {
         </div>
       </div>
 
+      {/* Page tabs — keep "حركة الصندوق" (the long movement ledger) in its own
+          tab so the main view stays short even after hundreds of operations. */}
+      <div className="tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <button type="button" className={`tab ${activeTab === 'main' ? 'active' : ''}`} onClick={() => setActiveTab('main')}>الرئيسية</button>
+        <button type="button" className={`tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>حركة الصندوق</button>
+      </div>
+
       {/* Boxes */}
+      {activeTab === 'main' && (
       <div className="card">
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 16 }}>الصناديق</h3>
         {loading ? (
@@ -372,7 +387,18 @@ function TreasuryContent() {
         ) : boxes.length === 0 ? (
           <div className="empty-state"><h3>لا توجد صناديق</h3><p>شغّل تهيئة النظام (/api/init) لإنشاء الصناديق.</p></div>
         ) : (
-          <div className="table-container">
+          <>
+          {/* Mobile: stacked cards (no horizontal scroll). Desktop: the table. */}
+          <DataCardList
+            rows={boxes}
+            fields={[
+              { key: '_name', label: 'الصندوق', format: (_, b) => boxName(b) + (b.type !== 'main' && b.owner_role ? ` (${ROLE_LABEL[b.owner_role] || b.owner_role})` : '') },
+              { key: 'type', label: 'النوع', format: (v) => v === 'main' ? 'عام' : 'عهدة' },
+              { key: 'balance', label: 'الرصيد', format: (v) => `${formatNumber(parseFloat(v) || 0)} €` },
+            ]}
+            emptyMessage="لا توجد صناديق"
+          />
+          <div className="table-container has-card-fallback">
             <table className="data-table">
               <thead><tr><th>الصندوق</th><th>النوع</th><th>الرصيد</th></tr></thead>
               <tbody>
@@ -392,15 +418,17 @@ function TreasuryContent() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
+      )}
 
       {/* Money movements per box — a tab per box (general box first, then each
           person within the viewer's scope). Admins follow every person's money
           moves; each holder reviews their own. Read-only ledger from
           cash_movements with a running balance; shown even when the system is
           paused so history stays reviewable. */}
-      {boxes.length > 0 && (
+      {activeTab === 'movements' && boxes.length > 0 && (
         <div className="card" style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>حركات الأموال</h3>
           <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
@@ -431,7 +459,7 @@ function TreasuryContent() {
           ) : (
             <>
               <DataCardList
-                rows={movements}
+                rows={movPag.paginatedRows}
                 fields={[
                   { key: 'date', label: 'التاريخ' },
                   { key: 'kind', label: 'النوع', format: (v) => KIND_LABEL[v] || v },
@@ -449,7 +477,7 @@ function TreasuryContent() {
                     <th>الطرف الآخر</th><th>بواسطة</th><th>ملاحظة</th><th>الرصيد</th>
                   </tr></thead>
                   <tbody>
-                    {movements.map((m) => {
+                    {movPag.paginatedRows.map((m) => {
                       const amt = parseFloat(m.signed_amount) || 0;
                       return (
                         <tr key={m.id}>
@@ -469,10 +497,22 @@ function TreasuryContent() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={movPag.page}
+                totalPages={movPag.totalPages}
+                totalRows={movPag.totalRows}
+                perPage={movPag.perPage}
+                onPageChange={movPag.goTo}
+                onPerPageChange={movPag.setPerPage}
+              />
             </>
           )}
         </div>
       )}
+
+      {/* "الرئيسية" tab — capital, opening balances, reconciliation, pending
+          requests, and the money-action forms all live here. */}
+      {activeTab === 'main' && (<>
 
       {/* Capital by person (admin) — who funded, who withdrew, WHEN, and each
           person's current net capital. Tabs like the money-movement view; the
@@ -808,6 +848,7 @@ function TreasuryContent() {
           )}
         </>
       )}
+      </>)}
 
       <ConfirmModal
         isOpen={!!confirmDialog}
