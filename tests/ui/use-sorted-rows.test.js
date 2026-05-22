@@ -34,4 +34,19 @@ describe('useSortedRows — date sorting', () => {
     act(() => result.current.setSort('amount', 'asc'));
     expect(result.current.sortedRows.map((r) => r.amount)).toEqual([100, 200, 300]);
   });
+
+  it('same-value tiebreaker follows the sort direction (by id)', () => {
+    // Same date → tiebreak by id. Ascending must show 1,2,3 (oldest first);
+    // descending must show 3,2,1 — not always-descending as before.
+    const sameDate = [
+      { id: 1, date: '2026-04-17' },
+      { id: 3, date: '2026-04-17' },
+      { id: 2, date: '2026-04-17' },
+    ];
+    const { result } = renderHook(() => useSortedRows(sameDate));
+    act(() => result.current.setSort('date', 'asc'));
+    expect(result.current.sortedRows.map((r) => r.id)).toEqual([1, 2, 3]);
+    act(() => result.current.setSort('date', 'desc'));
+    expect(result.current.sortedRows.map((r) => r.id)).toEqual([3, 2, 1]);
+  });
 });
