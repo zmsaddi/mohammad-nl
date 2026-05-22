@@ -12,8 +12,9 @@ import { requireAuth } from '@/lib/api-auth';
  * Body: { amount: number (TTC, > 0), paymentMethod: 'كاش'|'بنك',
  *         notes?: string (ignored — stored by applyCollection as '') }
  *
- * Auth: admin, manager, seller. Drivers are rejected — they collect the
- * down-payment-at-delivery only, which is wired through updateDelivery.
+ * Auth: admin, manager. Sellers don't handle money (no custody box), so they
+ * can't record collections. Drivers collect the down-payment-at-delivery only,
+ * which is wired through updateDelivery — not this manual endpoint.
  *
  * Error mapping:
  *   - Sale not found → 404
@@ -22,7 +23,7 @@ import { requireAuth } from '@/lib/api-auth';
  *   - Unexpected → 500
  */
 export async function POST(request, { params }) {
-  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  const auth = await requireAuth(request, ['admin', 'manager']);
   if (auth.error) return auth.error;
   const { token } = auth;
 
