@@ -17,6 +17,7 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 
 const SALES_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
@@ -38,6 +39,7 @@ function SalesContent() {
   const [bonusSettings, setBonusSettings] = useState({});
   const [categoryRates, setCategoryRates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // v1.2 UX-1: filter state hydrated from URL on first render so
@@ -160,6 +162,7 @@ function SalesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const fetches = [
         fetch('/api/sales', { cache: 'no-store' }),
         fetch('/api/clients', { cache: 'no-store' }),
@@ -170,6 +173,7 @@ function SalesContent() {
         fetches.push(fetch('/api/category-bonus-rates', { cache: 'no-store' }));
       }
       const results = await Promise.all(fetches);
+      if (!results[0].ok) throw new Error(`HTTP ${results[0].status}`);
       const salesData = await results[0].json();
       const clientsData = await results[1].json();
       const productsData = await results[2].json();
@@ -182,6 +186,7 @@ function SalesContent() {
         setCategoryRates(Array.isArray(cr) ? cr : []);
       }
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -495,13 +500,13 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="sale-qty">الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
-              <input id="sale-qty" type="number" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="sale-qty" type="number" inputMode="decimal" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="sale-price">سعر البيع *</label>
               <input
                 id="sale-price"
-                type="number"
+                type="number" inputMode="decimal"
                 min="0"
                 step="any"
                 value={form.unitPrice}
@@ -613,7 +618,7 @@ function SalesContent() {
                 <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
                 <input
                   id="sale-dpe"
-                  type="number"
+                  type="number" inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={form.downPaymentExpected}
@@ -754,6 +759,8 @@ function SalesContent() {
 
         {loading ? (
           <PageSkeleton rows={8} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج مطابقة'}</h3>

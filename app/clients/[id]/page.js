@@ -228,7 +228,7 @@ function ClientDetailContent({ params }) {
               <div className="form-group">
                 <label>المبلغ (€) *</label>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={paymentForm.amount}

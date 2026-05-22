@@ -155,7 +155,7 @@ function SettingsContent() {
               <label htmlFor="vat-rate">Taux TVA (%)</label>
               <input
                 id="vat-rate"
-                type="number"
+                type="number" inputMode="decimal"
                 min="0"
                 max="100"
                 step="0.5"

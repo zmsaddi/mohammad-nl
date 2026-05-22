@@ -14,6 +14,7 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 
 const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '' }, to: { default: '' }, driver: { default: 'all' }, bank: { default: '' } };
@@ -157,6 +158,7 @@ function DeliveriesContent() {
   const [clients, setClients] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const canAssignDriver = ['admin', 'manager'].includes(userRole);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -221,6 +223,7 @@ function DeliveriesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       // Only admin/manager need the users list (for driver-assignment dropdown).
       // Drivers don't see the dropdown so skip the fetch to avoid a 403 console error.
       const fetches = [
@@ -231,6 +234,7 @@ function DeliveriesContent() {
         fetches.push(fetch('/api/users', { cache: 'no-store' }).catch(() => ({ ok: false })));
       }
       const [deliveriesRes, clientsRes, usersRes] = await Promise.all(fetches);
+      if (!deliveriesRes.ok) throw new Error(`HTTP ${deliveriesRes.status}`);
       const deliveriesData = await deliveriesRes.json();
       const clientsData = await clientsRes.json();
       if (usersRes?.ok) {
@@ -240,6 +244,7 @@ function DeliveriesContent() {
       setRows(Array.isArray(deliveriesData) ? deliveriesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -511,7 +516,7 @@ function DeliveriesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="del-amount">المبلغ</label>
-                <input id="del-amount" type="number" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
+                <input id="del-amount" type="number" inputMode="decimal" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
               </div>
               <div className="form-group">
                 <label htmlFor="del-driver">اسم السائق</label>
@@ -576,6 +581,8 @@ function DeliveriesContent() {
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : paginatedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />

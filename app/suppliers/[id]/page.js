@@ -136,7 +136,7 @@ function SupplierDetailContent() {
               </div>
               <div className="form-group">
                 <label>المبلغ *</label>
-                <input type="number" min="0" step="any" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} required />
+                <input type="number" inputMode="decimal" min="0" step="any" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label>طريقة الدفع</label>

@@ -2,10 +2,12 @@
 
 // v1.1 S3.2 — DataCardList: mobile card-fallback for data tables.
 //
-// On viewports below 640px (Tailwind `sm`), renders each row as a
-// stacked card with full-width action buttons instead of the desktop
-// horizontal-scroll table. The existing <table> is hidden; at sm and
+// On viewports below 768px (the app's mobile breakpoint), renders each row
+// as a stacked card with full-width action buttons instead of the desktop
+// horizontal-scroll table. The existing <table> is hidden; at 768px and
 // above, the table shows and cards hide. No JS media query — pure CSS.
+// (The .data-card-list / .table-container.has-card-fallback rules that
+// drive this live in globals.css under the 768px media query.)
 //
 // Usage in a page:
 //
@@ -27,7 +29,7 @@
 //   />
 //
 // The component renders:
-//   <div className="data-card-list">  ← visible below sm, hidden at sm+
+//   <div className="data-card-list">  ← visible below 768px, hidden at 768px+
 //     <div className="data-card">
 //       <div className="data-card-status">مؤكد</div>
 //       <div className="data-card-fields">

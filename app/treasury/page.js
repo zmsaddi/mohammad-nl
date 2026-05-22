@@ -30,6 +30,9 @@ function TreasuryContent() {
   const [capitalOps, setCapitalOps] = useState([]);
   const [openingInputs, setOpeningInputs] = useState({});
   const [recon, setRecon] = useState(null);
+  // Guards every money action below against a double-tap while the POST is
+  // in flight (each one moves real money). Disables the action buttons.
+  const [busy, setBusy] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -71,9 +74,13 @@ function TreasuryContent() {
   const handleHandover = async () => {
     if (!myBoxId || !generalBoxId) { addToast('الصناديق غير مهيّأة', 'error'); return; }
     if (!(parseFloat(handAmount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: myBoxId, toBoxId: generalBoxId, amount: handAmount });
-    if (ok) { addToast('تم إنشاء طلب تسليم — بانتظار تأكيد الصندوق العام'); setHandAmount(''); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: myBoxId, toBoxId: generalBoxId, amount: handAmount });
+      if (ok) { addToast('تم إنشاء طلب تسليم — بانتظار تأكيد الصندوق العام'); setHandAmount(''); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   const handleFund = async () => {
@@ -81,9 +88,13 @@ function TreasuryContent() {
     if (!(parseFloat(fundForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
     const fromBoxId = role === 'admin' ? generalBoxId : myBoxId; // admin funds from treasury, manager from own
     if (!fromBoxId) { addToast('صندوق المصدر غير مهيّأ', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'funding', fromBoxId, toBoxId: Number(fundForm.toBoxId), amount: fundForm.amount });
-    if (ok) { addToast('تم إنشاء طلب تمويل — بانتظار تأكيد المستلم'); setFundForm({ toBoxId: '', amount: '' }); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'funding', fromBoxId, toBoxId: Number(fundForm.toBoxId), amount: fundForm.amount });
+      if (ok) { addToast('تم إنشاء طلب تمويل — بانتظار تأكيد المستلم'); setFundForm({ toBoxId: '', amount: '' }); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   // Request a person to settle their custody (مطالبة بتسليم العهدة). The money
@@ -102,9 +113,13 @@ function TreasuryContent() {
     if (!(parseFloat(reqForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
     const toBoxId = role === 'admin' ? generalBoxId : myBoxId; // hierarchy: admin → general, manager → own
     if (!toBoxId) { addToast('صندوق الوجهة غير مهيّأ', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: Number(reqForm.fromBoxId), toBoxId, amount: reqForm.amount });
-    if (ok) { addToast('تم إرسال طلب التسليم — بانتظار تأكيد حامل العهدة'); setReqForm({ fromBoxId: '', amount: '' }); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: Number(reqForm.fromBoxId), toBoxId, amount: reqForm.amount });
+      if (ok) { addToast('تم إرسال طلب التسليم — بانتظار تأكيد حامل العهدة'); setReqForm({ fromBoxId: '', amount: '' }); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   const handleConfirm = async (id) => {
@@ -118,12 +133,16 @@ function TreasuryContent() {
 
   const handleInitCapital = async () => {
     if (!(parseFloat(capForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/capital', capForm);
-    if (ok) {
-      addToast(d.status === 'approved' ? 'تمّ تنفيذ العملية' : 'تمّ إنشاء العملية — بانتظار موافقة بقية المدراء');
-      setCapForm({ kind: 'injection', amount: '', method: 'كاش' });
-      fetchData();
-    } else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/capital', capForm);
+      if (ok) {
+        addToast(d.status === 'approved' ? 'تمّ تنفيذ العملية' : 'تمّ إنشاء العملية — بانتظار موافقة بقية المدراء');
+        setCapForm({ kind: 'injection', amount: '', method: 'كاش' });
+        fetchData();
+      } else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
   const handleApproveCapital = async (id) => {
     const { ok, d } = await post(`/api/treasury/capital/${id}/approve`);
@@ -282,7 +301,7 @@ function TreasuryContent() {
                         <td>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <input
-                              type="number" min="0" step="any"
+                              type="number" inputMode="decimal" min="0" step="any"
                               value={openingInputs[b.id] ?? ''}
                               onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
                               placeholder="0.00"
@@ -393,9 +412,9 @@ function TreasuryContent() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
+                  <input type="number" inputMode="decimal" min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
                 </div>
-                <button className="btn btn-primary" onClick={handleHandover}>إنشاء طلب تسليم</button>
+                <button className="btn btn-primary" onClick={handleHandover} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تسليم'}</button>
               </div>
             </div>
           )}
@@ -419,9 +438,9 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
+                  <input type="number" inputMode="decimal" min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
                 </div>
-                <button className="btn btn-primary" onClick={handleFund}>إنشاء طلب تمويل</button>
+                <button className="btn btn-primary" onClick={handleFund} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تمويل'}</button>
               </div>
             </div>
           )}
@@ -445,9 +464,9 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ المطلوب (€)</label>
-                  <input type="number" min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
+                  <input type="number" inputMode="decimal" min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
                 </div>
-                <button className="btn btn-primary" onClick={handleRequestSettlement}>إرسال الطلب</button>
+                <button className="btn btn-primary" onClick={handleRequestSettlement} disabled={busy}>{busy ? 'جارٍ…' : 'إرسال الطلب'}</button>
               </div>
             </div>
           )}
@@ -469,7 +488,7 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 150, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
+                  <input type="number" inputMode="decimal" min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
                 </div>
                 <div className="form-group" style={{ maxWidth: 120, margin: 0 }}>
                   <label>الطريقة</label>
@@ -478,7 +497,7 @@ function TreasuryContent() {
                     <option value="بنك">بنك</option>
                   </select>
                 </div>
-                <button className="btn btn-primary" onClick={handleInitCapital}>إنشاء</button>
+                <button className="btn btn-primary" onClick={handleInitCapital} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء'}</button>
               </div>
               {capitalOps.length > 0 && (
                 <div className="table-container">

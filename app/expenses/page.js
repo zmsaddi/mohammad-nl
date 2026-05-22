@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
@@ -25,6 +26,7 @@ function ExpensesContent() {
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -45,10 +47,13 @@ function ExpensesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/expenses', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -205,7 +210,7 @@ function ExpensesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="exp-amount">المبلغ *</label>
-                <input id="exp-amount" type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+                <input id="exp-amount" type="number" inputMode="decimal" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
               </div>
               <div className="form-group">
                 <label>وسيلة الدفع</label>
@@ -286,6 +291,8 @@ function ExpensesContent() {
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مصاريف بعد' : 'لا توجد نتائج مطابقة'}</h3>

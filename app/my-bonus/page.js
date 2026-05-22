@@ -11,6 +11,7 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -23,16 +24,19 @@ function MyBonusContent() {
 
   const [bonuses, setBonuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   // UX-09: filter state (URL-synced via the shared hook)
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(BONUS_FILTERS);
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/bonuses', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setBonuses(Array.isArray(data) ? data : []);
-    } catch { addToast('خطأ', 'error'); }
+    } catch { setError(true); addToast('خطأ', 'error'); }
     finally { setLoading(false); }
   };
 
@@ -155,6 +159,8 @@ function MyBonusContent() {
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             {bonuses.length === 0 ? (

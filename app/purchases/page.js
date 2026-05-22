@@ -17,6 +17,7 @@ import { matchesText, dateInRange } from '@/lib/filter-engine';
 const PURCHASE_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -29,6 +30,7 @@ function PurchasesContent() {
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -77,11 +79,13 @@ function PurchasesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const [purchasesRes, productsRes, suppliersRes] = await Promise.all([
         fetch('/api/purchases', { cache: 'no-store' }),
         fetch('/api/products', { cache: 'no-store' }),
         fetch('/api/suppliers', { cache: 'no-store' }),
       ]);
+      if (!purchasesRes.ok) throw new Error(`HTTP ${purchasesRes.status}`);
       const purchasesData = await purchasesRes.json();
       const productsData = await productsRes.json();
       const suppliersData = await suppliersRes.json();
@@ -89,6 +93,7 @@ function PurchasesContent() {
       setProducts(Array.isArray(productsData) ? productsData : []);
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -415,17 +420,17 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="pur-qty">الكمية *</label>
-              <input id="pur-qty" type="number" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="pur-qty" type="number" inputMode="decimal" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-price">سعر الوحدة *</label>
-              <input id="pur-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <input id="pur-price" type="number" inputMode="decimal" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-sell-price">سعر البيع الموصى *</label>
               <input
                 id="pur-sell-price"
-                type="number"
+                type="number" inputMode="decimal"
                 min="0"
                 step="any"
                 value={form.sellPrice}
@@ -469,7 +474,7 @@ function PurchasesContent() {
               <label htmlFor="pur-paid">المدفوع الآن (اختياري)</label>
               <input
                 id="pur-paid"
-                type="number"
+                type="number" inputMode="decimal"
                 min="0"
                 step="any"
                 value={form.paidAmount}
@@ -541,6 +546,8 @@ function PurchasesContent() {
 
         {loading ? (
           <PageSkeleton rows={8} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مشتريات بعد' : 'لا توجد نتائج مطابقة'}</h3>
@@ -793,7 +800,7 @@ function PurchasesContent() {
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label>المبلغ *</label>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   min="0"
                   step="any"
                   value={s.amount}

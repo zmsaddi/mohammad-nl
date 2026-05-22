@@ -7,6 +7,7 @@ import { formatNumber } from '@/lib/utils';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import DataCardList from '@/components/DataCardList';
 import Pagination, { usePagination } from '@/components/Pagination';
 import { useSortedRows } from '@/lib/use-sorted-rows';
@@ -20,6 +21,7 @@ function SuppliersContent() {
   const addToast = useToast();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(SUPPLIER_FILTERS);
@@ -27,10 +29,13 @@ function SuppliersContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/suppliers?withDebt=true', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setSuppliers(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -170,6 +175,8 @@ function SuppliersContent() {
 
         {loading ? (
           <PageSkeleton rows={5} showStats={false} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد موردين بعد'}</h3>

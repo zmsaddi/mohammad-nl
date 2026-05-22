@@ -55,4 +55,14 @@ describe('InvoicesPage (smoke)', () => {
     render(<InvoicesPage />);
     expect(await screen.findByText('لا توجد فواتير بعد')).toBeInTheDocument();
   });
+
+  it('shows an error state (not a misleading empty state) when the fetch fails', async () => {
+    // Commit 2: a failed/non-OK fetch must surface as an explicit error with a
+    // retry, NOT as "no invoices yet".
+    global.fetch = vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }));
+    render(<InvoicesPage />);
+    expect(await screen.findByText('تعذّر تحميل البيانات')).toBeInTheDocument();
+    expect(screen.getByText(/إعادة المحاولة/)).toBeInTheDocument();
+    expect(screen.queryByText('لا توجد فواتير بعد')).not.toBeInTheDocument();
+  });
 });

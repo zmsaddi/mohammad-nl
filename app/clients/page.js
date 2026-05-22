@@ -12,6 +12,7 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import DataCardList from '@/components/DataCardList';
 
 const CLIENT_FILTERS = { q: { default: '', debounce: 300 }, debt: { default: 'all' } };
@@ -23,6 +24,7 @@ function ClientsContent() {
 
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(CLIENT_FILTERS);
@@ -39,10 +41,13 @@ function ClientsContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setClients(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -248,6 +253,8 @@ function ClientsContent() {
 
         {loading ? (
           <PageSkeleton rows={5} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد عملاء بعد'}</h3>

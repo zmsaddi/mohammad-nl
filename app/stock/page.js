@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
@@ -36,6 +37,7 @@ function StockContent() {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   // Filters (q / status / category) URL-synced via the shared hook.
@@ -62,10 +64,13 @@ function StockContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/products', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProducts(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -339,6 +344,8 @@ function StockContent() {
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا توجد منتجات بعد'}</h3>
@@ -430,7 +437,7 @@ function StockContent() {
                         <td className="number-cell">
                           {isAdmin ? (
                             <input
-                              type="number"
+                              type="number" inputMode="decimal"
                               min="0"
                               step="any"
                               defaultValue={p.sell_price || ''}
@@ -459,7 +466,7 @@ function StockContent() {
                         {isAdmin && (
                           <td onClick={(e) => e.stopPropagation()}>
                             <input
-                              type="number"
+                              type="number" inputMode="decimal"
                               min="0"
                               defaultValue={p.low_stock_threshold ?? 3}
                               style={{
