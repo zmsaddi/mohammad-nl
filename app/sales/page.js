@@ -16,7 +16,7 @@ import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -383,6 +383,24 @@ function SalesContent() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Build + open a WhatsApp share for a sale row (used by the row actions on
+  // both the mobile card and desktop table — single source of truth).
+  const shareWhatsApp = (row) => {
+    const client = clients.find((c) => c.name === row.client_name);
+    const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, '');
+    if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
+    const msg = encodeURIComponent(
+`*Vitesse Eco*
+*العميل:* ${row.client_name}
+*الكود:* ${row.ref_code || row.id}
+*المنتج:* ${row.item}
+*الكمية:* ${row.quantity}
+*المبلغ:* ${row.total}
+*الحالة:* ${row.status || 'محجوز'}`
+    );
+    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
   };
 
   return (
@@ -797,196 +815,54 @@ function SalesContent() {
           </div>
         ) : (
           <>
-          {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
-          <DataCardList
+          {/* Unified mobile-first DataView. Cost/profit columns stay gated to
+              canSeeCosts AND hidden on mobile cards (mobileHide) — same as the
+              old card list, which never surfaced them. unit_price is desktop-
+              only too. Row click opens the detail modal. */}
+          <DataView
             rows={paginatedRows}
-            fields={[
-              { key: 'ref_code', label: 'الكود' },
-              { key: 'date', label: 'التاريخ' },
-              { key: 'client_name', label: 'العميل' },
-              { key: 'item', label: 'المنتج' },
-              { key: 'quantity', label: 'الكمية' },
-              { key: 'total', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
-              { key: 'paid_amount', label: 'المدفوع', format: (v) => v ? `${formatNumber(v)} €` : '—' },
-              { key: 'remaining', label: 'المتبقي', format: (v) => v ? `${formatNumber(v)} €` : '—' },
-              { key: 'payment_type', label: 'الدفع' },
-            ]}
-            statusField="status"
-            statusColors={{
-              'مؤكد': '#16a34a',
-              'محجوز': '#f59e0b',
-              'ملغي': '#dc2626',
-            }}
+            sort={{ requestSort, getAriaSort, getSortIndicator }}
+            onRowClick={(row) => setSelectedRow(row)}
+            rowKey={(row) => row.id}
+            emptyMessage="لا توجد مبيعات"
+            columns={[
+              { key: 'ref_code', label: 'الكود', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{r.ref_code || `SL-${r.id}`}</span> },
+              { key: 'date', label: 'التاريخ', sortable: true },
+              { key: 'client_name', label: 'العميل', sortable: true },
+              { key: 'item', label: 'الصنف', sortable: true },
+              { key: 'quantity', label: 'الكمية', align: 'end', sortable: true, cell: (r) => formatNumber(r.quantity) },
+              { key: 'unit_price', label: 'سعر الوحدة', align: 'end', sortable: true, mobileHide: true, cell: (r) => `${formatNumber(r.unit_price)} €` },
+              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{formatNumber(r.total)} €</span> },
+              { key: 'paid_amount', label: 'المدفوع', align: 'end', sortable: true, cell: (r) => `${formatNumber(r.paid_amount)} €` },
+              { key: 'remaining', label: 'المتبقي', align: 'end', sortable: true, cell: (r) => <span style={{ color: (r.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(r.remaining)} €</span> },
+              canSeeCosts && { key: 'cost_total', label: 'التكلفة', align: 'end', sortable: true, mobileHide: true, cell: (r) => <span style={{ color: '#94a3b8' }}>{formatNumber(r.cost_total)} €</span> },
+              canSeeCosts && { key: 'profit', label: 'الربح', align: 'end', sortable: true, mobileHide: true, cell: (r) => <span style={{ color: (r.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>{formatNumber(r.profit)} €</span> },
+              {
+                key: 'status', label: 'الحالة', sortable: true,
+                cell: (r) => <span className="status-badge" style={{ background: r.status === 'مؤكد' ? '#dcfce7' : r.status === 'ملغي' ? '#fee2e2' : '#fef3c7', color: r.status === 'مؤكد' ? '#16a34a' : r.status === 'ملغي' ? '#dc2626' : '#d97706' }}>{r.status || 'محجوز'}</span>,
+              },
+              {
+                key: 'payment_type', label: 'الدفع', sortable: true,
+                cell: (r) => <span className="status-badge" style={{ background: r.payment_type === 'بنك' ? '#dbeafe' : r.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: r.payment_type === 'بنك' ? '#1e40af' : r.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>{r.payment_type || 'كاش'}</span>,
+              },
+            ].filter(Boolean)}
             actions={(row) => (
-              <>
-                {/* v1.2 — mobile card parity with desktop table actions.
-                    Pre-v1.2 only the "تفاصيل" button was on mobile, leaving
-                    WhatsApp share, edit, and cancel/delete all desktop-
-                    exclusive. Same permission gates as desktop. */}
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#25d366', color: 'white' }}
-                  onClick={() => {
-                    const client = clients.find((c) => c.name === row.client_name);
-                    const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, '');
-                    if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
-                    const msg = encodeURIComponent(
-`*Vitesse Eco*
-*العميل:* ${row.client_name}
-*الكود:* ${row.ref_code || row.id}
-*المنتج:* ${row.item}
-*الكمية:* ${row.quantity}
-*المبلغ:* ${row.total}
-*الحالة:* ${row.status || 'محجوز'}`
-                    );
-                    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-                  }}
-                  title="مشاركة عبر واتساب"
-                >
-                  واتساب
-                </button>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                <button className="btn btn-sm" style={{ background: '#25d366', color: 'white' }} onClick={() => shareWhatsApp(row)} title="مشاركة عبر واتساب">واتساب</button>
                 {(row.status || 'محجوز') !== 'ملغي' && (
                   isAdmin || ((!isAdmin) && (role === 'seller' || role === 'manager') && (row.status || 'محجوز') === 'محجوز')
                 ) && (
-                  <button className="btn btn-outline btn-sm" onClick={() => startEditSale(row)}>
-                    تعديل
-                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={() => startEditSale(row)}>تعديل</button>
                 )}
                 {canCancelSale(row, currentUser) && (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}
-                  >
-                    إلغاء
-                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}>إلغاء</button>
                 )}
                 {canCancelSale(row, currentUser) && isAdmin && (
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: '#7f1d1d', color: '#fff' }}
-                    onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
-                  >
-                    حذف نهائي
-                  </button>
+                  <button className="btn btn-sm" style={{ background: '#7f1d1d', color: '#fff' }} onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}>حذف نهائي</button>
                 )}
-              </>
+              </div>
             )}
-            emptyMessage="لا توجد مبيعات"
           />
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('ref_code')}>الكود{getSortIndicator('ref_code')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('client_name')}>العميل{getSortIndicator('client_name')}</th>
-                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('item')}>الصنف{getSortIndicator('item')}</th>
-                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
-                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('unit_price')}>سعر الوحدة{getSortIndicator('unit_price')}</th>
-                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total')}>الإجمالي{getSortIndicator('total')}</th>
-                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('paid_amount')}>المدفوع{getSortIndicator('paid_amount')}</th>
-                  <th onClick={() => requestSort('remaining')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remaining')}>المتبقي{getSortIndicator('remaining')}</th>
-                  {canSeeCosts && <th onClick={() => requestSort('cost_total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('cost_total')}>التكلفة{getSortIndicator('cost_total')}</th>}
-                  {canSeeCosts && <th onClick={() => requestSort('profit')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('profit')}>الربح{getSortIndicator('profit')}</th>}
-                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('status')}>الحالة{getSortIndicator('status')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>الدفع{getSortIndicator('payment_type')}</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRows.map((row) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `SL-${row.id}`}</td>
-                    <td>{row.date}</td>
-                    <td>{row.client_name}</td>
-                    <td>{row.item}</td>
-                    <td className="number-cell">{formatNumber(row.quantity)}</td>
-                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    <td className="number-cell">{formatNumber(row.paid_amount)}</td>
-                    <td className="number-cell" style={{ color: (row.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(row.remaining)}</td>
-                    {canSeeCosts && <td className="number-cell" style={{ color: '#94a3b8' }}>{formatNumber(row.cost_total)}</td>}
-                    {canSeeCosts && <td className="number-cell" style={{ color: (row.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-                      {formatNumber(row.profit)}
-                    </td>}
-                    <td>
-                      <span className="status-badge" style={{
-                        background: row.status === 'مؤكد' ? '#dcfce7' : row.status === 'ملغي' ? '#fee2e2' : '#fef3c7',
-                        color: row.status === 'مؤكد' ? '#16a34a' : row.status === 'ملغي' ? '#dc2626' : '#d97706',
-                      }}>
-                        {row.status || 'محجوز'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="status-badge" style={{
-                        background: row.payment_type === 'بنك' ? '#dbeafe' : row.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7',
-                        color: row.payment_type === 'بنك' ? '#1e40af' : row.payment_type === 'آجل' ? '#d97706' : '#16a34a'
-                      }}>
-                        {row.payment_type || 'كاش'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          className="btn btn-sm"
-                          style={{ background: '#25d366', color: 'white', padding: '4px 8px' }}
-                          onClick={() => {
-                            const client = clients.find((c) => c.name === row.client_name);
-                            const phone = (client?.phone || '').replace(/[^0-9+]/g, '').replace(/^00/, '').replace(/^\+/, '');
-                            if (!phone) { addToast('لا يوجد رقم هاتف للعميل', 'error'); return; }
-                            const msg = encodeURIComponent(
-`*Vitesse Eco*
-*العميل:* ${row.client_name}
-*الكود:* ${row.ref_code || row.id}
-*المنتج:* ${row.item}
-*الكمية:* ${row.quantity}
-*المبلغ:* ${row.total}
-*الحالة:* ${row.status || 'محجوز'}`
-                            );
-                            window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-                          }}
-                          title="مشاركة عبر واتساب"
-                        >
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.737.813.813-2.737-.149-.252A8 8 0 1112 20z"/></svg>
-                        </button>
-                        {/* Edit button: admin can edit all non-cancelled; seller/manager only reserved */}
-                        {(row.status || 'محجوز') !== 'ملغي' && (
-                          isAdmin || ((!isAdmin) && (role === 'seller' || role === 'manager') && (row.status || 'محجوز') === 'محجوز')
-                        ) && (
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditSale(row); }}>
-                            تعديل
-                          </button>
-                        )}
-                        {/* v1 pre-delivery — locked cancel rule wired via canCancelSale.
-                            Admin gets the full CancelSaleDialog (can cancel reserved + confirmed,
-                            handles bonuses/refunds). Manager + seller reach this branch only for
-                            reserved sales and use the simple DELETE path (no bonuses/payments on
-                            reserved). Driver never sees a cancel button. */}
-                        {canCancelSale(row, currentUser) && (
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}
-                          >
-                            إلغاء
-                          </button>
-                        )}
-                        {canCancelSale(row, currentUser) && isAdmin && (
-                          <button
-                            className="btn btn-sm"
-                            style={{ background: '#7f1d1d', color: '#fff' }}
-                            onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}
-                          >
-                            حذف نهائي
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           <Pagination
             page={page}
             totalPages={totalPages}
