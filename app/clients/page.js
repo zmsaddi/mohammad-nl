@@ -8,6 +8,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
@@ -122,7 +123,7 @@ function ClientsContent() {
   }), [clients, f.q, f.debt]);
 
   // Item 3 — click-to-sort, default to name ascending
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'name', direction: 'asc' }
   );
@@ -260,6 +261,16 @@ function ClientsContent() {
             )}
           </div>
         </div>
+
+        <SortControl
+          fields={[
+            { key: 'name', label: 'الاسم' },
+            { key: 'remainingDebt', label: 'الدين' },
+            { key: 'totalSales', label: 'إجمالي المبيعات' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={5} />

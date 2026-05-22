@@ -1831,114 +1831,6 @@ html, body {
 .cash-zero { color: var(--color-text-disabled); }
 
 /* ============================
-   FilterSheet (Commit 3) — mobile bottom sheet for list-page filters.
-   Desktop is a pure passthrough so the existing filter bars are unchanged;
-   the mobile bits only appear below the 768px breakpoint.
-   ============================ */
-.filter-sheet { display: contents; }
-.filter-sheet-controls { display: contents; }
-.filter-sheet-trigger-row,
-.filter-sheet-backdrop,
-.filter-sheet-header,
-.filter-sheet-footer,
-.filter-sheet-close { display: none; }
-
-@media (max-width: 768px) {
-  /* The wrapper becomes a real box again on mobile */
-  .filter-sheet { display: block; }
-
-  /* Compact trigger + active-filter chips replace the stacked filter bar */
-  .filter-sheet-trigger-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  .filter-sheet-open-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    min-height: 44px;
-    border: 1.5px solid #1e40af;
-    background: #fff;
-    color: #1e40af;
-    border-radius: 10px;
-    font-family: 'Cairo', sans-serif;
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .filter-sheet-open-btn:active { background: #eff6ff; }
-
-  /* Controls hidden until the sheet opens */
-  .filter-sheet-controls { display: none; }
-
-  .filter-sheet.open .filter-sheet-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 70;
-  }
-  .filter-sheet.open .filter-sheet-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 71;
-    background: #fff;
-    border-radius: 16px 16px 0 0;
-    padding: 16px;
-    max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-    animation: sheetUp 0.25s ease;
-  }
-  @keyframes sheetUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  .filter-sheet-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 700;
-    font-size: 1rem;
-    color: #1e293b;
-  }
-  .filter-sheet-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 40px;
-    min-height: 40px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 1.1rem;
-    color: #64748b;
-    border-radius: 8px;
-  }
-  .filter-sheet-footer {
-    display: flex;
-    gap: 8px;
-    padding-top: 12px;
-    border-top: 1px solid #f1f5f9;
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-  }
-  .filter-sheet-footer .btn { flex: 1; min-height: 44px; }
-}
-
-/* ============================
    Shared filter controls (Commit 9 — styling consolidation).
    Replaces the per-page inline style repeated on every filter-bar
    input/select/date field. Properties match the old inline style exactly, so
@@ -1963,3 +1855,18 @@ html, body {
   background: #e2e8f0;
   color: #334155;
 }
+
+/* Always-visible sort control (mobile + desktop) — see components/SortControl. */
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sort-control-label {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 600;
+}
+.sort-control-dir { white-space: nowrap; }

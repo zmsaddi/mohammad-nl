@@ -12,6 +12,7 @@ import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
@@ -211,7 +212,7 @@ function SalesContent() {
   }), [rows, f.from, f.to, f.q, f.status, f.pay, f.seller]);
 
   // Item 3 — click-to-sort, defaulting to newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filteredRows,
     { key: 'date', direction: 'desc' }
   );
@@ -407,7 +408,7 @@ function SalesContent() {
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="sale-date">التاريخ *</label>
-              <input id="sale-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <input id="sale-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>اسم العميل *</label>
@@ -771,6 +772,16 @@ function SalesContent() {
           )}
         </div>
         </FilterSheet>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'total', label: 'الإجمالي' },
+            { key: 'client_name', label: 'العميل' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={8} />

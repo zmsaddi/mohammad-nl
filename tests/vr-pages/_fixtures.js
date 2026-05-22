@@ -94,6 +94,10 @@ const MAP = {
     { id: 1, date: '2026-05-01', kind: 'opening', signed_amount: 220, method: 'كاش', counterparty_box_id: null, created_by: 'admin', notes: 'رصيد افتتاحي', running_balance: 220 },
   ],
   '/api/treasury/capital': [],
+  '/api/treasury/capital/history': [
+    { id: 2, kind: 'withdrawal', amount: 500, method: 'بنك', status: 'approved', initiated_by: 'admin', initiator_name: 'مدير عام', notes: '', created_at: '2026-05-03', resolved_at: '2026-05-03' },
+    { id: 1, kind: 'injection', amount: 10000, method: 'كاش', status: 'approved', initiated_by: 'admin', initiator_name: 'مدير عام', notes: 'رأس مال ابتدائي', created_at: '2026-05-01', resolved_at: '2026-05-01' },
+  ],
   '/api/treasury/reconciliation': { available: false },
   '/api/profit-distributions': profitDistributions,
   '/api/profit-distributions/share-config': { mode: 'manual', shares: [] },

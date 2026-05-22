@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import InvoiceActionModal from '@/components/InvoiceActionModal';
 import { formatNumber } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
@@ -66,7 +67,7 @@ function InvoicesContent() {
   );
 
   // Item 3 — click-to-sort, default newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'date', direction: 'desc' }
   );
@@ -150,6 +151,17 @@ function InvoicesContent() {
             )}
           </div>
         </div>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'total', label: 'الإجمالي' },
+            { key: 'client_name', label: 'العميل' },
+            { key: 'ref_code', label: 'رقم الفاتورة' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />

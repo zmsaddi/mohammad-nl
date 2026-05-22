@@ -29,6 +29,14 @@ const KIND_LABEL = {
   handover: 'تسليم عهدة',
 };
 
+// Capital-operation status labels + badge colours for the "سجلّ رأس المال" log.
+const CAP_STATUS = { approved: 'منفّذة', pending: 'معلّقة', rejected: 'مرفوضة' };
+const CAP_STATUS_STYLE = {
+  approved: { background: '#dcfce7', color: '#16a34a' },
+  pending: { background: '#fef3c7', color: '#d97706' },
+  rejected: { background: '#fee2e2', color: '#dc2626' },
+};
+
 function TreasuryContent() {
   const { data: session } = useSession();
   const addToast = useToast();
@@ -47,6 +55,7 @@ function TreasuryContent() {
   const [reqForm, setReqForm] = useState({ fromBoxId: '', amount: '' });
   const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
   const [capitalOps, setCapitalOps] = useState([]);
+  const [capitalHistory, setCapitalHistory] = useState([]);
   const [openingInputs, setOpeningInputs] = useState({});
   const [recon, setRecon] = useState(null);
   // Money-movement ledger tabs: which box is selected + its movements.
@@ -69,6 +78,12 @@ function TreasuryContent() {
       setEnabled(data?.enabled !== false);
       setGeneralBoxId(data?.generalBoxId ?? null);
       setMyBoxId(data?.myBoxId ?? null);
+      // Capital log (admin) — fetched regardless of the enabled flag so the
+      // injections/withdrawals history is always reviewable.
+      if (role === 'admin') {
+        const chres = await fetch('/api/treasury/capital/history', { cache: 'no-store' });
+        if (chres.ok) setCapitalHistory(await chres.json());
+      }
       if (data?.enabled !== false) {
         const hres = await fetch('/api/treasury/handovers', { cache: 'no-store' });
         if (hres.ok) setPending(await hres.json());
@@ -429,6 +444,48 @@ function TreasuryContent() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Capital log (admin) — every injection/withdrawal in any status. Always
+          visible so the funding history stays reviewable even when paused. */}
+      {role === 'admin' && capitalHistory.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>سجلّ رأس المال</h3>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+            كل عمليات إدخال وسحب رأس المال — مَن نفّذها، المبلغ، والحالة.
+          </p>
+          <DataCardList
+            rows={capitalHistory}
+            fields={[
+              { key: 'created_at', label: 'التاريخ', format: (v) => String(v).slice(0, 10) },
+              { key: 'kind', label: 'النوع', format: (v) => (v === 'injection' ? 'إدخال رأس مال' : 'سحب رأس مال') },
+              { key: 'amount', label: 'المبلغ', format: (v, r) => `${r.kind === 'injection' ? '+' : '−'}${formatNumber(v)} €` },
+              { key: 'method', label: 'الطريقة' },
+              { key: 'initiator_name', label: 'بواسطة', format: (v, r) => v || r.initiated_by || '—' },
+              { key: 'status', label: 'الحالة', format: (v) => CAP_STATUS[v] || v },
+            ]}
+          />
+          <div className="table-container has-card-fallback">
+            <table className="data-table">
+              <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th><th>بواسطة</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {capitalHistory.map((o) => {
+                  const inj = o.kind === 'injection';
+                  return (
+                    <tr key={o.id}>
+                      <td>{String(o.created_at).slice(0, 10)}</td>
+                      <td style={{ fontWeight: 600, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? 'إدخال رأس مال' : 'سحب رأس مال'}</td>
+                      <td className="number-cell" style={{ fontWeight: 700, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? '+' : '−'}{formatNumber(o.amount)} €</td>
+                      <td>{o.method}</td>
+                      <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{o.initiator_name || o.initiated_by || '—'}</td>
+                      <td><span className="status-badge" style={CAP_STATUS_STYLE[o.status] || {}}>{CAP_STATUS[o.status] || o.status}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

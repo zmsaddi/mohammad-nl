@@ -14,6 +14,7 @@ import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
@@ -74,7 +75,7 @@ function ExpensesContent() {
   }), [rows, f.from, f.to, f.category, f.q]);
 
   // Item 3 — click-to-sort, default newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filtered,
     { key: 'date', direction: 'desc' }
   );
@@ -196,7 +197,7 @@ function ExpensesContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="exp-date">التاريخ *</label>
-                <input id="exp-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <input id="exp-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label htmlFor="exp-category">الفئة *</label>
@@ -300,6 +301,16 @@ function ExpensesContent() {
           )}
         </div>
         </FilterSheet>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'amount', label: 'المبلغ' },
+            { key: 'category', label: 'الفئة' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={6} />

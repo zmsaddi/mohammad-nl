@@ -5,6 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
@@ -93,7 +94,7 @@ function SettlementsContent() {
                         amountNum > availableCredit + 0.01;
 
   // Item 3 — click-to-sort on the settlements history table, default newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     Array.isArray(settlements) ? settlements : [],
     { key: 'date', direction: 'desc' }
   );
@@ -272,7 +273,7 @@ function SettlementsContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label>التاريخ *</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <input type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label>النوع *</label>
@@ -369,6 +370,15 @@ function SettlementsContent() {
             {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ تسوية جديدة</button>}
           </div>
         </div>
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'amount', label: 'المبلغ' },
+            { key: 'type', label: 'النوع' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
         {loading ? <PageSkeleton rows={6} showStats={false} /> : (
           !Array.isArray(settlements) || settlements.length === 0 ? (
             <div className="empty-state"><h3>لا توجد تسويات</h3></div>

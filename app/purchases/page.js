@@ -10,6 +10,7 @@ import { formatNumber, getTodayDate, PRODUCT_CATEGORIES, numberInputProps } from
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
@@ -115,7 +116,7 @@ function PurchasesContent() {
   }), [rows, f.from, f.to, f.q, f.supplier, f.pay]);
 
   // Item 3 — click-to-sort, default newest first
-  const { sortedRows, requestSort, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
     filteredRows,
     { key: 'date', direction: 'desc' }
   );
@@ -365,7 +366,7 @@ function PurchasesContent() {
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="pur-date">التاريخ *</label>
-              <input id="pur-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <input id="pur-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>المورد *</label>
@@ -556,6 +557,16 @@ function PurchasesContent() {
           )}
         </div>
         </FilterSheet>
+
+        <SortControl
+          fields={[
+            { key: 'date', label: 'التاريخ' },
+            { key: 'total', label: 'الإجمالي' },
+            { key: 'supplier', label: 'المورّد' },
+          ]}
+          sortConfig={sortConfig}
+          setSort={setSort}
+        />
 
         {loading ? (
           <PageSkeleton rows={8} />
