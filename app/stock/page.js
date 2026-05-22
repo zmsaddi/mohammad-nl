@@ -12,7 +12,7 @@ import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
-import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { formatNumber, PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
@@ -448,7 +448,7 @@ function StockContent() {
                         <td className="number-cell">
                           {isAdmin ? (
                             <input
-                              type="number" inputMode="decimal"
+                              {...numberInputProps}
                               min="0"
                               step="any"
                               defaultValue={p.sell_price || ''}
@@ -477,7 +477,7 @@ function StockContent() {
                         {isAdmin && (
                           <td onClick={(e) => e.stopPropagation()}>
                             <input
-                              type="number" inputMode="decimal"
+                              {...numberInputProps}
                               min="0"
                               defaultValue={p.low_stock_threshold ?? 3}
                               style={{

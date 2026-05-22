@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
+import { numberInputProps } from '@/lib/utils';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 
 function SettingsContent() {
@@ -155,7 +156,7 @@ function SettingsContent() {
               <label htmlFor="vat-rate">Taux TVA (%)</label>
               <input
                 id="vat-rate"
-                type="number" inputMode="decimal"
+                {...numberInputProps}
                 min="0"
                 max="100"
                 step="0.5"

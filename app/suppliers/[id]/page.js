@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
@@ -136,7 +136,7 @@ function SupplierDetailContent() {
               </div>
               <div className="form-group">
                 <label>المبلغ *</label>
-                <input type="number" inputMode="decimal" min="0" step="any" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} required />
+                <input {...numberInputProps} min="0" step="any" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label>طريقة الدفع</label>

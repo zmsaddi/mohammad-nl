@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
-import { formatNumber, getTodayDate, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { formatNumber, getTodayDate, PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { useSortedRows } from '@/lib/use-sorted-rows';
@@ -421,17 +421,17 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="pur-qty">الكمية *</label>
-              <input id="pur-qty" type="number" inputMode="decimal" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="pur-qty" {...numberInputProps} min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-price">سعر الوحدة *</label>
-              <input id="pur-price" type="number" inputMode="decimal" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <input id="pur-price" {...numberInputProps} min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-sell-price">سعر البيع الموصى *</label>
               <input
                 id="pur-sell-price"
-                type="number" inputMode="decimal"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.sellPrice}
@@ -475,7 +475,7 @@ function PurchasesContent() {
               <label htmlFor="pur-paid">المدفوع الآن (اختياري)</label>
               <input
                 id="pur-paid"
-                type="number" inputMode="decimal"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.paidAmount}
@@ -813,7 +813,7 @@ function PurchasesContent() {
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label>المبلغ *</label>
                 <input
-                  type="number" inputMode="decimal"
+                  {...numberInputProps}
                   min="0"
                   step="any"
                   value={s.amount}

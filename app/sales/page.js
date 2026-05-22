@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
@@ -501,13 +501,13 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="sale-qty">الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
-              <input id="sale-qty" type="number" inputMode="decimal" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="sale-qty" {...numberInputProps} min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="sale-price">سعر البيع *</label>
               <input
                 id="sale-price"
-                type="number" inputMode="decimal"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.unitPrice}
@@ -619,7 +619,7 @@ function SalesContent() {
                 <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
                 <input
                   id="sale-dpe"
-                  type="number" inputMode="decimal"
+                  {...numberInputProps}
                   min="0"
                   step="0.01"
                   value={form.downPaymentExpected}

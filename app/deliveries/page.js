@@ -7,7 +7,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
@@ -517,7 +517,7 @@ function DeliveriesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="del-amount">المبلغ</label>
-                <input id="del-amount" type="number" inputMode="decimal" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
+                <input id="del-amount" {...numberInputProps} min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
               </div>
               <div className="form-group">
                 <label htmlFor="del-driver">اسم السائق</label>

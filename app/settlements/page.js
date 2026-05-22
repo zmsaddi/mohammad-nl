@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
@@ -309,8 +309,7 @@ function SettlementsContent() {
               <div className="form-group">
                 <label>المبلغ *</label>
                 <input
-                  type="number"
-                  inputMode="decimal"
+                  {...numberInputProps}
                   min="0"
                   step="any"
                   value={form.amount}

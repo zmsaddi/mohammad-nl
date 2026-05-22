@@ -10,7 +10,7 @@ import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
-import { PRODUCT_CATEGORIES } from '@/lib/utils';
+import { PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 
 const ROLES = [
   { value: 'admin', label: 'مدير عام', color: '#dc2626', bg: '#fee2e2' },
@@ -406,15 +406,15 @@ function UsersContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label>عمولة ثابتة للبائع (لكل توصيلة مؤكدة)</label>
-                <input type="number" inputMode="decimal" min="0" step="any" value={settingsForm.seller_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_fixed: e.target.value })} />
+                <input {...numberInputProps} min="0" step="any" value={settingsForm.seller_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_fixed: e.target.value })} />
               </div>
               <div className="form-group">
                 <label>نسبة البائع من فرق السعر (%)</label>
-                <input type="number" inputMode="decimal" min="0" max="100" value={settingsForm.seller_bonus_percentage} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_percentage: e.target.value })} />
+                <input {...numberInputProps} min="0" max="100" value={settingsForm.seller_bonus_percentage} onChange={(e) => setSettingsForm({ ...settingsForm, seller_bonus_percentage: e.target.value })} />
               </div>
               <div className="form-group">
                 <label>عمولة ثابتة للسائق (لكل توصيلة مؤكدة)</label>
-                <input type="number" inputMode="decimal" min="0" step="any" value={settingsForm.driver_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, driver_bonus_fixed: e.target.value })} />
+                <input {...numberInputProps} min="0" step="any" value={settingsForm.driver_bonus_fixed} onChange={(e) => setSettingsForm({ ...settingsForm, driver_bonus_fixed: e.target.value })} />
               </div>
             </div>
             <button className="btn btn-primary" onClick={() => setConfirmSettings(true)} style={{ marginTop: '12px' }}>حفظ الإعدادات</button>
@@ -445,15 +445,15 @@ function UsersContent() {
                     return (
                       <tr key={cat}>
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{cat}</td>
-                        <td><input type="number" inputMode="decimal" min="0" step="any" style={{ width: 90 }}
+                        <td><input {...numberInputProps} min="0" step="any" style={{ width: 90 }}
                           placeholder={settingsForm.seller_bonus_fixed}
                           value={v.seller_fixed ?? ''}
                           onChange={(e) => setCatField(cat, 'seller_fixed', e.target.value)} /></td>
-                        <td><input type="number" inputMode="decimal" min="0" max="100" style={{ width: 90 }}
+                        <td><input {...numberInputProps} min="0" max="100" style={{ width: 90 }}
                           placeholder={settingsForm.seller_bonus_percentage}
                           value={v.seller_percentage ?? ''}
                           onChange={(e) => setCatField(cat, 'seller_percentage', e.target.value)} /></td>
-                        <td><input type="number" inputMode="decimal" min="0" step="any" style={{ width: 90 }}
+                        <td><input {...numberInputProps} min="0" step="any" style={{ width: 90 }}
                           placeholder={settingsForm.driver_bonus_fixed}
                           value={v.driver_fixed ?? ''}
                           onChange={(e) => setCatField(cat, 'driver_fixed', e.target.value)} /></td>
@@ -562,19 +562,19 @@ function UsersContent() {
                   if (role === 'seller') return (<>
                     <div className="form-group">
                       <label>عمولة البائع الثابتة (€) — لكل قطعة</label>
-                      <input type="number" inputMode="decimal" min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
+                      <input {...numberInputProps} min="0" step="any" placeholder={settingsForm.seller_bonus_fixed}
                         value={rateForm.seller_fixed} onChange={(e) => setRateForm({ ...rateForm, seller_fixed: e.target.value })} />
                     </div>
                     <div className="form-group">
                       <label>نسبة البائع من فرق السعر (%)</label>
-                      <input type="number" inputMode="decimal" min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
+                      <input {...numberInputProps} min="0" max="100" placeholder={settingsForm.seller_bonus_percentage}
                         value={rateForm.seller_percentage} onChange={(e) => setRateForm({ ...rateForm, seller_percentage: e.target.value })} />
                     </div>
                   </>);
                   if (role === 'driver') return (
                     <div className="form-group">
                       <label>عمولة السائق الثابتة (€) — لكل قطعة</label>
-                      <input type="number" inputMode="decimal" min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
+                      <input {...numberInputProps} min="0" step="any" placeholder={settingsForm.driver_bonus_fixed}
                         value={rateForm.driver_fixed} onChange={(e) => setRateForm({ ...rateForm, driver_fixed: e.target.value })} />
                     </div>
                   );
@@ -643,15 +643,15 @@ function UsersContent() {
                         return (
                           <tr key={cat}>
                             <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{cat}</td>
-                            {isSel && <td><input type="number" inputMode="decimal" min="0" step="any" style={{ width: 110 }}
+                            {isSel && <td><input {...numberInputProps} min="0" step="any" style={{ width: 110 }}
                               placeholder={phSeller}
                               value={v.seller_fixed ?? ''}
                               onChange={(e) => setUcField(cat, 'seller_fixed', e.target.value)} /></td>}
-                            {isSel && <td><input type="number" inputMode="decimal" min="0" max="100" style={{ width: 110 }}
+                            {isSel && <td><input {...numberInputProps} min="0" max="100" style={{ width: 110 }}
                               placeholder={phPct}
                               value={v.seller_percentage ?? ''}
                               onChange={(e) => setUcField(cat, 'seller_percentage', e.target.value)} /></td>}
-                            {isDrv && <td><input type="number" inputMode="decimal" min="0" step="any" style={{ width: 110 }}
+                            {isDrv && <td><input {...numberInputProps} min="0" step="any" style={{ width: 110 }}
                               placeholder={phDriver}
                               value={v.driver_fixed ?? ''}
                               onChange={(e) => setUcField(cat, 'driver_fixed', e.target.value)} /></td>}

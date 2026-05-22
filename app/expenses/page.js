@@ -12,7 +12,7 @@ import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
-import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
+import { formatNumber, getTodayDate, EXPENSE_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
@@ -211,7 +211,7 @@ function ExpensesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="exp-amount">المبلغ *</label>
-                <input id="exp-amount" type="number" inputMode="decimal" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+                <input id="exp-amount" {...numberInputProps} min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
               </div>
               <div className="form-group">
                 <label>وسيلة الدفع</label>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import ConfirmModal from '@/components/ConfirmModal';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -358,7 +358,7 @@ function ProfitDistributionsContent() {
                   <span style={{ minWidth: '140px', fontWeight: 600, fontSize: '0.88rem' }}>{u.name || u.username}</span>
                   <span style={{ fontSize: '0.78rem', color: '#64748b', minWidth: '50px' }}>({u.role === 'admin' ? 'مدير' : 'مشرف'})</span>
                   <input
-                    type="number" inputMode="decimal" min="0" max="100" step="any"
+                    {...numberInputProps} min="0" max="100" step="any"
                     value={currentPct}
                     onChange={(e) => setEditedShares(prev => ({
                       ...prev,
@@ -437,7 +437,7 @@ function ProfitDistributionsContent() {
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label>قاعدة التوزيع (صافي الربح المتاح) *</label>
                 <input
-                  type="number" inputMode="decimal"
+                  {...numberInputProps}
                   min="0"
                   step="any"
                   value={form.baseAmount}
@@ -538,7 +538,7 @@ function ProfitDistributionsContent() {
                       ))}
                     </select>
                     <input
-                      type="number" inputMode="decimal"
+                      {...numberInputProps}
                       min="0"
                       max="100"
                       step="any"

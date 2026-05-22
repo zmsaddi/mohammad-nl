@@ -8,6 +8,7 @@ import { formatNumber } from '@/lib/utils';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
 import ConfirmModal from '@/components/ConfirmModal';
+import MoneyInput from '@/components/MoneyInput';
 
 const ROLE_LABEL = { admin: 'مدير عام', manager: 'مشرف', driver: 'سائق', seller: 'بائع' };
 
@@ -320,8 +321,8 @@ function TreasuryContent() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <input
-                              type="number" inputMode="decimal" min="0" step="any"
+                            <MoneyInput
+                              min="0" step="any"
                               value={openingInputs[b.id] ?? ''}
                               onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
                               placeholder="0.00"
@@ -432,7 +433,7 @@ function TreasuryContent() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" inputMode="decimal" min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
+                  <MoneyInput min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
                 </div>
                 <button className="btn btn-primary" onClick={handleHandover} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تسليم'}</button>
               </div>
@@ -458,7 +459,7 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" inputMode="decimal" min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
                 </div>
                 <button className="btn btn-primary" onClick={handleFund} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تمويل'}</button>
               </div>
@@ -484,7 +485,7 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ المطلوب (€)</label>
-                  <input type="number" inputMode="decimal" min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
                 </div>
                 <button className="btn btn-primary" onClick={handleRequestSettlement} disabled={busy}>{busy ? 'جارٍ…' : 'إرسال الطلب'}</button>
               </div>
@@ -508,7 +509,7 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 150, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" inputMode="decimal" min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
                 </div>
                 <div className="form-group" style={{ maxWidth: 120, margin: 0 }}>
                   <label>الطريقة</label>
