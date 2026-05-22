@@ -10,7 +10,7 @@ import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -199,55 +199,26 @@ function MyBonusContent() {
           </div>
         ) : (
           <>
-          {/* PA-02: mobile card fallback */}
-          <DataCardList
-            rows={paginatedRows.map((b) => ({ ...b, _status: b.settled ? 'تم الصرف' : 'مستحق' }))}
-            fields={[
-              { key: 'date', label: 'التاريخ' },
-              { key: 'item', label: 'المنتج' },
-              { key: 'quantity', label: 'الكمية' },
-              { key: 'fixed_bonus', label: 'ثابت', format: (v) => formatNumber(v) },
-              { key: 'total_bonus', label: 'المجموع', format: (v) => `${formatNumber(v)} €` },
+          <DataView
+            rows={paginatedRows}
+            sort={{ requestSort, getAriaSort, getSortIndicator }}
+            columns={[
+              { key: 'date', label: 'التاريخ', sortable: true },
+              { key: 'item', label: 'المنتج', sortable: true },
+              { key: 'quantity', label: 'الكمية', sortable: true, align: 'end' },
+              ...(role === 'seller' ? [
+                { key: 'recommended_price', label: 'السعر الموصى', sortable: true, align: 'end', mobileHide: true, cell: (r) => formatNumber(r.recommended_price) },
+                { key: 'actual_price', label: 'سعر البيع', sortable: true, align: 'end', mobileHide: true, cell: (r) => formatNumber(r.actual_price) },
+              ] : []),
+              { key: 'fixed_bonus', label: 'ثابت', sortable: true, align: 'end', cell: (r) => formatNumber(r.fixed_bonus) },
+              ...(role === 'seller' ? [
+                { key: 'extra_bonus', label: 'إضافي', sortable: true, align: 'end', mobileHide: true, cell: (r) => <span style={{ color: r.extra_bonus > 0 ? '#1e40af' : '#94a3b8' }}>{formatNumber(r.extra_bonus)}</span> },
+              ] : []),
+              { key: 'total_bonus', label: 'المجموع', sortable: true, align: 'end', cell: (r) => <strong style={{ color: '#16a34a' }}>{formatNumber(r.total_bonus)}</strong> },
+              { key: '_status', label: 'الحالة', cell: (r) => <StatusBadge status={r.settled ? 'تم الصرف' : 'مستحق'} /> },
             ]}
-            statusField="_status"
-            statusColors={{ 'تم الصرف': '#16a34a', 'مستحق': '#d97706' }}
             emptyMessage="لا توجد عمولات"
           />
-          {/* Desktop table */}
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('item')}>المنتج{getSortIndicator('item')}</th>
-                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
-                  {role === 'seller' && <th onClick={() => requestSort('recommended_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('recommended_price')}>السعر الموصى{getSortIndicator('recommended_price')}</th>}
-                  {role === 'seller' && <th onClick={() => requestSort('actual_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('actual_price')}>سعر البيع{getSortIndicator('actual_price')}</th>}
-                  <th onClick={() => requestSort('fixed_bonus')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('fixed_bonus')}>ثابت{getSortIndicator('fixed_bonus')}</th>
-                  {role === 'seller' && <th onClick={() => requestSort('extra_bonus')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('extra_bonus')}>إضافي{getSortIndicator('extra_bonus')}</th>}
-                  <th onClick={() => requestSort('total_bonus')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total_bonus')}>المجموع{getSortIndicator('total_bonus')}</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRows.map((b) => (
-                  <tr key={b.id}>
-                    <td>{b.date}</td>
-                    <td>{b.item}</td>
-                    <td className="number-cell">{b.quantity}</td>
-                    {role === 'seller' && <td className="number-cell">{formatNumber(b.recommended_price)}</td>}
-                    {role === 'seller' && <td className="number-cell">{formatNumber(b.actual_price)}</td>}
-                    <td className="number-cell">{formatNumber(b.fixed_bonus)}</td>
-                    {role === 'seller' && <td className="number-cell" style={{ color: b.extra_bonus > 0 ? '#1e40af' : '#94a3b8' }}>{formatNumber(b.extra_bonus)}</td>}
-                    <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>{formatNumber(b.total_bonus)}</td>
-                    <td>
-                      <StatusBadge status={b.settled ? 'تم الصرف' : 'مستحق'} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           <Pagination
             page={page}
             totalPages={totalPages}

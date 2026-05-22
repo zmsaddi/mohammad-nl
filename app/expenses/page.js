@@ -6,7 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -326,71 +326,27 @@ function ExpensesContent() {
           </div>
         ) : (
           <>
-          {/* PA-02: mobile card fallback */}
-          <DataCardList
+          <DataView
             rows={paginatedRows}
-            fields={[
-              { key: 'date', label: 'التاريخ' },
-              { key: 'category', label: 'الفئة' },
-              { key: 'description', label: 'الوصف' },
-              { key: 'amount', label: 'المبلغ', format: (v) => `${formatNumber(v)} €` },
-              { key: 'payment_type', label: 'الدفع', format: (v) => v || 'كاش' },
+            sort={{ requestSort, getAriaSort, getSortIndicator }}
+            onRowClick={(row) => setSelectedRow(row)}
+            columns={[
+              { key: 'id', label: '#', sortable: true, mobileHide: true },
+              { key: 'date', label: 'التاريخ', sortable: true },
+              { key: 'category', label: 'الفئة', sortable: true, cell: (r) => <span className="status-badge status-credit">{r.category}</span> },
+              { key: 'description', label: 'الوصف', sortable: true },
+              { key: 'amount', label: 'المبلغ', sortable: true, align: 'end', cell: (r) => <strong>{formatNumber(r.amount)}</strong> },
+              { key: 'payment_type', label: 'الدفع', sortable: true, cell: (r) => <StatusBadge status={r.payment_type || 'كاش'} /> },
+              { key: 'notes', label: 'ملاحظات', mobileHide: true, cell: (r) => r.notes || '—' },
             ]}
-            actions={(row) => (
+            actions={isAdmin ? (row) => (
               <>
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
-                {isAdmin && (
-                  <>
-                    <button className="btn btn-outline btn-sm" onClick={() => startEditExpense(row)}>تعديل</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
-                  </>
-                )}
+                <button className="btn btn-outline btn-sm" onClick={() => startEditExpense(row)}>تعديل</button>
+                <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
               </>
-            )}
+            ) : undefined}
             emptyMessage="لا توجد مصاريف"
           />
-          {/* Desktop table: hidden below 768px when card fallback is active */}
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
-                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description')}>الوصف{getSortIndicator('description')}</th>
-                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('amount')}>المبلغ{getSortIndicator('amount')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>الدفع{getSortIndicator('payment_type')}</th>
-                  <th>ملاحظات</th>
-                  {isAdmin && <th>إجراءات</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRows.map((row) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td>{row.id}</td>
-                    <td>{row.date}</td>
-                    <td><span className="status-badge status-credit">{row.category}</span></td>
-                    <td>{row.description}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.amount)}</td>
-                    <td><StatusBadge status={row.payment_type || 'كاش'} /></td>
-                    <td>{row.notes}</td>
-                    {isAdmin && (
-                      <td>
-                        <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditExpense(row); }}>
-                            تعديل
-                          </button>
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                            حذف
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           {/* PA-03: pagination */}
           <Pagination
             page={page}
