@@ -18,7 +18,7 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 
-const EXPENSE_FILTERS = { from: { default: '' }, to: { default: '' }, category: { default: '' }, q: { default: '', debounce: 300 } };
+const EXPENSE_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, category: { default: '' }, q: { default: '', debounce: 300 } };
 
 function ExpensesContent() {
   const { data: session } = useSession();

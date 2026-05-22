@@ -16,7 +16,7 @@ import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
-const BONUS_FILTERS = { from: { default: '' }, to: { default: '' }, settled: { default: 'all' } };
+const BONUS_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, settled: { default: 'all' } };
 
 function MyBonusContent() {
   const { data: session } = useSession();

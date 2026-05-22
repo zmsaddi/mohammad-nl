@@ -21,7 +21,7 @@ import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
-const SALES_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
+const SALES_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
 function SalesContent() {
   const { data: session } = useSession();

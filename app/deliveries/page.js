@@ -18,7 +18,7 @@ import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
-const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '' }, to: { default: '' }, driver: { default: 'all' }, bank: { default: '' } };
+const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, driver: { default: 'all' }, bank: { default: '' } };
 
 // Three workflow states the user picks from: قيد الانتظار / تم التسليم / إلغاء.
 // 'جاري التوصيل' is kept here ONLY so legacy rows that still have it render with

@@ -14,7 +14,7 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 
-const PURCHASE_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
+const PURCHASE_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
