@@ -53,14 +53,23 @@
   }
 }
 
-@theme inline {
-  --color-primary: var(--color-primary-legacy);
-  --color-primary-light: var(--color-info);
-  --color-primary-dark: #1e3a8a;
-  --color-success: var(--color-success);
-  --color-danger: var(--color-danger-legacy);
-  --color-warning: var(--color-warning);
-}
+/* Commit 4 — token unification.
+ *
+ * The block here used to be `@theme inline { --color-primary: ...; ... }`,
+ * which redefined the primary/success/danger/warning tokens to a second set of
+ * values. That created two conflicting sources of truth: the `:root` block
+ * above and this one. In the compiled output the `@theme` declarations were
+ * emitted BEFORE `:root`, so for every `var(--color-*)` consumer the `:root`
+ * values won the cascade — e.g. `var(--color-primary)` renders #1e2a5a, not the
+ * #1e40af this block set. The block also generated Tailwind colour utilities
+ * (bg-primary, text-success, …) that this codebase never uses (verified: zero
+ * occurrences in app/ and components/).
+ *
+ * It was therefore dead weight whose only effect was confusion, so it has been
+ * removed. `:root` above is now the single source of truth for design tokens;
+ * the legacy #1e40af is still available as --color-primary-legacy for the one
+ * rule that consumes it. Removing this block changes no rendered value
+ * (verified against the compiled CSS before/after). */
 
 * {
   margin: 0;
