@@ -7,6 +7,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import Pagination, { usePagination } from '@/components/Pagination';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
@@ -70,6 +71,7 @@ function SupplierDetailContent() {
   };
 
   const purchasesSort = useSortedRows(purchases, { key: 'date', direction: 'desc' });
+  const purchasesPag = usePagination(purchasesSort.sortedRows);
   const unpaidPurchases = purchases.filter((p) => p.payment_status !== 'paid');
   const totalDebt = unpaidPurchases.reduce((s, p) => s + Math.max(0, (parseFloat(p.total) || 0) - (parseFloat(p.paid_amount) || 0)), 0);
 
@@ -160,7 +162,7 @@ function SupplierDetailContent() {
         ) : (
           <>
           <DataCardList
-            rows={purchasesSort.sortedRows}
+            rows={purchasesPag.paginatedRows}
             fields={[
               { key: 'date', label: 'التاريخ' },
               { key: 'item', label: 'المنتج' },
@@ -191,7 +193,7 @@ function SupplierDetailContent() {
                 </tr>
               </thead>
               <tbody>
-                {purchasesSort.sortedRows.map((p) => {
+                {purchasesPag.paginatedRows.map((p) => {
                   const remaining = Math.max(0, (parseFloat(p.total) || 0) - (parseFloat(p.paid_amount) || 0));
                   const statusLabel = p.payment_status === 'paid' ? 'مدفوع' : p.payment_status === 'partial' ? 'جزئي' : 'معلق';
                   return (
@@ -210,6 +212,7 @@ function SupplierDetailContent() {
               </tbody>
             </table>
           </div>
+          <Pagination page={purchasesPag.page} totalPages={purchasesPag.totalPages} totalRows={purchasesPag.totalRows} perPage={purchasesPag.perPage} onPageChange={purchasesPag.goTo} onPerPageChange={purchasesPag.setPerPage} />
           </>
         )}
       </div>

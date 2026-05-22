@@ -9,6 +9,7 @@ import CancelSaleDialog from '@/components/CancelSaleDialog';
 import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
+import Pagination, { usePagination } from '@/components/Pagination';
 // v1.1 F-016 — read settings.vat_rate and compute TVA via the
 // centralized helper instead of hardcoding `/ 6`. See lib/money.js.
 import { tvaFromTtc } from '@/lib/money';
@@ -151,6 +152,9 @@ function ClientDetailContent({ params }) {
   // Item 3 — click-to-sort on both tables. Default sort: newest first.
   const salesSort = useSortedRows(sales, { key: 'date', direction: 'desc' });
   const paymentsSort = useSortedRows(payments, { key: 'date', direction: 'desc' });
+  // Paginate both history lists so a heavy client's page can't grow unbounded.
+  const salesPag = usePagination(salesSort.sortedRows);
+  const paymentsPag = usePagination(paymentsSort.sortedRows);
 
   if (loading) {
     return (
@@ -299,7 +303,7 @@ function ClientDetailContent({ params }) {
         ) : (
           <>
           <DataCardList
-            rows={salesSort.sortedRows}
+            rows={salesPag.paginatedRows}
             fields={[
               { key: 'date', label: 'التاريخ' },
               { key: 'item', label: 'الصنف' },
@@ -350,7 +354,7 @@ function ClientDetailContent({ params }) {
                 </tr>
               </thead>
               <tbody>
-                {salesSort.sortedRows.map((row) => (
+                {salesPag.paginatedRows.map((row) => (
                   <tr key={row.id}>
                     <td>{row.date}</td>
                     <td>{row.item}</td>
@@ -400,6 +404,7 @@ function ClientDetailContent({ params }) {
               </tbody>
             </table>
           </div>
+          <Pagination page={salesPag.page} totalPages={salesPag.totalPages} totalRows={salesPag.totalRows} perPage={salesPag.perPage} onPageChange={salesPag.goTo} onPerPageChange={salesPag.setPerPage} />
           </>
         )}
       </div>
@@ -416,7 +421,7 @@ function ClientDetailContent({ params }) {
         ) : (
           <>
           <DataCardList
-            rows={paymentsSort.sortedRows}
+            rows={paymentsPag.paginatedRows}
             fields={[
               { key: 'date', label: 'التاريخ' },
               { key: 'amount', label: 'المبلغ', format: (v) => formatNumber(v) },
@@ -438,7 +443,7 @@ function ClientDetailContent({ params }) {
                 </tr>
               </thead>
               <tbody>
-                {paymentsSort.sortedRows.map((row) => {
+                {paymentsPag.paginatedRows.map((row) => {
                   const amt = parseFloat(row.amount) || 0;
                   const isRefund = row.type === 'refund' || amt < 0;
                   return (
@@ -465,6 +470,7 @@ function ClientDetailContent({ params }) {
               </tbody>
             </table>
           </div>
+          <Pagination page={paymentsPag.page} totalPages={paymentsPag.totalPages} totalRows={paymentsPag.totalRows} perPage={paymentsPag.perPage} onPageChange={paymentsPag.goTo} onPerPageChange={paymentsPag.setPerPage} />
           </>
         )}
       </div>
