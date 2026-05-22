@@ -343,12 +343,13 @@ function SummaryContent() {
               <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid)}</div>
             </div>
           </div>
-          {/* Dashboard revamp — the seller's actual reserved orders (was: a count
-              only). Lets the seller see WHICH orders await delivery. */}
+          {/* The seller's own orders awaiting delivery — for follow-up. Scoped
+              server-side to created_by = this seller, so each seller sees only
+              their own. Delivery status lets them track progress. */}
           {data.reservedList?.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#92400e', marginBottom: 10 }}>
-                طلباتي المحجوزة (بانتظار التوصيل) — {data.reservedList.length}
+                طلباتي بانتظار التسليم — {data.reservedList.length}
               </h4>
               <DataCardList
                 rows={data.reservedList}
@@ -357,8 +358,9 @@ function SummaryContent() {
                   { key: 'client_name', label: 'العميل' },
                   { key: 'item', label: 'المنتج' },
                   { key: 'total', label: 'القيمة', format: (v) => formatNumber(v) },
+                  { key: 'delivery_status', label: 'حالة التوصيل', format: (v) => v || 'قيد الانتظار' },
                 ]}
-                emptyMessage="لا توجد طلبات محجوزة"
+                emptyMessage="لا توجد طلبات بانتظار التسليم"
               />
             </div>
           )}
@@ -514,6 +516,35 @@ function SummaryContent() {
                   );
                 })}
               </div>
+
+              {/* النقد في الصناديق — per-box breakdown under the cash KPI (admin
+                  sees all boxes; manager sees own + drivers'). Data is already
+                  fetched in `treasury`; shown only when the feature is live. */}
+              {treasuryEnabled && (
+                <div className="card" style={{ marginBottom: 24, padding: 16, borderRight: '4px solid #0ea5e9' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0369a1' }}>🏦 النقد في الصناديق</h3>
+                    <Link href="/treasury" className="btn btn-sm btn-outline">إدارة المال ←</Link>
+                  </div>
+                  <div className="treasury-boxes">
+                    {treasury.boxes.map((b) => (
+                      <div key={b.id} className="treasury-box-row">
+                        <span className="treasury-box-name">
+                          {b.type === 'main' ? 'الصندوق العام' : (b.owner_name || b.owner_username || 'صندوق')}
+                          {b.owner_role && b.type !== 'main' ? ` · ${b.owner_role === 'driver' ? 'سائق' : b.owner_role === 'manager' ? 'مشرف' : b.owner_role === 'admin' ? 'أدمن' : b.owner_role}` : ''}
+                        </span>
+                        <span className="treasury-box-bal" style={{ color: (parseFloat(b.balance) || 0) >= 0 ? '#0369a1' : '#dc2626' }}>
+                          {formatNumber(parseFloat(b.balance) || 0)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="treasury-box-row treasury-box-total">
+                      <span>الإجمالي</span>
+                      <span style={{ color: '#0369a1' }}>{formatNumber(treasuryTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Today strip — a quick "what happened today" pulse */}
               <div className="today-strip">
@@ -975,7 +1006,8 @@ function SummaryContent() {
               remaining columns, mirroring the v1.0.1 supplier credit flow.
               Remaining is red when > 0 (outstanding debt to supplier),
               green when fully settled. */}
-          {isAdmin && data.topSuppliers?.length > 0 && (
+          {/* Manager sees suppliers too (owner's decision: manager = admin). */}
+          {canSeeCosts && data.topSuppliers?.length > 0 && (
             <details className="card" style={{ marginBottom: '24px' }}>
               <summary style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
                 أداء الموردين
