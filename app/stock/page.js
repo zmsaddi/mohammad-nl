@@ -321,13 +321,13 @@ function StockContent() {
               placeholder="بحث بالاسم أو الفئة..."
               value={f.q}
               onChange={(e) => setF('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             />
             <select
               value={f.status}
               onChange={(e) => setF('status', e.target.value)}
               aria-label="تصفية حسب حالة المخزون"
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             >
               <option value="all">الكل</option>
               <option value="in-stock">متوفر</option>
@@ -339,7 +339,7 @@ function StockContent() {
               value={f.category}
               onChange={(e) => setF('category', e.target.value)}
               aria-label="تصفية حسب الفئة"
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             >
               <option value="all">كل الفئات</option>
               {PRODUCT_CATEGORIES.map((c) => (

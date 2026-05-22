@@ -1937,3 +1937,23 @@ html, body {
   }
   .filter-sheet-footer .btn { flex: 1; min-height: 44px; }
 }
+
+/* ============================
+   Shared filter controls (Commit 9 — styling consolidation).
+   Replaces the per-page inline style repeated on every filter-bar
+   input/select/date field. Properties match the old inline style exactly, so
+   adoption is pixel-equivalent (verified by the page + gallery VR suites).
+   ============================ */
+.filter-control {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+/* Larger header-search variant (clients / stock / invoices search + selects). */
+.filter-control-lg {
+  padding: 8px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.85rem;
+}

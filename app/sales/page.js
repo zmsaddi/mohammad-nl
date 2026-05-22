@@ -742,16 +742,16 @@ function SalesContent() {
           ].filter(Boolean)}
         >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
+          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} className="filter-control" />
+          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" className="filter-control">
             <option value="all">كل الحالات</option>
             <option value="محجوز">محجوز</option>
             <option value="مؤكد">مؤكد</option>
             <option value="ملغي">ملغي</option>
           </select>
-          <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" className="filter-control">
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
             <option value="partial">جزئي</option>
@@ -759,7 +759,7 @@ function SalesContent() {
             <option value="cancelled">ملغي</option>
           </select>
           {canSeeCosts && (
-            <select value={f.seller} onChange={(e) => setF('seller', e.target.value)} aria-label="تصفية حسب البائع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <select value={f.seller} onChange={(e) => setF('seller', e.target.value)} aria-label="تصفية حسب البائع" className="filter-control">
               <option value="all">كل البائعين</option>
               {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>

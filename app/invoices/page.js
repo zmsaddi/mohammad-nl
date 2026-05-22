@@ -143,7 +143,7 @@ function InvoicesContent() {
               placeholder="بحث بالاسم أو الكود أو VIN..."
               value={f.q}
               onChange={(e) => setFilter('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', flex: 1 }}
+              className="filter-control-lg" style={{ flex: 1 }}
             />
             {filtersActive && (
               <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>

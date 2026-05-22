@@ -563,13 +563,13 @@ function DeliveriesContent() {
           ].filter(Boolean)}
         >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
           <select
             value={f.status}
             onChange={(e) => setF('status', e.target.value)}
             aria-label="تصفية حسب الحالة"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="">كل الحالات</option>
             {SELECTABLE_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -578,7 +578,7 @@ function DeliveriesContent() {
             value={f.driver}
             onChange={(e) => setF('driver', e.target.value)}
             aria-label="تصفية حسب السائق"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="all">كل السائقين</option>
             {driverOptions.map((d) => <option key={d} value={d}>{d}</option>)}

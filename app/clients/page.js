@@ -237,12 +237,12 @@ function ClientsContent() {
               placeholder="بحث بالاسم أو الهاتف..."
               value={f.q}
               onChange={(e) => setFilter('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             />
             <select
               value={f.debt}
               onChange={(e) => setFilter('debt', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
               aria-label="تصفية حسب الدين"
             >
               <option value="all">الكل</option>

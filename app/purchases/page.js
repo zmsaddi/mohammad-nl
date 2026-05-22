@@ -536,14 +536,14 @@ function PurchasesContent() {
           ].filter(Boolean)}
         >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث مورد / منتج / كود..." aria-label="بحث في المشتريات" value={f.q} onChange={(e) => setFilter('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} aria-label="تصفية حسب المورد" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
+          <input type="text" placeholder="بحث مورد / منتج / كود..." aria-label="بحث في المشتريات" value={f.q} onChange={(e) => setFilter('q', e.target.value)} className="filter-control" />
+          <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} aria-label="تصفية حسب المورد" className="filter-control">
             <option value="all">كل الموردين</option>
             {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={f.pay} onChange={(e) => setFilter('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setFilter('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" className="filter-control">
             <option value="all">كل حالات الدفع</option>
             <option value="paid">مدفوع</option>
             <option value="partial">جزئي</option>

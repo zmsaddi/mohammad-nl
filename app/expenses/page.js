@@ -274,13 +274,13 @@ function ExpensesContent() {
           ].filter(Boolean)}
         >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
           <select
             value={f.category}
             onChange={(e) => setFilter('category', e.target.value)}
             aria-label="تصفية حسب الفئة"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="">كل الفئات</option>
             {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
