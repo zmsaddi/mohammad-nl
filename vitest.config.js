@@ -48,7 +48,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.test-env.js'],
     // tests/vr/* are Playwright visual-regression specs (they import
     // @playwright/test) — excluded from the Vitest run; use `npm run test:vr`.
-    exclude: [...configDefaults.exclude, 'tests/vr/**'],
+    exclude: [...configDefaults.exclude, 'tests/vr/**', 'tests/vr-pages/**'],
     testTimeout: 30000,
     sequence: { hooks: 'list' },
     fileParallelism: false,

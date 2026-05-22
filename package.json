@@ -13,6 +13,8 @@
     "test:unsafe": "vitest run",
     "test:vr": "node scripts/build-vr-css.mjs && playwright test",
     "test:vr:update": "node scripts/build-vr-css.mjs && playwright test --update-snapshots",
+    "test:vr:pages": "playwright test -c playwright.pages.config.js",
+    "test:vr:pages:update": "playwright test -c playwright.pages.config.js --update-snapshots",
     "typecheck": "tsc --project jsconfig.json --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "migrate:dry": "node scripts/migrate.mjs --dry-run"
