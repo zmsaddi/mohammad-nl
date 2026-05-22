@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -56,6 +56,7 @@ function TreasuryContent() {
   const [capForm, setCapForm] = useState({ kind: 'injection', amount: '', method: 'كاش' });
   const [capitalOps, setCapitalOps] = useState([]);
   const [capitalHistory, setCapitalHistory] = useState([]);
+  const [capTab, setCapTab] = useState('__all'); // selected capital tab: '__all' summary or a username
   const [openingInputs, setOpeningInputs] = useState({});
   const [recon, setRecon] = useState(null);
   // Money-movement ledger tabs: which box is selected + its movements.
@@ -98,8 +99,13 @@ function TreasuryContent() {
     finally { setLoading(false); }
   };
 
+  // Re-run when `role` resolves: on a cold load the session is still loading at
+  // mount, so role is undefined and the admin-gated fetches (capital, capital
+  // history, reconciliation) would be skipped — leaving the capital log empty
+  // until a 60s auto-refresh. Depending on `role` re-fetches the moment the
+  // session hydrates, so admins see their capital tracking immediately.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [role]);
   useAutoRefresh(fetchData);
 
   // Read-only per-box money-movement ledger. The API re-checks that this box is
@@ -140,6 +146,27 @@ function TreasuryContent() {
     return m.counterparty_name || m.counterparty_username || '—';
   };
   const total = boxes.reduce((s, b) => s + (parseFloat(b.balance) || 0), 0);
+
+  // Capital grouped by PERSON (who initiated each op). For each person: their
+  // injections, withdrawals, current net capital (approved ops only — pending/
+  // rejected don't count toward the live balance), and their op timeline (with
+  // dates). Powers the per-person capital tabs. Pure derivation from
+  // capitalHistory — no extra fetch.
+  const capitalByPerson = useMemo(() => {
+    const map = {};
+    for (const o of capitalHistory) {
+      const key = o.initiated_by || '—';
+      if (!map[key]) map[key] = { username: key, name: o.initiator_name || key, injected: 0, withdrawn: 0, net: 0, ops: [] };
+      map[key].ops.push(o);
+      if (o.status === 'approved') {
+        const amt = parseFloat(o.amount) || 0;
+        if (o.kind === 'injection') { map[key].injected += amt; map[key].net += amt; }
+        else { map[key].withdrawn += amt; map[key].net -= amt; }
+      }
+    }
+    return Object.values(map).sort((a, b) => b.net - a.net);
+  }, [capitalHistory]);
+
   // Funding recipients the caller may fund: manager → drivers; admin → any custody box.
   const fundTargets = boxes.filter((b) => b.type === 'custody' && (role === 'admin' || b.owner_role === 'driver') && b.owner_username !== username);
 
@@ -447,45 +474,87 @@ function TreasuryContent() {
         </div>
       )}
 
-      {/* Capital log (admin) — every injection/withdrawal in any status. Always
-          visible so the funding history stays reviewable even when paused. */}
-      {role === 'admin' && capitalHistory.length > 0 && (
+      {/* Capital by person (admin) — who funded, who withdrew, WHEN, and each
+          person's current net capital. Tabs like the money-movement view; the
+          "الملخّص" tab is the at-a-glance overview. Derived from capitalHistory. */}
+      {role === 'admin' && (
         <div className="card" style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>سجلّ رأس المال</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>رأس المال حسب الشخص</h3>
           <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
-            كل عمليات إدخال وسحب رأس المال — مَن نفّذها، المبلغ، والحالة.
+            مَن أدخل ومَن سحب رأس المال، متى، ورصيد كل شخص الحالي من رأس المال.
           </p>
-          <DataCardList
-            rows={capitalHistory}
-            fields={[
-              { key: 'created_at', label: 'التاريخ', format: (v) => String(v).slice(0, 10) },
-              { key: 'kind', label: 'النوع', format: (v) => (v === 'injection' ? 'إدخال رأس مال' : 'سحب رأس مال') },
-              { key: 'amount', label: 'المبلغ', format: (v, r) => `${r.kind === 'injection' ? '+' : '−'}${formatNumber(v)} €` },
-              { key: 'method', label: 'الطريقة' },
-              { key: 'initiator_name', label: 'بواسطة', format: (v, r) => v || r.initiated_by || '—' },
-              { key: 'status', label: 'الحالة', format: (v) => CAP_STATUS[v] || v },
-            ]}
-          />
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th><th>بواسطة</th><th>الحالة</th></tr></thead>
-              <tbody>
-                {capitalHistory.map((o) => {
-                  const inj = o.kind === 'injection';
-                  return (
-                    <tr key={o.id}>
-                      <td>{String(o.created_at).slice(0, 10)}</td>
-                      <td style={{ fontWeight: 600, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? 'إدخال رأس مال' : 'سحب رأس مال'}</td>
-                      <td className="number-cell" style={{ fontWeight: 700, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? '+' : '−'}{formatNumber(o.amount)} €</td>
-                      <td>{o.method}</td>
-                      <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{o.initiator_name || o.initiated_by || '—'}</td>
-                      <td><span className="status-badge" style={CAP_STATUS_STYLE[o.status] || {}}>{CAP_STATUS[o.status] || o.status}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {capitalHistory.length === 0 ? (
+            <div className="empty-state">
+              <h3>لا توجد عمليات رأس مال بعد</h3>
+              <p>عند إدخال أو سحب رأس مال (من قسم «رأس المال» أدناه) تظهر هنا حركة كل شخص ورصيده.</p>
+            </div>
+          ) : (
+          <>
+          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            <button type="button" className={`tab ${capTab === '__all' ? 'active' : ''}`} onClick={() => setCapTab('__all')}>الملخّص</button>
+            {capitalByPerson.map((p) => (
+              <button key={p.username} type="button" className={`tab ${capTab === p.username ? 'active' : ''}`} onClick={() => setCapTab(p.username)}>{p.name}</button>
+            ))}
           </div>
+
+          {capTab === '__all' ? (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>الشخص</th><th>إجمالي الإدخال</th><th>إجمالي السحب</th><th>رأس المال الحالي</th></tr></thead>
+                <tbody>
+                  {capitalByPerson.map((p) => (
+                    <tr key={p.username} className="clickable-row" onClick={() => setCapTab(p.username)}>
+                      <td style={{ fontWeight: 600 }}>{p.name}</td>
+                      <td className="number-cell" style={{ color: '#16a34a' }}>+{formatNumber(p.injected)} €</td>
+                      <td className="number-cell" style={{ color: '#dc2626' }}>−{formatNumber(p.withdrawn)} €</td>
+                      <td className="number-cell" style={{ fontWeight: 700, color: p.net < 0 ? '#dc2626' : '#0f172a' }}>{formatNumber(p.net)} €</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ fontWeight: 700 }}>الإجمالي</td>
+                    <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>+{formatNumber(capitalByPerson.reduce((s, p) => s + p.injected, 0))} €</td>
+                    <td className="number-cell" style={{ fontWeight: 700, color: '#dc2626' }}>−{formatNumber(capitalByPerson.reduce((s, p) => s + p.withdrawn, 0))} €</td>
+                    <td className="number-cell" style={{ fontWeight: 800 }}>{formatNumber(capitalByPerson.reduce((s, p) => s + p.net, 0))} €</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (() => {
+            const p = capitalByPerson.find((x) => x.username === capTab);
+            if (!p) return null;
+            return (
+              <>
+                <div className="summary-cards" style={{ marginBottom: 16 }}>
+                  <div className="summary-card"><div className="summary-card-content"><h3>رأس المال الحالي</h3><div className="value" style={{ color: p.net < 0 ? '#dc2626' : '#16a34a' }}>{formatNumber(p.net)} €</div></div></div>
+                  <div className="summary-card"><div className="summary-card-content"><h3>إجمالي الإدخال</h3><div className="value" style={{ color: '#16a34a' }}>{formatNumber(p.injected)} €</div></div></div>
+                  <div className="summary-card"><div className="summary-card-content"><h3>إجمالي السحب</h3><div className="value" style={{ color: '#dc2626' }}>{formatNumber(p.withdrawn)} €</div></div></div>
+                </div>
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th><th>الحالة</th></tr></thead>
+                    <tbody>
+                      {p.ops.map((o) => {
+                        const inj = o.kind === 'injection';
+                        return (
+                          <tr key={o.id}>
+                            <td>{String(o.created_at).slice(0, 10)}</td>
+                            <td style={{ fontWeight: 600, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? 'إدخال رأس مال' : 'سحب رأس مال'}</td>
+                            <td className="number-cell" style={{ fontWeight: 700, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? '+' : '−'}{formatNumber(o.amount)} €</td>
+                            <td>{o.method}</td>
+                            <td><span className="status-badge" style={CAP_STATUS_STYLE[o.status] || {}}>{CAP_STATUS[o.status] || o.status}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+          </>
+          )}
         </div>
       )}
 
