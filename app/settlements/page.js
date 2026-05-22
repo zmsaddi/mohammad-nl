@@ -8,6 +8,7 @@ import { useSortedRows } from '@/lib/use-sorted-rows';
 import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
@@ -242,26 +243,23 @@ function SettlementsContent() {
       {Object.keys(unsettledByUser).length > 0 && (
         <div className="card" style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#dc2626' }}>عمولات مستحقة (غير مسوّاة)</h3>
-          <div className="table-container">
-            <table className="data-table">
-              <thead><tr><th>المستخدم</th><th>الدور</th><th>عدد العمليات</th><th>المبلغ المستحق</th><th>إجراء</th></tr></thead>
-              <tbody>
-                {Object.entries(unsettledByUser).map(([username, data]) => {
-                  const user = (Array.isArray(users) ? users : []).find((u) => u.username === username);
-                  const r = TYPES[data.role === 'driver' ? 'driver_payout' : 'seller_payout'];
-                  return (
-                    <tr key={username}>
-                      <td style={{ fontWeight: 600 }}>{user?.name || username}</td>
-                      <td><span className="status-badge" style={{ background: r.bg, color: r.color }}>{data.role === 'driver' ? 'سائق' : 'بائع'}</span></td>
-                      <td className="number-cell">{data.count}</td>
-                      <td className="number-cell" style={{ fontWeight: 700, color: '#dc2626' }}>{formatNumber(data.total)}</td>
-                      <td><button className="btn btn-primary btn-sm" onClick={() => handleQuickSettle(username, data.total)}>تسوية</button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataView
+            rows={Object.entries(unsettledByUser).map(([username, data]) => ({ username, ...data }))}
+            rowKey={(r) => r.username}
+            columns={[
+              { key: 'username', label: 'المستخدم', cell: (r) => <span style={{ fontWeight: 600 }}>{(Array.isArray(users) ? users : []).find((u) => u.username === r.username)?.name || r.username}</span> },
+              { key: 'role', label: 'الدور', cell: (r) => {
+                const t = TYPES[r.role === 'driver' ? 'driver_payout' : 'seller_payout'];
+                return <span className="status-badge" style={{ background: t.bg, color: t.color }}>{r.role === 'driver' ? 'سائق' : 'بائع'}</span>;
+              } },
+              { key: 'count', label: 'عدد العمليات', align: 'end' },
+              { key: 'total', label: 'المبلغ المستحق', align: 'end', cell: (r) => <span style={{ fontWeight: 700, color: '#dc2626' }}>{formatNumber(r.total)}</span> },
+            ]}
+            actions={(r) => (
+              <button className="btn btn-primary btn-sm" onClick={() => handleQuickSettle(r.username, r.total)}>تسوية</button>
+            )}
+            emptyMessage="لا توجد عمولات مستحقة"
+          />
         </div>
       )}
 
