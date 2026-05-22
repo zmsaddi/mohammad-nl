@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { canCancelSale } from '@/lib/cancel-rule';
@@ -17,9 +17,11 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
-const SALES_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
+const SALES_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
 function SalesContent() {
   const { data: session } = useSession();
@@ -38,6 +40,7 @@ function SalesContent() {
   const [bonusSettings, setBonusSettings] = useState({});
   const [categoryRates, setCategoryRates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // v1.2 UX-1: filter state hydrated from URL on first render so
@@ -160,6 +163,7 @@ function SalesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const fetches = [
         fetch('/api/sales', { cache: 'no-store' }),
         fetch('/api/clients', { cache: 'no-store' }),
@@ -170,6 +174,7 @@ function SalesContent() {
         fetches.push(fetch('/api/category-bonus-rates', { cache: 'no-store' }));
       }
       const results = await Promise.all(fetches);
+      if (!results[0].ok) throw new Error(`HTTP ${results[0].status}`);
       const salesData = await results[0].json();
       const clientsData = await results[1].json();
       const productsData = await results[2].json();
@@ -182,6 +187,7 @@ function SalesContent() {
         setCategoryRates(Array.isArray(cr) ? cr : []);
       }
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -495,13 +501,13 @@ function SalesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="sale-qty">الكمية * {form.item && products.find((p) => p.name === form.item) ? `(متاح: ${products.find((p) => p.name === form.item).stock})` : ''}</label>
-              <input id="sale-qty" type="number" min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="sale-qty" {...numberInputProps} min="0" step="any" max={products.find((p) => p.name === form.item)?.stock || ''} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="sale-price">سعر البيع *</label>
               <input
                 id="sale-price"
-                type="number"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.unitPrice}
@@ -613,7 +619,7 @@ function SalesContent() {
                 <label htmlFor="sale-dpe">الدفعة المقدمة المتوقعة (€)</label>
                 <input
                   id="sale-dpe"
-                  type="number"
+                  {...numberInputProps}
                   min="0"
                   step="0.01"
                   value={form.downPaymentExpected}
@@ -720,19 +726,32 @@ function SalesContent() {
           </h3>
         </div>
 
-        {/* Filter bar — URL-synced via the shared useUrlFilters hook. Text search
-            is debounced; selects/dates apply immediately; "✕ مسح" preserves ?new=1. */}
+        {/* Filter bar — URL-synced via the shared useUrlFilters hook. Wrapped in
+            FilterSheet: mobile gets a bottom sheet + active-filter chips, desktop
+            renders inline (passthrough). Filtering stays live; "✕ مسح" preserves ?new=1. */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setF('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setF('to', '') },
+            f.q && { label: `بحث: ${f.q}`, onRemove: () => setF('q', '') },
+            f.status !== 'all' && { label: f.status, onRemove: () => setF('status', 'all') },
+            f.pay !== 'all' && { label: ({ pending: 'معلق', partial: 'جزئي', paid: 'مدفوع', cancelled: 'ملغي' })[f.pay] || f.pay, onRemove: () => setF('pay', 'all') },
+            canSeeCosts && f.seller !== 'all' && { label: f.seller, onRemove: () => setF('seller', 'all') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
+          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} className="filter-control" />
+          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" className="filter-control">
             <option value="all">كل الحالات</option>
             <option value="محجوز">محجوز</option>
             <option value="مؤكد">مؤكد</option>
             <option value="ملغي">ملغي</option>
           </select>
-          <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" className="filter-control">
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
             <option value="partial">جزئي</option>
@@ -740,7 +759,7 @@ function SalesContent() {
             <option value="cancelled">ملغي</option>
           </select>
           {canSeeCosts && (
-            <select value={f.seller} onChange={(e) => setF('seller', e.target.value)} aria-label="تصفية حسب البائع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+            <select value={f.seller} onChange={(e) => setF('seller', e.target.value)} aria-label="تصفية حسب البائع" className="filter-control">
               <option value="all">كل البائعين</option>
               {sellerOptions.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -751,15 +770,18 @@ function SalesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={8} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج مطابقة'}</h3>
             <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
             {rows.length > 0 && filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (

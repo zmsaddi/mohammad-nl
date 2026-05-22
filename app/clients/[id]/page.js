@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { canCancelSale } from '@/lib/cancel-rule';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 // v1.1 F-016 — read settings.vat_rate and compute TVA via the
@@ -228,7 +228,7 @@ function ClientDetailContent({ params }) {
               <div className="form-group">
                 <label>المبلغ (€) *</label>
                 <input
-                  type="number"
+                  {...numberInputProps}
                   min="0"
                   step="0.01"
                   value={paymentForm.amount}

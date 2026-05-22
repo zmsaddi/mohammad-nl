@@ -12,6 +12,8 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import DataCardList from '@/components/DataCardList';
 
 const CLIENT_FILTERS = { q: { default: '', debounce: 300 }, debt: { default: 'all' } };
@@ -23,6 +25,7 @@ function ClientsContent() {
 
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(CLIENT_FILTERS);
@@ -39,10 +42,13 @@ function ClientsContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/clients?withDebt=true', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setClients(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -217,18 +223,26 @@ function ClientsContent() {
             قائمة العملاء ({filtered.length === clients.length ? clients.length : `${filtered.length} من ${clients.length}`})
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <FilterSheet
+              isActive={filtersActive}
+              onClear={resetFilters}
+              chips={[
+                f.q && { label: `بحث: ${f.q}`, onRemove: () => setFilter('q', '') },
+                f.debt !== 'all' && { label: ({ debt: 'عليه دين', clear: 'بدون دين' })[f.debt] || f.debt, onRemove: () => setFilter('debt', 'all') },
+              ].filter(Boolean)}
+            >
             <input
               type="text"
               aria-label="بحث في العملاء"
               placeholder="بحث بالاسم أو الهاتف..."
               value={f.q}
               onChange={(e) => setFilter('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             />
             <select
               value={f.debt}
               onChange={(e) => setFilter('debt', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
               aria-label="تصفية حسب الدين"
             >
               <option value="all">الكل</option>
@@ -236,8 +250,9 @@ function ClientsContent() {
               <option value="clear">بدون دين</option>
             </select>
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
+            </FilterSheet>
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة عميل
@@ -248,12 +263,14 @@ function ClientsContent() {
 
         {loading ? (
           <PageSkeleton rows={5} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد عملاء بعد'}</h3>
             <p>{filtersActive ? 'جرّب تعديل البحث أو مسح الفلاتر' : 'أضف أول عميل بالضغط على زر الإضافة'}</p>
             {filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (

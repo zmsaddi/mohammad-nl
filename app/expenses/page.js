@@ -8,15 +8,17 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
-import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
+import { formatNumber, getTodayDate, EXPENSE_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 
-const EXPENSE_FILTERS = { from: { default: '' }, to: { default: '' }, category: { default: '' }, q: { default: '', debounce: 300 } };
+const EXPENSE_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, category: { default: '' }, q: { default: '', debounce: 300 } };
 
 function ExpensesContent() {
   const { data: session } = useSession();
@@ -25,6 +27,7 @@ function ExpensesContent() {
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -45,10 +48,13 @@ function ExpensesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/expenses', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -205,7 +211,7 @@ function ExpensesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="exp-amount">المبلغ *</label>
-                <input id="exp-amount" type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
+                <input id="exp-amount" {...numberInputProps} min="0" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" required />
               </div>
               <div className="form-group">
                 <label>وسيلة الدفع</label>
@@ -256,15 +262,25 @@ function ExpensesContent() {
           )}
         </div>
 
-        {/* UX-05: filter bar */}
+        {/* UX-05: filter bar — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setFilter('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setFilter('to', '') },
+            f.category && { label: f.category, onRemove: () => setFilter('category', '') },
+            f.q && { label: `بحث: ${f.q}`, onRemove: () => setFilter('q', '') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
           <select
             value={f.category}
             onChange={(e) => setFilter('category', e.target.value)}
             aria-label="تصفية حسب الفئة"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="">كل الفئات</option>
             {EXPENSE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
@@ -283,15 +299,18 @@ function ExpensesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مصاريف بعد' : 'لا توجد نتائج مطابقة'}</h3>
             <p>{rows.length === 0 ? 'أضف أول مصروف من الزر أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
             {rows.length > 0 && filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (

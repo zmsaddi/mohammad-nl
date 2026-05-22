@@ -51,3 +51,10 @@ next-env.d.ts
 
 # DB snapshots (baseline JSONs may contain payment totals — keep local)
 snapshots/
+
+# visual-regression: generated CSS + Playwright run artifacts (baselines under
+# tests/vr/__screenshots__ ARE committed; these are not)
+tests/vr/app.css
+/test-results/
+/playwright-report/
+/blob-report/

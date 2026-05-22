@@ -11,10 +11,12 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
-const BONUS_FILTERS = { from: { default: '' }, to: { default: '' }, settled: { default: 'all' } };
+const BONUS_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, settled: { default: 'all' } };
 
 function MyBonusContent() {
   const { data: session } = useSession();
@@ -23,16 +25,19 @@ function MyBonusContent() {
 
   const [bonuses, setBonuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   // UX-09: filter state (URL-synced via the shared hook)
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(BONUS_FILTERS);
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/bonuses', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setBonuses(Array.isArray(data) ? data : []);
-    } catch { addToast('خطأ', 'error'); }
+    } catch { setError(true); addToast('خطأ', 'error'); }
     finally { setLoading(false); }
   };
 
@@ -128,7 +133,16 @@ function MyBonusContent() {
           سجل العمولات ({filtered.length === count ? `${count} عملية` : `${filtered.length} من ${count}`})
         </h3>
 
-        {/* UX-09: Filters */}
+        {/* UX-09: Filters — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setFilter('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setFilter('to', '') },
+            f.settled !== 'all' && { label: ({ settled: 'تم الصرف', unsettled: 'مستحق' })[f.settled] || f.settled, onRemove: () => setFilter('settled', 'all') },
+          ].filter(Boolean)}
+        >
         <div className="form-grid" style={{ marginBottom: '16px', gap: '12px' }}>
           <div className="form-group">
             <label>من تاريخ</label>
@@ -148,13 +162,16 @@ function MyBonusContent() {
           </div>
           {filtersActive && (
             <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters}>✕ مسح الفلاتر</button>
             </div>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             {bonuses.length === 0 ? (
@@ -166,7 +183,7 @@ function MyBonusContent() {
               <>
                 <h3>لا توجد نتائج مطابقة</h3>
                 <p>جرّب تعديل الفلاتر أو مسحها</p>
-                <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+                <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
               </>
             )}
           </div>

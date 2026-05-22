@@ -11,9 +11,11 @@ name: ci
 #     env-test-doctor will refuse.
 #
 # Jobs:
-#   - lint        : ESLint (non-blocking for now — see continue-on-error)
+#   - lint        : ESLint (BLOCKING — must pass; 0 errors required)
+#   - typecheck   : tsc --noEmit over the JS sources (BLOCKING)
 #   - build       : next build (must pass)
 #   - test-mock   : vitest run on unit/mock tests that don't need a DB
+#                   (now includes the tests/ui/* component + page suite)
 #   - test-real   : vitest run on real-DB integration tests (gated on
 #                   NEON_TEST_BRANCH_URL secret being set — skipped in
 #                   forks without the secret)
@@ -39,7 +41,18 @@ jobs:
       - run: npm ci
       - name: ESLint
         run: npm run lint
-        continue-on-error: true
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npm run typecheck
 
   build:
     runs-on: ubuntu-latest
@@ -89,6 +102,7 @@ jobs:
         # test-real-db job, not here.
         run: |
           npx vitest run \
+            tests/ui/ \
             tests/setup.test-env.guard.test.js \
             tests/ignore-expected-ddl.test.js \
             tests/authz/ \

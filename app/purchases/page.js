@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
-import { formatNumber, getTodayDate, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { formatNumber, getTodayDate, PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 import DetailModal from '@/components/DetailModal';
 import SmartSelect from '@/components/SmartSelect';
 import { useSortedRows } from '@/lib/use-sorted-rows';
@@ -14,9 +14,11 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 
-const PURCHASE_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
+const PURCHASE_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -29,6 +31,7 @@ function PurchasesContent() {
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -77,11 +80,13 @@ function PurchasesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const [purchasesRes, productsRes, suppliersRes] = await Promise.all([
         fetch('/api/purchases', { cache: 'no-store' }),
         fetch('/api/products', { cache: 'no-store' }),
         fetch('/api/suppliers', { cache: 'no-store' }),
       ]);
+      if (!purchasesRes.ok) throw new Error(`HTTP ${purchasesRes.status}`);
       const purchasesData = await purchasesRes.json();
       const productsData = await productsRes.json();
       const suppliersData = await suppliersRes.json();
@@ -89,6 +94,7 @@ function PurchasesContent() {
       setProducts(Array.isArray(productsData) ? productsData : []);
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -415,17 +421,17 @@ function PurchasesContent() {
             </div>
             <div className="form-group">
               <label htmlFor="pur-qty">الكمية *</label>
-              <input id="pur-qty" type="number" min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
+              <input id="pur-qty" {...numberInputProps} min="0" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-price">سعر الوحدة *</label>
-              <input id="pur-price" type="number" min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
+              <input id="pur-price" {...numberInputProps} min="0" step="any" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} placeholder="0" required />
             </div>
             <div className="form-group">
               <label htmlFor="pur-sell-price">سعر البيع الموصى *</label>
               <input
                 id="pur-sell-price"
-                type="number"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.sellPrice}
@@ -469,7 +475,7 @@ function PurchasesContent() {
               <label htmlFor="pur-paid">المدفوع الآن (اختياري)</label>
               <input
                 id="pur-paid"
-                type="number"
+                {...numberInputProps}
                 min="0"
                 step="any"
                 value={form.paidAmount}
@@ -517,16 +523,27 @@ function PurchasesContent() {
           </h3>
         </div>
 
-        {/* UX-05: filter bar */}
+        {/* UX-05: filter bar — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setFilter('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setFilter('to', '') },
+            f.q && { label: `بحث: ${f.q}`, onRemove: () => setFilter('q', '') },
+            f.supplier !== 'all' && { label: f.supplier, onRemove: () => setFilter('supplier', 'all') },
+            f.pay !== 'all' && { label: ({ paid: 'مدفوع', partial: 'جزئي', pending: 'معلق' })[f.pay] || f.pay, onRemove: () => setFilter('pay', 'all') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="text" placeholder="بحث مورد / منتج / كود..." aria-label="بحث في المشتريات" value={f.q} onChange={(e) => setFilter('q', e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} aria-label="تصفية حسب المورد" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
+          <input type="text" placeholder="بحث مورد / منتج / كود..." aria-label="بحث في المشتريات" value={f.q} onChange={(e) => setFilter('q', e.target.value)} className="filter-control" />
+          <select value={f.supplier} onChange={(e) => setFilter('supplier', e.target.value)} aria-label="تصفية حسب المورد" className="filter-control">
             <option value="all">كل الموردين</option>
             {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={f.pay} onChange={(e) => setFilter('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+          <select value={f.pay} onChange={(e) => setFilter('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" className="filter-control">
             <option value="all">كل حالات الدفع</option>
             <option value="paid">مدفوع</option>
             <option value="partial">جزئي</option>
@@ -538,15 +555,18 @@ function PurchasesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={8} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{rows.length === 0 ? 'لا توجد مشتريات بعد' : 'لا توجد نتائج مطابقة'}</h3>
             <p>{rows.length === 0 ? 'أضف أول عملية شراء من النموذج أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
             {rows.length > 0 && filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (
@@ -793,7 +813,7 @@ function PurchasesContent() {
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label>المبلغ *</label>
                 <input
-                  type="number"
+                  {...numberInputProps}
                   min="0"
                   step="any"
                   value={s.amount}

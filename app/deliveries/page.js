@@ -7,16 +7,18 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import CancelSaleDialog from '@/components/CancelSaleDialog';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
-const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '' }, to: { default: '' }, driver: { default: 'all' }, bank: { default: '' } };
+const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, driver: { default: 'all' }, bank: { default: '' } };
 
 // Three workflow states the user picks from: قيد الانتظار / تم التسليم / إلغاء.
 // 'جاري التوصيل' is kept here ONLY so legacy rows that still have it render with
@@ -157,6 +159,7 @@ function DeliveriesContent() {
   const [clients, setClients] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const canAssignDriver = ['admin', 'manager'].includes(userRole);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -221,6 +224,7 @@ function DeliveriesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       // Only admin/manager need the users list (for driver-assignment dropdown).
       // Drivers don't see the dropdown so skip the fetch to avoid a 403 console error.
       const fetches = [
@@ -231,6 +235,7 @@ function DeliveriesContent() {
         fetches.push(fetch('/api/users', { cache: 'no-store' }).catch(() => ({ ok: false })));
       }
       const [deliveriesRes, clientsRes, usersRes] = await Promise.all(fetches);
+      if (!deliveriesRes.ok) throw new Error(`HTTP ${deliveriesRes.status}`);
       const deliveriesData = await deliveriesRes.json();
       const clientsData = await clientsRes.json();
       if (usersRes?.ok) {
@@ -240,6 +245,7 @@ function DeliveriesContent() {
       setRows(Array.isArray(deliveriesData) ? deliveriesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -511,7 +517,7 @@ function DeliveriesContent() {
               </div>
               <div className="form-group">
                 <label htmlFor="del-amount">المبلغ</label>
-                <input id="del-amount" type="number" min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
+                <input id="del-amount" {...numberInputProps} min="0" step="any" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" />
               </div>
               <div className="form-group">
                 <label htmlFor="del-driver">اسم السائق</label>
@@ -545,15 +551,25 @@ function DeliveriesContent() {
           )}
         </div>
 
-        {/* Item 2 — filter bar */}
+        {/* Item 2 — filter bar — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setF('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setF('to', '') },
+            f.status && { label: f.status, onRemove: () => setF('status', '') },
+            f.driver !== 'all' && { label: f.driver, onRemove: () => setF('driver', 'all') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
-          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
-          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+          <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
+          <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
           <select
             value={f.status}
             onChange={(e) => setF('status', e.target.value)}
             aria-label="تصفية حسب الحالة"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="">كل الحالات</option>
             {SELECTABLE_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -562,7 +578,7 @@ function DeliveriesContent() {
             value={f.driver}
             onChange={(e) => setF('driver', e.target.value)}
             aria-label="تصفية حسب السائق"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            className="filter-control"
           >
             <option value="all">كل السائقين</option>
             {driverOptions.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -573,16 +589,19 @@ function DeliveriesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : paginatedRows.length === 0 ? (
           <div className="empty-state">
             <TruckIcon size={64} color="#94a3b8" />
             <h3>{rows.length === 0 ? 'لا توجد توصيلات بعد' : 'لا توجد نتائج مطابقة'}</h3>
             <p>{rows.length === 0 ? 'أضف أول توصيلة بالضغط على الزر أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
             {rows.length > 0 && filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (

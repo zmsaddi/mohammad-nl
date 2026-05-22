@@ -8,9 +8,11 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
+import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
-import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
+import { formatNumber, PRODUCT_CATEGORIES, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
@@ -36,6 +38,7 @@ function StockContent() {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   // Filters (q / status / category) URL-synced via the shared hook.
@@ -62,10 +65,13 @@ function StockContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/products', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProducts(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -299,6 +305,15 @@ function StockContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             جرد المخزون ({filtered.length === products.length ? products.length : `${filtered.length} من ${products.length}`})
           </h3>
+          <FilterSheet
+            isActive={filtersActive}
+            onClear={resetFilters}
+            chips={[
+              f.q && { label: `بحث: ${f.q}`, onRemove: () => setF('q', '') },
+              f.status !== 'all' && { label: ({ 'in-stock': 'متوفر', low: 'مخزون منخفض', out: 'نفذ' })[f.status] || f.status, onRemove: () => setF('status', 'all') },
+              f.category !== 'all' && { label: f.category, onRemove: () => setF('category', 'all') },
+            ].filter(Boolean)}
+          >
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
@@ -306,13 +321,13 @@ function StockContent() {
               placeholder="بحث بالاسم أو الفئة..."
               value={f.q}
               onChange={(e) => setF('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             />
             <select
               value={f.status}
               onChange={(e) => setF('status', e.target.value)}
               aria-label="تصفية حسب حالة المخزون"
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             >
               <option value="all">الكل</option>
               <option value="in-stock">متوفر</option>
@@ -324,7 +339,7 @@ function StockContent() {
               value={f.category}
               onChange={(e) => setF('category', e.target.value)}
               aria-label="تصفية حسب الفئة"
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
+              className="filter-control-lg"
             >
               <option value="all">كل الفئات</option>
               {PRODUCT_CATEGORIES.map((c) => (
@@ -332,19 +347,22 @@ function StockContent() {
               ))}
             </select>
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
           </div>
+          </FilterSheet>
         </div>
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : sortedRows.length === 0 ? (
           <div className="empty-state">
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا توجد منتجات بعد'}</h3>
             <p>{filtersActive ? 'جرّب تعديل الفلاتر أو مسحها' : 'المنتجات تُضاف تلقائياً عند الشراء'}</p>
             {filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (
@@ -430,7 +448,7 @@ function StockContent() {
                         <td className="number-cell">
                           {isAdmin ? (
                             <input
-                              type="number"
+                              {...numberInputProps}
                               min="0"
                               step="any"
                               defaultValue={p.sell_price || ''}
@@ -459,7 +477,7 @@ function StockContent() {
                         {isAdmin && (
                           <td onClick={(e) => e.stopPropagation()}>
                             <input
-                              type="number"
+                              {...numberInputProps}
                               min="0"
                               defaultValue={p.low_stock_threshold ?? 3}
                               style={{

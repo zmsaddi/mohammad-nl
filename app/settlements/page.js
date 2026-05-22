@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
-import { formatNumber, getTodayDate } from '@/lib/utils';
+import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import DataCardList from '@/components/DataCardList';
@@ -33,6 +33,7 @@ function SettlementsContent() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // v1.0.1 Feature 3 — eligible-users list for the currently selected
   // settlement type. Refetched every time the type changes.
@@ -124,20 +125,22 @@ function SettlementsContent() {
     // الرصيد". Now we refresh and compare; if the credit dropped below
     // the amount the user typed, we stop and surface the fresh number
     // instead of sending a request that will fail server-side anyway.
-    if (form.type === 'seller_payout' || form.type === 'driver_payout') {
-      try {
-        const res = await fetch(`/api/users/eligible-for-settlement?type=${form.type}`, { cache: 'no-store' });
-        const fresh = await res.json();
-        const freshUser = (Array.isArray(fresh) ? fresh : []).find((u) => u.username === form.username);
-        const freshCredit = freshUser?.available_credit;
-        if (freshCredit != null && amountNum > freshCredit + 0.01) {
-          setEligibleUsers(Array.isArray(fresh) ? fresh : []);
-          addToast(`الرصيد تغيّر — المتاح الآن ${freshCredit.toFixed(2)}€ فقط`, 'error');
-          return;
-        }
-      } catch { /* fall through — backend is still the hard gate */ }
-    }
+    if (submitting) return;
+    setSubmitting(true);
     try {
+      if (form.type === 'seller_payout' || form.type === 'driver_payout') {
+        try {
+          const res = await fetch(`/api/users/eligible-for-settlement?type=${form.type}`, { cache: 'no-store' });
+          const fresh = await res.json();
+          const freshUser = (Array.isArray(fresh) ? fresh : []).find((u) => u.username === form.username);
+          const freshCredit = freshUser?.available_credit;
+          if (freshCredit != null && amountNum > freshCredit + 0.01) {
+            setEligibleUsers(Array.isArray(fresh) ? fresh : []);
+            addToast(`الرصيد تغيّر — المتاح الآن ${freshCredit.toFixed(2)}€ فقط`, 'error');
+            return;
+          }
+        } catch { /* fall through — backend is still the hard gate */ }
+      }
       const res = await fetch('/api/settlements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,6 +157,7 @@ function SettlementsContent() {
         addToast(d.error || 'خطأ', 'error');
       }
     } catch { addToast('خطأ', 'error'); }
+    finally { setSubmitting(false); }
   };
 
   // v1.0.1 Feature 3 + 4 — when the user picks a recipient, auto-fill
@@ -305,7 +309,7 @@ function SettlementsContent() {
               <div className="form-group">
                 <label>المبلغ *</label>
                 <input
-                  type="number"
+                  {...numberInputProps}
                   min="0"
                   step="any"
                   value={form.amount}
@@ -347,9 +351,9 @@ function SettlementsContent() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={exceedsCredit}
+                disabled={exceedsCredit || submitting}
               >
-                تسجيل التسوية
+                {submitting ? 'جارٍ الحفظ…' : 'تسجيل التسوية'}
               </button>
               <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>إلغاء</button>
             </div>

@@ -13,6 +13,7 @@ import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
+import ErrorState from '@/components/ErrorState';
 import PageSkeleton from '@/components/PageSkeleton';
 import StatusBadge from '@/components/StatusBadge';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -31,6 +32,7 @@ function InvoicesContent() {
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [pdfRefCode, setPdfRefCode] = useState(null);
   const { values: f, set: setFilter, reset: resetFilters, isActive: filtersActive } = useUrlFilters(INVOICE_FILTERS);
@@ -40,10 +42,13 @@ function InvoicesContent() {
 
   const fetchData = async () => {
     try {
+      setError(false);
       const res = await fetch('/api/invoices', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setInvoices(Array.isArray(data) ? data : []);
     } catch {
+      setError(true);
       addToast('خطأ في جلب البيانات', 'error');
     } finally {
       setLoading(false);
@@ -138,16 +143,18 @@ function InvoicesContent() {
               placeholder="بحث بالاسم أو الكود أو VIN..."
               value={f.q}
               onChange={(e) => setFilter('q', e.target.value)}
-              style={{ padding: '8px 14px', border: '1.5px solid #d1d5db', borderRadius: '10px', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem', flex: 1 }}
+              className="filter-control-lg" style={{ flex: 1 }}
             />
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
           </div>
         </div>
 
         {loading ? (
           <PageSkeleton rows={6} showStats={false} />
+        ) : error ? (
+          <ErrorState onRetry={fetchData} />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             {invoices.length === 0 ? (
@@ -159,7 +166,7 @@ function InvoicesContent() {
               <>
                 <h3>لا توجد نتائج مطابقة</h3>
                 <p>جرّب تعديل البحث أو مسح الفلاتر</p>
-                <button className="btn btn-sm" onClick={resetFilters} style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+                <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ marginTop: 8 }}>✕ مسح الفلاتر</button>
               </>
             )}
           </div>
@@ -317,7 +324,7 @@ function InvoicesContent() {
               />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={closeVinEdit} disabled={vinSaving} style={{ background: '#e2e8f0', color: '#334155' }}>إلغاء</button>
+              <button className="btn btn-clear" onClick={closeVinEdit} disabled={vinSaving}>إلغاء</button>
               <button className="btn btn-primary" onClick={saveVin} disabled={vinSaving}>
                 {vinSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}
               </button>

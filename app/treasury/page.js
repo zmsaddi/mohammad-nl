@@ -7,8 +7,27 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import { formatNumber } from '@/lib/utils';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import PageSkeleton from '@/components/PageSkeleton';
+import ConfirmModal from '@/components/ConfirmModal';
+import MoneyInput from '@/components/MoneyInput';
+import DataCardList from '@/components/DataCardList';
+import ErrorState from '@/components/ErrorState';
 
 const ROLE_LABEL = { admin: 'مدير عام', manager: 'مشرف', driver: 'سائق', seller: 'بائع' };
+
+// Human labels for every cash_movements.kind (the per-box money-movement ledger).
+const KIND_LABEL = {
+  opening: 'رصيد افتتاحي',
+  capital_injection: 'إدخال رأس مال',
+  capital_withdrawal: 'سحب رأس مال',
+  collection: 'تحصيل',
+  refund: 'استرجاع',
+  supplier_payment: 'دفع مورّد',
+  expense: 'مصروف',
+  commission_payout: 'دفع عمولة',
+  profit_distribution: 'توزيع أرباح',
+  funding: 'تمويل',
+  handover: 'تسليم عهدة',
+};
 
 function TreasuryContent() {
   const { data: session } = useSession();
@@ -30,6 +49,17 @@ function TreasuryContent() {
   const [capitalOps, setCapitalOps] = useState([]);
   const [openingInputs, setOpeningInputs] = useState({});
   const [recon, setRecon] = useState(null);
+  // Money-movement ledger tabs: which box is selected + its movements.
+  const [movBoxId, setMovBoxId] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [movLoading, setMovLoading] = useState(false);
+  const [movError, setMovError] = useState(false);
+  // Guards every money action below against a double-tap while the POST is
+  // in flight (each one moves real money). Disables the action buttons.
+  const [busy, setBusy] = useState(false);
+  // Branded confirm dialog (replaces window.confirm for the two money-sensitive
+  // admin actions: setting an opening balance + toggling the treasury system).
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -57,7 +87,43 @@ function TreasuryContent() {
   useEffect(() => { fetchData(); }, []);
   useAutoRefresh(fetchData);
 
+  // Read-only per-box money-movement ledger. The API re-checks that this box is
+  // within the caller's scope, so a driver can never load another person's box.
+  const fetchMovements = async (boxId) => {
+    if (!boxId) return;
+    setMovLoading(true);
+    setMovError(false);
+    try {
+      const res = await fetch(`/api/treasury/movements?boxId=${boxId}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMovements(Array.isArray(data) ? data : []);
+    } catch {
+      setMovError(true);
+      addToast('خطأ في جلب الحركات', 'error');
+    } finally {
+      setMovLoading(false);
+    }
+  };
+  const selectMovTab = (id) => { setMovBoxId(id); fetchMovements(id); };
+
+  // When the boxes list (re)loads, keep the selected tab valid and refresh its
+  // movements. Defaults to the first visible box (general box leads the list).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!boxes.length) { setMovBoxId(null); setMovements([]); return; }
+    const target = boxes.some((b) => b.id === movBoxId) ? movBoxId : boxes[0].id;
+    setMovBoxId(target);
+    fetchMovements(target);
+  }, [boxes]);
+
   const boxName = (b) => b.type === 'main' ? 'الصندوق العام' : (b.owner_name || b.owner_username || '—');
+  // Counterparty label for a movement row (the box on the other side of a transfer).
+  const cpLabel = (m) => {
+    if (!m.counterparty_box_id) return '—';
+    if (m.counterparty_type === 'main') return 'الصندوق العام';
+    return m.counterparty_name || m.counterparty_username || '—';
+  };
   const total = boxes.reduce((s, b) => s + (parseFloat(b.balance) || 0), 0);
   // Funding recipients the caller may fund: manager → drivers; admin → any custody box.
   const fundTargets = boxes.filter((b) => b.type === 'custody' && (role === 'admin' || b.owner_role === 'driver') && b.owner_username !== username);
@@ -71,9 +137,13 @@ function TreasuryContent() {
   const handleHandover = async () => {
     if (!myBoxId || !generalBoxId) { addToast('الصناديق غير مهيّأة', 'error'); return; }
     if (!(parseFloat(handAmount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: myBoxId, toBoxId: generalBoxId, amount: handAmount });
-    if (ok) { addToast('تم إنشاء طلب تسليم — بانتظار تأكيد الصندوق العام'); setHandAmount(''); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: myBoxId, toBoxId: generalBoxId, amount: handAmount });
+      if (ok) { addToast('تم إنشاء طلب تسليم — بانتظار تأكيد الصندوق العام'); setHandAmount(''); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   const handleFund = async () => {
@@ -81,9 +151,13 @@ function TreasuryContent() {
     if (!(parseFloat(fundForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
     const fromBoxId = role === 'admin' ? generalBoxId : myBoxId; // admin funds from treasury, manager from own
     if (!fromBoxId) { addToast('صندوق المصدر غير مهيّأ', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'funding', fromBoxId, toBoxId: Number(fundForm.toBoxId), amount: fundForm.amount });
-    if (ok) { addToast('تم إنشاء طلب تمويل — بانتظار تأكيد المستلم'); setFundForm({ toBoxId: '', amount: '' }); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'funding', fromBoxId, toBoxId: Number(fundForm.toBoxId), amount: fundForm.amount });
+      if (ok) { addToast('تم إنشاء طلب تمويل — بانتظار تأكيد المستلم'); setFundForm({ toBoxId: '', amount: '' }); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   // Request a person to settle their custody (مطالبة بتسليم العهدة). The money
@@ -102,9 +176,13 @@ function TreasuryContent() {
     if (!(parseFloat(reqForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
     const toBoxId = role === 'admin' ? generalBoxId : myBoxId; // hierarchy: admin → general, manager → own
     if (!toBoxId) { addToast('صندوق الوجهة غير مهيّأ', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: Number(reqForm.fromBoxId), toBoxId, amount: reqForm.amount });
-    if (ok) { addToast('تم إرسال طلب التسليم — بانتظار تأكيد حامل العهدة'); setReqForm({ fromBoxId: '', amount: '' }); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/handovers', { kind: 'handover', fromBoxId: Number(reqForm.fromBoxId), toBoxId, amount: reqForm.amount });
+      if (ok) { addToast('تم إرسال طلب التسليم — بانتظار تأكيد حامل العهدة'); setReqForm({ fromBoxId: '', amount: '' }); fetchData(); }
+      else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
 
   const handleConfirm = async (id) => {
@@ -118,12 +196,16 @@ function TreasuryContent() {
 
   const handleInitCapital = async () => {
     if (!(parseFloat(capForm.amount) > 0)) { addToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-    const { ok, d } = await post('/api/treasury/capital', capForm);
-    if (ok) {
-      addToast(d.status === 'approved' ? 'تمّ تنفيذ العملية' : 'تمّ إنشاء العملية — بانتظار موافقة بقية المدراء');
-      setCapForm({ kind: 'injection', amount: '', method: 'كاش' });
-      fetchData();
-    } else addToast(d.error || 'خطأ', 'error');
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { ok, d } = await post('/api/treasury/capital', capForm);
+      if (ok) {
+        addToast(d.status === 'approved' ? 'تمّ تنفيذ العملية' : 'تمّ إنشاء العملية — بانتظار موافقة بقية المدراء');
+        setCapForm({ kind: 'injection', amount: '', method: 'كاش' });
+        fetchData();
+      } else addToast(d.error || 'خطأ', 'error');
+    } finally { setBusy(false); }
   };
   const handleApproveCapital = async (id) => {
     const { ok, d } = await post(`/api/treasury/capital/${id}/approve`);
@@ -136,7 +218,7 @@ function TreasuryContent() {
 
   // Opening balance (admin go-live): set a box's starting cash by physical count.
   // Deliberate, with an explicit confirm; re-entry replaces the prior opening.
-  const handleSetOpening = async (box) => {
+  const handleSetOpening = (box) => {
     const raw = openingInputs[box.id];
     if (raw === undefined || raw === '') { addToast('أدخل المبلغ', 'error'); return; }
     const amount = parseFloat(raw);
@@ -145,25 +227,41 @@ function TreasuryContent() {
     const msg = `تعيين الرصيد الافتتاحي (عدّ فعلي) لصندوق «${boxName(box)}» = ${formatNumber(amount)} €؟` +
       (hasOpening ? `\n\nيوجد رصيد افتتاحي سابق (${formatNumber(parseFloat(box.opening) || 0)} €) — سيُستبدل.` : '') +
       `\n\nيُسجَّل كنقطة بداية لتتبّع النقد. متابعة؟`;
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
-    const { ok, d } = await post('/api/treasury/opening', { boxId: box.id, amount });
-    if (ok) { addToast('تم تعيين الرصيد الافتتاحي ✓'); setOpeningInputs((s) => ({ ...s, [box.id]: '' })); fetchData(); }
-    else addToast(d.error || 'خطأ', 'error');
+    setConfirmDialog({
+      title: 'تأكيد الرصيد الافتتاحي',
+      message: msg,
+      confirmText: 'تأكيد',
+      confirmClass: 'btn-primary',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const { ok, d } = await post('/api/treasury/opening', { boxId: box.id, amount });
+        if (ok) { addToast('تم تعيين الرصيد الافتتاحي ✓'); setOpeningInputs((s) => ({ ...s, [box.id]: '' })); fetchData(); }
+        else addToast(d.error || 'خطأ', 'error');
+      },
+    });
   };
 
   // Master switch (admin). Toggling NEVER deletes data — it only starts/stops
   // recording money movements; balances and all records are preserved.
-  const toggleTreasury = async () => {
+  const toggleTreasury = () => {
     const turningOn = !enabled;
     const msg = turningOn
       ? 'تفعيل نظام الصناديق؟ سيبدأ تسجيل حركة الأموال من الآن. لا تُفقد أي بيانات حالية. تذكّر إدخال الأرصدة الافتتاحية (عدّ فعلي) بعد التفعيل.'
       : 'إيقاف نظام الصناديق؟ يتوقّف تسجيل الحركات الجديدة، وتبقى كل الأرصدة والبيانات كما هي.';
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
-    try {
-      const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ treasury_enabled: turningOn ? 'true' : 'false' }), cache: 'no-store' });
-      if (res.ok) { addToast(turningOn ? 'تم تفعيل نظام الصناديق' : 'تم إيقاف نظام الصناديق'); fetchData(); }
-      else { const d = await res.json().catch(() => ({})); addToast(d.error || 'خطأ', 'error'); }
-    } catch { addToast('خطأ في الاتصال', 'error'); }
+    setConfirmDialog({
+      title: turningOn ? 'تفعيل نظام الصناديق' : 'إيقاف نظام الصناديق',
+      message: msg,
+      confirmText: turningOn ? 'تفعيل' : 'إيقاف',
+      confirmClass: turningOn ? 'btn-success' : 'btn-danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ treasury_enabled: turningOn ? 'true' : 'false' }), cache: 'no-store' });
+          if (res.ok) { addToast(turningOn ? 'تم تفعيل نظام الصناديق' : 'تم إيقاف نظام الصناديق'); fetchData(); }
+          else { const d = await res.json().catch(() => ({})); addToast(d.error || 'خطأ', 'error'); }
+        } catch { addToast('خطأ في الاتصال', 'error'); }
+      },
+    });
   };
 
   const partyLabel = (type, name, owner) => type === 'main' ? 'الصندوق العام' : (name || owner || '—');
@@ -255,6 +353,85 @@ function TreasuryContent() {
         )}
       </div>
 
+      {/* Money movements per box — a tab per box (general box first, then each
+          person within the viewer's scope). Admins follow every person's money
+          moves; each holder reviews their own. Read-only ledger from
+          cash_movements with a running balance; shown even when the system is
+          paused so history stays reviewable. */}
+      {boxes.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>حركات الأموال</h3>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
+            سجلّ كل دخول/خروج لكل صندوق مع الرصيد الجاري — لمتابعة حركة المال لكل شخص.
+          </p>
+          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            {boxes.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={`tab ${b.id === movBoxId ? 'active' : ''}`}
+                onClick={() => selectMovTab(b.id)}
+              >
+                {boxName(b)}
+                {b.type !== 'main' && b.owner_role && (
+                  <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '0.72rem' }}> ({ROLE_LABEL[b.owner_role] || b.owner_role})</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {movLoading ? (
+            <PageSkeleton rows={5} showStats={false} />
+          ) : movError ? (
+            <ErrorState onRetry={() => fetchMovements(movBoxId)} />
+          ) : movements.length === 0 ? (
+            <div className="empty-state"><h3>لا توجد حركات</h3><p>لم تُسجَّل أي حركة على هذا الصندوق بعد.</p></div>
+          ) : (
+            <>
+              <DataCardList
+                rows={movements}
+                fields={[
+                  { key: 'date', label: 'التاريخ' },
+                  { key: 'kind', label: 'النوع', format: (v) => KIND_LABEL[v] || v },
+                  { key: 'signed_amount', label: 'المبلغ', format: (v) => `${Number(v) >= 0 ? '+' : ''}${formatNumber(v)} €` },
+                  { key: 'method', label: 'الطريقة' },
+                  { key: '_cp', label: 'الطرف الآخر', format: (_, r) => cpLabel(r) },
+                  { key: 'created_by', label: 'بواسطة', format: (v) => v || '—' },
+                  { key: 'running_balance', label: 'الرصيد', format: (v) => `${formatNumber(v)} €` },
+                ]}
+              />
+              <div className="table-container has-card-fallback">
+                <table className="data-table">
+                  <thead><tr>
+                    <th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th>
+                    <th>الطرف الآخر</th><th>بواسطة</th><th>ملاحظة</th><th>الرصيد</th>
+                  </tr></thead>
+                  <tbody>
+                    {movements.map((m) => {
+                      const amt = parseFloat(m.signed_amount) || 0;
+                      return (
+                        <tr key={m.id}>
+                          <td>{m.date}</td>
+                          <td>{KIND_LABEL[m.kind] || m.kind}</td>
+                          <td className="number-cell" style={{ fontWeight: 700, color: amt < 0 ? '#dc2626' : '#16a34a' }}>
+                            {amt >= 0 ? '+' : ''}{formatNumber(amt)} €
+                          </td>
+                          <td>{m.method}</td>
+                          <td>{cpLabel(m)}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{m.created_by || '—'}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{m.notes || '—'}</td>
+                          <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(m.running_balance)} €</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Actions — only when the treasury is live */}
       {enabled && (
         <>
@@ -281,8 +458,8 @@ function TreasuryContent() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <input
-                              type="number" min="0" step="any"
+                            <MoneyInput
+                              min="0" step="any"
                               value={openingInputs[b.id] ?? ''}
                               onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
                               placeholder="0.00"
@@ -393,9 +570,9 @@ function TreasuryContent() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
+                  <MoneyInput min="0" step="any" value={handAmount} onChange={(e) => setHandAmount(e.target.value)} />
                 </div>
-                <button className="btn btn-primary" onClick={handleHandover}>إنشاء طلب تسليم</button>
+                <button className="btn btn-primary" onClick={handleHandover} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تسليم'}</button>
               </div>
             </div>
           )}
@@ -419,9 +596,9 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={fundForm.amount} onChange={(e) => setFundForm({ ...fundForm, amount: e.target.value })} />
                 </div>
-                <button className="btn btn-primary" onClick={handleFund}>إنشاء طلب تمويل</button>
+                <button className="btn btn-primary" onClick={handleFund} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء طلب تمويل'}</button>
               </div>
             </div>
           )}
@@ -445,9 +622,9 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 180, margin: 0 }}>
                   <label>المبلغ المطلوب (€)</label>
-                  <input type="number" min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={reqForm.amount} onChange={(e) => setReqForm({ ...reqForm, amount: e.target.value })} />
                 </div>
-                <button className="btn btn-primary" onClick={handleRequestSettlement}>إرسال الطلب</button>
+                <button className="btn btn-primary" onClick={handleRequestSettlement} disabled={busy}>{busy ? 'جارٍ…' : 'إرسال الطلب'}</button>
               </div>
             </div>
           )}
@@ -469,7 +646,7 @@ function TreasuryContent() {
                 </div>
                 <div className="form-group" style={{ maxWidth: 150, margin: 0 }}>
                   <label>المبلغ (€)</label>
-                  <input type="number" min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
+                  <MoneyInput min="0" step="any" value={capForm.amount} onChange={(e) => setCapForm({ ...capForm, amount: e.target.value })} />
                 </div>
                 <div className="form-group" style={{ maxWidth: 120, margin: 0 }}>
                   <label>الطريقة</label>
@@ -478,7 +655,7 @@ function TreasuryContent() {
                     <option value="بنك">بنك</option>
                   </select>
                 </div>
-                <button className="btn btn-primary" onClick={handleInitCapital}>إنشاء</button>
+                <button className="btn btn-primary" onClick={handleInitCapital} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء'}</button>
               </div>
               {capitalOps.length > 0 && (
                 <div className="table-container">
@@ -505,6 +682,19 @@ function TreasuryContent() {
           )}
         </>
       )}
+
+      <ConfirmModal
+        isOpen={!!confirmDialog}
+        title={confirmDialog?.title}
+        confirmText={confirmDialog?.confirmText}
+        confirmClass={confirmDialog?.confirmClass}
+        onConfirm={confirmDialog?.onConfirm}
+        onCancel={() => setConfirmDialog(null)}
+      >
+        <p style={{ whiteSpace: 'pre-line', color: '#64748b', fontSize: '0.9rem', marginBottom: 24 }}>
+          {confirmDialog?.message}
+        </p>
+      </ConfirmModal>
     </AppLayout>
   );
 }

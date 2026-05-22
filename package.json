@@ -11,6 +11,10 @@
     "test": "vitest run",
     "test:ui": "vitest",
     "test:unsafe": "vitest run",
+    "test:vr": "node scripts/build-vr-css.mjs && playwright test",
+    "test:vr:update": "node scripts/build-vr-css.mjs && playwright test --update-snapshots",
+    "test:vr:pages": "playwright test -c playwright.pages.config.js",
+    "test:vr:pages:update": "playwright test -c playwright.pages.config.js --update-snapshots",
     "typecheck": "tsc --project jsconfig.json --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "migrate:dry": "node scripts/migrate.mjs --dry-run"
@@ -30,11 +34,15 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@vitest/ui": "^4.1.4",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "jsdom": "^26.1.0",
     "tailwindcss": "^4",
     "vitest": "^4.1.4"
   }
