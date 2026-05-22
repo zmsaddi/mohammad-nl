@@ -334,8 +334,8 @@ function UsersContent() {
               {!showForm && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ إضافة مستخدم</button>}
             </div>
 
-            {/* Desktop table */}
-            <div className="table-container">
+            {/* Desktop table (hidden on mobile — the card list below takes over) */}
+            <div className="table-container has-card-fallback">
               <table className="data-table">
                 <thead>
                   <tr><th>#</th><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>
