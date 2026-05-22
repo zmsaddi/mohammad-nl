@@ -15,7 +15,7 @@ import { matchesText } from '@/lib/filter-engine';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 
 const CLIENT_FILTERS = { q: { default: '', debounce: 300 }, debt: { default: 'all' } };
 
@@ -286,15 +286,26 @@ function ClientsContent() {
           </div>
         ) : (
           <>
-            <DataCardList
+            <DataView
               rows={sortedRows}
-              fields={[
-                { key: 'name', label: 'الاسم' },
-                { key: 'description_ar', label: 'عربي' },
-                { key: 'phone', label: 'الهاتف' },
-                { key: 'totalSales', label: 'المشتريات', format: (v) => formatNumber(v) },
-                { key: 'totalPaid', label: 'المدفوع', format: (v) => formatNumber(v) },
-                { key: 'remainingDebt', label: 'الدين', format: (v) => formatNumber(v) },
+              sort={{ requestSort, getAriaSort, getSortIndicator }}
+              columns={[
+                { key: 'id', label: '#', sortable: true, mobileHide: true },
+                { key: 'name', label: 'الاسم', sortable: true, cell: (c) => (
+                  <span style={{ fontWeight: 600 }}>
+                    {c.name}
+                    {c._duplicateOfId && (
+                      <span style={{ marginRight: '8px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                        ⚠️ مكرر — انظر #{c._duplicateOfId}
+                      </span>
+                    )}
+                  </span>
+                ) },
+                { key: 'description_ar', label: 'عربي', sortable: true, cell: (c) => <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{c.description_ar || '—'}</span> },
+                { key: 'phone', label: 'الهاتف', sortable: true },
+                { key: 'totalSales', label: 'المشتريات', sortable: true, align: 'end', cell: (c) => formatNumber(c.totalSales) },
+                { key: 'totalPaid', label: 'المدفوع', sortable: true, align: 'end', cell: (c) => <span style={{ color: '#16a34a' }}>{formatNumber(c.totalPaid)}</span> },
+                { key: 'remainingDebt', label: 'الدين', sortable: true, align: 'end', cell: (c) => <span style={{ color: c.remainingDebt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>{formatNumber(c.remainingDebt)}</span> },
               ]}
               actions={(row) => (
                 <>
@@ -306,74 +317,6 @@ function ClientsContent() {
               )}
               emptyMessage="لا يوجد عملاء"
             />
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>الاسم (لاتيني){getSortIndicator('name')}</th>
-                  <th onClick={() => requestSort('description_ar')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description_ar')}>الاسم (عربي){getSortIndicator('description_ar')}</th>
-                  <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('phone')}>رقم الهاتف{getSortIndicator('phone')}</th>
-                  <th onClick={() => requestSort('totalSales')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalSales')}>إجمالي المشتريات{getSortIndicator('totalSales')}</th>
-                  <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPaid')}>المدفوع{getSortIndicator('totalPaid')}</th>
-                  <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remainingDebt')}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((client) => (
-                  <tr
-                    key={client.id}
-                    style={client._duplicateOfId ? { background: '#fffbeb' } : undefined}
-                  >
-                    <td>{client.id}</td>
-                    <td style={{ fontWeight: 600 }}>
-                      {client.name}
-                      {/* v1.0.3 Bug C — duplicate-name client rows are flagged
-                          by getClients with _duplicateOfId. The aggregate is
-                          attributed to the lowest-id row only; the others show
-                          a 'مكرر' badge so the admin can manually merge or
-                          delete them. The proper fix (sales.client_id FK) ships
-                          in v1.1 — see docs/v1.1-backlog.md § 4.4. */}
-                      {client._duplicateOfId && (
-                        <span style={{
-                          marginRight: '8px',
-                          padding: '2px 8px',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          background: '#fef3c7',
-                          color: '#92400e',
-                          borderRadius: '6px',
-                          border: '1px solid #fde68a',
-                        }}>
-                          ⚠️ مكرر — انظر #{client._duplicateOfId}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{client.description_ar || '—'}</td>
-                    <td>{client.phone}</td>
-                    <td className="number-cell">{formatNumber(client.totalSales)}</td>
-                    <td className="number-cell" style={{ color: '#16a34a' }}>{formatNumber(client.totalPaid)}</td>
-                    <td className="number-cell" style={{ color: client.remainingDebt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
-                      {formatNumber(client.remainingDebt)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <Link href={`/clients/${client.id}`} className="btn btn-primary btn-sm">
-                          التفاصيل
-                        </Link>
-                        {isAdmin && (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(client.id)}>
-                            حذف
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           </>
         )}
       </div>

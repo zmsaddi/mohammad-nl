@@ -8,7 +8,7 @@ import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import Pagination, { usePagination } from '@/components/Pagination';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import SortControl from '@/components/SortControl';
@@ -200,53 +200,23 @@ function SuppliersContent() {
           </div>
         ) : (
           <>
-            <DataCardList
+            <DataView
               rows={paginatedRows}
-              fields={[
-                { key: 'name', label: 'الاسم' },
-                { key: 'phone', label: 'الهاتف' },
-                { key: 'totalPurchases', label: 'إجمالي المشتريات', format: (v) => formatNumber(v) },
-                { key: 'totalPaid', label: 'المدفوع', format: (v) => formatNumber(v) },
-                { key: 'remainingDebt', label: 'الدين المتبقي', format: (v) => formatNumber(v) },
+              sort={{ requestSort, getAriaSort, getSortIndicator }}
+              onRowClick={(s) => { window.location.href = `/suppliers/${s.id}`; }}
+              columns={[
+                { key: 'id', label: '#', sortable: true, mobileHide: true },
+                { key: 'name', label: 'اسم المورد', sortable: true, cell: (s) => <span style={{ fontWeight: 600 }}>{s.name}</span> },
+                { key: 'phone', label: 'الهاتف', sortable: true, cell: (s) => <span style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>{s.phone || '—'}</span> },
+                { key: 'totalPurchases', label: 'إجمالي المشتريات', sortable: true, align: 'end', cell: (s) => formatNumber(s.totalPurchases) },
+                { key: 'totalPaid', label: 'المدفوع', sortable: true, align: 'end', cell: (s) => <span style={{ color: 'var(--color-success)' }}>{formatNumber(s.totalPaid)}</span> },
+                { key: 'remainingDebt', label: 'الدين المتبقي', sortable: true, align: 'end', cell: (s) => <span style={{ color: parseFloat(s.remainingDebt) > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(s.remainingDebt)}</span> },
               ]}
-              actions={(row) => (
-                <>
-                  <Link href={`/suppliers/${row.id}`} className="btn btn-primary btn-sm">تفاصيل</Link>
-                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
-                </>
+              actions={(s) => (
+                <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(s.id)}>حذف</button>
               )}
               emptyMessage="لا يوجد موردين"
             />
-            <div className="table-container has-card-fallback">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>اسم المورد{getSortIndicator('name')}</th>
-                    <th onClick={() => requestSort('phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('phone')}>الهاتف{getSortIndicator('phone')}</th>
-                    <th onClick={() => requestSort('totalPurchases')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPurchases')}>إجمالي المشتريات{getSortIndicator('totalPurchases')}</th>
-                    <th onClick={() => requestSort('totalPaid')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('totalPaid')}>المدفوع{getSortIndicator('totalPaid')}</th>
-                    <th onClick={() => requestSort('remainingDebt')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('remainingDebt')}>الدين المتبقي{getSortIndicator('remainingDebt')}</th>
-                    <th>إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRows.map((s) => (
-                    <tr key={s.id} className="clickable-row" onClick={() => window.location.href = `/suppliers/${s.id}`}>
-                      <td>{s.id}</td>
-                      <td style={{ fontWeight: 600 }}>{s.name}</td>
-                      <td style={{ direction: 'ltr', textAlign: 'right' }}>{s.phone || '—'}</td>
-                      <td className="number-cell">{formatNumber(s.totalPurchases)}</td>
-                      <td className="number-cell" style={{ color: 'var(--color-success)' }}>{formatNumber(s.totalPaid)}</td>
-                      <td className="number-cell" style={{ color: parseFloat(s.remainingDebt) > 0 ? '#dc2626' : 'var(--color-success)', fontWeight: 600 }}>{formatNumber(s.remainingDebt)}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(s.id)}>حذف</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
             <Pagination page={page} totalPages={totalPages} totalRows={totalRows} perPage={perPage} onPageChange={goTo} onPerPageChange={setPerPage} />
           </>
         )}
