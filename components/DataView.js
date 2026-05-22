@@ -18,7 +18,13 @@
 // columns: [{
 //   key,                        // row property key (also the React key)
 //   label,                      // header text + mobile card label
-//   cell?: (row) => ReactNode,  // custom render (badges/colors/links); else row[key]
+//   cell?: (row) => ReactNode,  // desktop-table custom render; else row[key]
+//   mobileCell?: (row) => ReactNode, // mobile-card render when it must DIFFER from
+//                               // the desktop cell (e.g. desktop shows an edit
+//                               // input, mobile shows a read-only value). Falls
+//                               // back to `cell` then row[key]. Use it to keep
+//                               // exact parity with pages whose mobile layout was
+//                               // display-only while the desktop was editable.
 //   align?: 'end',              // numeric columns → right-aligned `.number-cell`
 //   sortable?: boolean,         // clickable sort header (requires the `sort` prop)
 //   mobileHide?: boolean,       // omit this column from the mobile card
@@ -69,7 +75,7 @@ export default function DataView({
               {columns.filter((c) => !c.mobileHide).map((col) => (
                 <div key={col.key} className="data-card-field">
                   <span className="data-card-label">{col.label}</span>
-                  <span className="data-card-value">{renderCell(col, row)}</span>
+                  <span className="data-card-value">{col.mobileCell ? col.mobileCell(row) : renderCell(col, row)}</span>
                 </div>
               ))}
             </div>
