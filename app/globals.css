@@ -522,6 +522,14 @@ html, body {
   padding: 12px 16px;
   border-bottom: 1px solid #f1f5f9;
   color: #334155;
+  /* Keep every cell on a single line so the table stays neat regardless of
+     which rows are visible. Without this, td (unlike th) wrapped on long
+     content (e.g. "V8 ULTRA MAX - BLACK", long client names): the table is
+     locked at width:100%, so long rows forced dates/ref-codes/action-buttons
+     to break onto two lines — making the layout reflow whenever a sort/page
+     brought longer rows into view. With nowrap the table grows past 100% when
+     needed and .table-container's overflow-x:auto provides horizontal scroll. */
+  white-space: nowrap;
 }
 
 .data-table tbody tr:hover {
