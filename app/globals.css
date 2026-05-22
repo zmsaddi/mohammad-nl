@@ -1927,6 +1927,17 @@ html, body {
   .pnl-hero-value { font-size: 2rem; }
 }
 
+/* النقد في الصناديق — per-box cash breakdown under the cash KPI */
+.treasury-boxes { display: flex; flex-direction: column; gap: 8px; }
+.treasury-box-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.88rem;
+}
+.treasury-box-name { color: #475569; font-weight: 600; }
+.treasury-box-bal { font-weight: 800; font-variant-numeric: tabular-nums; }
+.treasury-box-total { background: #e0f2fe; font-weight: 800; }
+.treasury-box-total span { font-weight: 800; color: #0369a1; }
+
 /* ============================
    Shared filter controls (Commit 9 — styling consolidation).
    Replaces the per-page inline style repeated on every filter-bar
