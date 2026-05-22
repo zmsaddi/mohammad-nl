@@ -14,7 +14,12 @@ export async function GET(request) {
   const { token } = auth;
   try {
     const { searchParams } = new URL(request.url);
-    const withDebt = searchParams.get('withDebt') === 'true';
+    // Debt aggregates (totalSales / totalPaid / remainingDebt) are financial
+    // data — only admin/manager may receive them. Sellers/drivers still get the
+    // plain client list (names) they need for the sales form / deliveries, but
+    // never every client's debt position.
+    const canSeeDebt = ['admin', 'manager'].includes(token.role);
+    const withDebt = canSeeDebt && searchParams.get('withDebt') === 'true';
     const rows = await getClients(withDebt);
     return NextResponse.json(rows);
   } catch (err) {

@@ -11,8 +11,10 @@ export async function GET(request) {
   const { token } = auth;
   try {
     let rows = await getProducts();
-    // Strip buy_price at the server — sellers must never receive cost data
-    if (token.role === 'seller') rows = rows.map(({ buy_price, ...rest }) => rest);
+    // Strip buy_price at the server — only admin/manager may receive cost data.
+    // (Was seller-only; drivers also fetch products via the dashboard and must
+    // not receive the purchase price either.)
+    if (!['admin', 'manager'].includes(token.role)) rows = rows.map(({ buy_price, ...rest }) => rest);
     return NextResponse.json(rows);
   } catch (err) {
     return apiError(err, 'خطأ في جلب البيانات', 500, 'products GET');

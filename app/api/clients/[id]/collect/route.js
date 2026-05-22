@@ -12,10 +12,11 @@ import { requireAuth } from '@/lib/api-auth';
  *
  * Body: { amount: number, paymentMethod: 'كاش'|'بنك' }
  *
- * Auth: admin, manager, seller.
+ * Auth: admin, manager. Sellers don't handle money (no custody box), so they
+ * can't record collections.
  */
 export async function POST(request, { params }) {
-  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
+  const auth = await requireAuth(request, ['admin', 'manager']);
   if (auth.error) return auth.error;
   const { token } = auth;
 

@@ -7,13 +7,22 @@ import { requireAuth } from '@/lib/api-auth';
 import { apiError } from '@/lib/api-errors';
 
 export async function GET(request) {
-  const auth = await requireAuth(request);
+  // Drivers have no business with the sales ledger (they work deliveries) —
+  // excluded so they can't pull every sale's cost/profit via the API.
+  const auth = await requireAuth(request, ['admin', 'manager', 'seller']);
   if (auth.error) return auth.error;
   const { token } = auth;
   try {
     const { searchParams } = new URL(request.url);
     let rows = await getSales(searchParams.get('client'));
-    if (token.role === 'seller') rows = rows.filter(r => r.created_by === token.username);
+    if (token.role === 'seller') {
+      // Sellers see ONLY their own sales, and NEVER cost/profit fields — same
+      // server-side stripping the products route applies to buy_price. The UI
+      // hiding the columns is not enough; the data must not leave the server.
+      rows = rows
+        .filter((r) => r.created_by === token.username)
+        .map(({ cost_price, cost_total, profit, ...rest }) => rest);
+    }
     return NextResponse.json(rows);
   } catch (err) {
     return apiError(err, 'خطأ في جلب البيانات', 500, 'sales GET');
