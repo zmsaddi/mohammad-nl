@@ -15,7 +15,7 @@ const navGroups = [
 ];
 
 const navLinks = [
-  { href: '/summary', label: 'لوحة التحكم', group: null, roles: ['admin', 'manager', 'seller'], icon: '📊' },
+  { href: '/summary', label: 'لوحة التحكم', group: null, roles: ['admin', 'manager', 'seller', 'driver'], icon: '📊' },
   { href: '/purchases', label: 'المشتريات', group: 'operations', roles: ['admin', 'manager'], icon: '🛒' },
   { href: '/sales', label: 'المبيعات', group: 'operations', roles: ['admin', 'manager', 'seller'], icon: '💰' },
   { href: '/expenses', label: 'المصاريف', group: 'operations', roles: ['admin', 'manager'], icon: '📋' },

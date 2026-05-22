@@ -39,6 +39,9 @@ function SummaryContent() {
   const [activeTab, setActiveTab] = useState('quick');
   // DONE: Step 8 — products fetched separately for the category breakdown card
   const [productList, setProductList] = useState([]);
+  // Dashboard revamp — current treasury balance (admin/manager/driver; null when
+  // disabled or unavailable). Fetched alongside the summary, failure-tolerant.
+  const [treasury, setTreasury] = useState(null);
   const canUseVoice = ['admin', 'manager', 'seller'].includes(session?.user?.role);
 
   const fetchData = async (from, to) => {
@@ -61,6 +64,13 @@ function SummaryContent() {
       const products = await productsRes.json();
       setData(result);
       setProductList(Array.isArray(products) ? products : []);
+      // Dashboard revamp — current treasury balance. Allowed for
+      // admin/manager/driver; sellers get 403 → treated as unavailable. Any
+      // failure (disabled flag, network) degrades gracefully to no card.
+      try {
+        const tRes = await fetch('/api/treasury/boxes', { cache: 'no-store' });
+        setTreasury(tRes.ok ? await tRes.json() : null);
+      } catch { setTreasury(null); }
     } catch (err) {
       // v1.1 F-022 — set fetchError so the render shows a retry button
       // instead of silently rendering the empty state.
@@ -126,6 +136,8 @@ function SummaryContent() {
 
   // DONE: Fix 3 — branch on seller payload
   const isSellerView = data?.sellerView === true;
+  // Dashboard revamp — drivers now get a dedicated payload + view (was 403).
+  const isDriverView = data?.driverView === true;
 
   // DONE: Fix 6 — gross + net margin (used inside the P&L cards)
   const grossMargin = data && data.totalRevenue > 0
@@ -201,18 +213,37 @@ function SummaryContent() {
     ? Object.entries(data.expenseByCategory).map(([name, value]) => ({ name, value }))
     : [];
 
-  const exportData = data ? [
-    { 'البند': 'إيرادات المبيعات (استحقاق)', 'المبلغ': data.totalRevenue },
-    { 'البند': 'تكلفة البضاعة المباعة (استحقاق)', 'المبلغ': data.totalCOGS },
-    { 'البند': 'الربح الإجمالي (استحقاق)', 'المبلغ': data.grossProfit },
-    { 'البند': 'المصاريف التشغيلية', 'المبلغ': data.totalExpenses },
-    { 'البند': 'صافي الربح (استحقاق)', 'المبلغ': data.netProfit },
-    { 'البند': 'إجمالي المشتريات', 'المبلغ': data.totalPurchases },
-    { 'البند': 'قيمة المخزون', 'المبلغ': data.inventoryValue },
-    { 'البند': 'الديون المستحقة', 'المبلغ': data.totalDebt },
-    { 'البند': 'مبيعات كاش (COD)', 'المبلغ': data.salesCash },
-    { 'البند': 'مبيعات بنك', 'المبلغ': data.salesBank },
-  ] : [];
+  // Dashboard revamp — stock alerts derived from the already-fetched product
+  // list (no extra request). Surfaced as a prominent alert instead of being
+  // buried in the per-category table.
+  const outStockItems = productList.filter((p) => (parseFloat(p.stock) || 0) <= 0);
+  const lowStockItems = productList.filter((p) => {
+    const s = parseFloat(p.stock) || 0;
+    return s > 0 && s <= (p.low_stock_threshold ?? 3);
+  });
+
+  // Dashboard revamp — current treasury balance across visible boxes (only when
+  // the treasury feature is live and returned boxes).
+  const treasuryEnabled = treasury?.enabled === true && Array.isArray(treasury?.boxes) && treasury.boxes.length > 0;
+  const treasuryTotal = treasuryEnabled
+    ? treasury.boxes.reduce((s, b) => s + (parseFloat(b.balance) || 0), 0)
+    : 0;
+
+  // Dashboard revamp — ↑↓ delta vs the previous comparable period. Returns null
+  // when there's no prior baseline (e.g. "all-time" filter, or prev period = 0).
+  const renderDelta = (cur, prev) => {
+    if (prev == null || !Number.isFinite(Number(prev)) || Number(prev) === 0) return null;
+    const c = Number(cur) || 0;
+    const p = Number(prev);
+    const d = ((c - p) / Math.abs(p)) * 100;
+    const up = d >= 0;
+    return (
+      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: up ? '#16a34a' : '#dc2626' }}
+            title={`مقارنةً بالفترة السابقة المماثلة (${formatNumber(p)})`}>
+        {up ? '▲' : '▼'} {Math.abs(d).toFixed(0)}%
+      </span>
+    );
+  };
 
   return (
     <AppLayout>
@@ -259,7 +290,7 @@ function SummaryContent() {
       />
 
       {/* Filter Chips */}
-      {!isSellerView && (
+      {!isSellerView && !isDriverView && (
         <div className="filter-bar-v2">
           <div className="filter-chips">
             <button className={`chip${!dateFrom && !dateTo && !showCustomDate ? ' active' : ''}`} onClick={() => { handlePreset('thisMonth'); setShowCustomDate(false); }}>هذا الشهر</button>
@@ -273,7 +304,7 @@ function SummaryContent() {
           )}
         </div>
       )}
-      {!isSellerView && showCustomDate && (
+      {!isSellerView && !isDriverView && showCustomDate && (
         <div className="date-range-row">
           <input type="date" className="date-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>إلى</span>
@@ -312,6 +343,89 @@ function SummaryContent() {
               <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid)}</div>
             </div>
           </div>
+          {/* Dashboard revamp — the seller's actual reserved orders (was: a count
+              only). Lets the seller see WHICH orders await delivery. */}
+          {data.reservedList?.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#92400e', marginBottom: 10 }}>
+                طلباتي المحجوزة (بانتظار التوصيل) — {data.reservedList.length}
+              </h4>
+              <DataCardList
+                rows={data.reservedList}
+                fields={[
+                  { key: 'date', label: 'التاريخ' },
+                  { key: 'client_name', label: 'العميل' },
+                  { key: 'item', label: 'المنتج' },
+                  { key: 'total', label: 'القيمة', format: (v) => formatNumber(v) },
+                ]}
+                emptyMessage="لا توجد طلبات محجوزة"
+              />
+            </div>
+          )}
+        </div>
+      ) : data && isDriverView ? (
+        /* Dashboard revamp — driver personal dashboard (deliveries + commissions) */
+        <div className="card" style={{ marginBottom: '24px', padding: '20px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: '#1e293b' }}>
+            لوحتي — التوصيلات والعمولات
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: 16 }}>
+            <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#d97706' }}>قيد الانتظار</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#b45309' }}>{data.pendingCount || 0}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#dbeafe', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#1e40af' }}>جاري التوصيل</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1e40af' }}>{data.inTransitCount || 0}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#dcfce7', borderRadius: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>عمولات مستحقة</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusOwed || 0)}</div>
+            </div>
+            <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', textAlign: 'center', border: '1px solid #bbf7d0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>عمولات تم صرفها</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#15803d' }}>{formatNumber(data.totalBonusPaid || 0)}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#374151' }}>توصيلاتي الحالية</h4>
+            <Link href="/deliveries" className="btn btn-sm btn-outline">فتح صفحة التوصيل &larr;</Link>
+          </div>
+          <DataCardList
+            rows={data.deliveries || []}
+            fields={[
+              { key: 'date', label: 'التاريخ' },
+              { key: 'client_name', label: 'العميل' },
+              { key: 'address', label: 'العنوان' },
+              { key: 'items', label: 'الأصناف' },
+              { key: 'status', label: 'الحالة' },
+            ]}
+            emptyMessage="لا توجد توصيلات حالية"
+          />
+          <div className="table-container has-card-fallback">
+            <table className="data-table">
+              <thead>
+                <tr><th>التاريخ</th><th>العميل</th><th>العنوان</th><th>الأصناف</th><th>الحالة</th></tr>
+              </thead>
+              <tbody>
+                {(data.deliveries || []).map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.date}</td>
+                    <td style={{ fontWeight: 600 }}>{d.client_name}</td>
+                    <td>{d.address}</td>
+                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
+                    <td>
+                      <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600,
+                        background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
+                        color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6' }}>
+                        {d.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : data ? (
         <>
@@ -325,13 +439,17 @@ function SummaryContent() {
           {/* ===== Tab 1: ملخص سريع — KPI cards & revenue breakdown ===== */}
           {activeTab === 'quick' && (
             <>
-              {/* KPI Cards — new design with colored borders */}
+              {/* KPI Cards — the owner's morning questions: how much did I really
+                  make (collected), how did the cash move, what's owed TO me, and
+                  what I owe. The accrual net-profit KPI moved to the الأرباح
+                  والخسائر tab so two competing "net profit" figures no longer sit
+                  side by side. ↑↓ delta compares to the previous equal period. */}
               <div className="kpi-grid">
                 {[
-                  { label: 'إيرادات مؤكدة (استحقاق)', value: data.totalRevenue, icon: '💎', color: '#10b981' },
-                  { label: 'صافي الربح (محصّل)', value: data.netProfitCashBasis || 0, icon: '📊', color: '#6366f1' },
-                  { label: 'صافي الربح (استحقاق)', value: data.netProfit, icon: '📈', color: '#3b82f6' },
-                  { label: 'الديون المستحقة', value: data.totalDebt, icon: '⚠️', color: '#f43f5e' },
+                  { label: 'صافي الربح المحصّل', value: data.netProfitCashBasis || 0, icon: '📊', color: '#6366f1', prev: data.prevNetProfitCashBasis },
+                  { label: 'صافي التدفق النقدي', value: (data.cashFlowNetCash || 0) + (data.cashFlowNetBank || 0), icon: '💵', color: '#0ea5e9' },
+                  { label: 'ديون العملاء (لنا)', value: data.totalDebt, icon: '📥', color: '#16a34a' },
+                  { label: 'مستحقات الموردين (علينا)', value: data.supplierPayablesTotal || 0, icon: '📤', color: '#f43f5e' },
                 ].map((kpi, i) => {
                   const num = parseFloat(kpi.value) || 0;
                   return (
@@ -340,33 +458,139 @@ function SummaryContent() {
                         <span style={{ fontSize: 24 }}>{kpi.icon}</span>
                         <span className="kpi-label">{kpi.label}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                         <span className="kpi-value" style={{ color: num === 0 ? '#cbd5e1' : kpi.color }}>
                           {num === 0 ? '—' : formatNumber(num)}
                         </span>
-                        {num === 0 && <span className="kpi-empty">لا بيانات</span>}
+                        {'prev' in kpi && renderDelta(num, kpi.prev)}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Reserved Orders */}
-              {(data.reservedCount > 0) && (
-                <div className="card" style={{ marginBottom: '24px', padding: '16px', borderRight: '4px solid #f59e0b' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>طلبات محجوزة (بانتظار التوصيل)</h3>
-                      <span style={{ fontSize: '0.85rem', color: '#a16207' }}>{data.reservedCount} طلب بقيمة {formatNumber(data.reservedRevenue)} - ربح متوقع: {formatNumber(data.reservedProfit)}</span>
+              {/* Today strip — a quick "what happened today" pulse */}
+              <div className="today-strip">
+                <div className="today-item" style={{ borderTop: '3px solid #16a34a' }}>
+                  <span className="today-label">مبيعات اليوم</span>
+                  <span className="today-value">{formatNumber(data.todayRevenue || 0)}</span>
+                </div>
+                <div className="today-item" style={{ borderTop: '3px solid #0ea5e9' }}>
+                  <span className="today-label">تحصيلات اليوم</span>
+                  <span className="today-value">{formatNumber(data.todayCollections || 0)}</span>
+                </div>
+                <div className="today-item" style={{ borderTop: '3px solid #f59e0b' }}>
+                  <span className="today-label">مصاريف اليوم</span>
+                  <span className="today-value">{formatNumber(data.todayExpenses || 0)}</span>
+                </div>
+              </div>
+
+              {/* Current treasury balance — only when the treasury feature is live */}
+              {treasuryEnabled && (
+                <div className="card" style={{ marginBottom: 24, padding: 16, borderRight: '4px solid #0ea5e9' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: treasury.boxes.length > 1 ? 12 : 0 }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0369a1' }}>🏦 النقد الحالي في الصناديق</h3>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0369a1' }}>{formatNumber(treasuryTotal)}</span>
+                  </div>
+                  {treasury.boxes.length > 1 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {treasury.boxes.map((b) => (
+                        <span key={b.id} style={{ fontSize: '0.8rem', background: '#f0f9ff', color: '#0369a1', borderRadius: 8, padding: '4px 10px' }}>
+                          {b.type === 'main' ? 'الصندوق العام' : (b.owner_name || b.owner_username || 'صندوق')}: <strong>{formatNumber(parseFloat(b.balance) || 0)}</strong>
+                        </span>
+                      ))}
                     </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span className="status-badge" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.9rem', padding: '6px 16px' }}>
-                        لم تُحسب في الأرباح
-                      </span>
-                      <button className="btn btn-sm" style={{ background: '#8b5cf6', color: 'white', fontSize: '0.8rem' }} onClick={() => setActiveTab('pnl')}>
-                        📊 عرض القائمة المتوقعة
+                  )}
+                </div>
+              )}
+
+              {/* Actions required now — one place for the operational queue:
+                  orders awaiting delivery, bank-receipt queue, reserved orders,
+                  and out/low stock. Each tile appears only when it has items. */}
+              {((data.reservedCount || 0) > 0 || (data.awaitingDeliveryCount || 0) > 0 || (data.bankPendingCount || 0) > 0 || outStockItems.length > 0 || lowStockItems.length > 0) && (
+                <div className="card" style={{ marginBottom: 24, padding: 16, borderRight: '4px solid #f59e0b' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#92400e', marginBottom: 12 }}>⚡ إجراءات مطلوبة الآن</h3>
+                  <div className="action-tiles">
+                    {(data.awaitingDeliveryCount || 0) > 0 && (
+                      <Link href="/deliveries" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#d97706' }}>{data.awaitingDeliveryCount}</span>
+                        <span className="action-tile-label">طلبات بانتظار التسليم</span>
+                        <span className="action-tile-sub">بقيمة {formatNumber(data.awaitingDeliveryValue || 0)}</span>
+                      </Link>
+                    )}
+                    {(data.bankPendingCount || 0) > 0 && (
+                      <Link href="/sales" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#7c3aed' }}>{data.bankPendingCount}</span>
+                        <span className="action-tile-label">بنك بانتظار الاستلام</span>
+                        <span className="action-tile-sub">بقيمة {formatNumber(data.bankPendingValue || 0)}</span>
+                      </Link>
+                    )}
+                    {(data.reservedCount || 0) > 0 && (
+                      <button className="action-tile" onClick={() => setActiveTab('pnl')}>
+                        <span className="action-tile-num" style={{ color: '#8b5cf6' }}>{data.reservedCount}</span>
+                        <span className="action-tile-label">طلبات محجوزة</span>
+                        <span className="action-tile-sub">ربح متوقع {formatNumber(data.reservedProfit || 0)}</span>
                       </button>
-                    </div>
+                    )}
+                    {outStockItems.length > 0 && (
+                      <Link href="/stock" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#dc2626' }}>{outStockItems.length}</span>
+                        <span className="action-tile-label">منتجات نفدت</span>
+                        <span className="action-tile-sub">إعادة الطلب</span>
+                      </Link>
+                    )}
+                    {lowStockItems.length > 0 && (
+                      <Link href="/stock" className="action-tile">
+                        <span className="action-tile-num" style={{ color: '#d97706' }}>{lowStockItems.length}</span>
+                        <span className="action-tile-label">مخزون منخفض</span>
+                        <span className="action-tile-sub">قارب على النفاد</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* الطلبات بانتظار التسليم — explicit admin/manager request: the full
+                  queue of orders awaiting handover (not just a count). */}
+              {data.awaitingDelivery?.length > 0 && (
+                <div className="card" style={{ marginBottom: '24px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151' }}>
+                    الطلبات بانتظار التسليم ({data.awaitingDeliveryCount}) — بقيمة {formatNumber(data.awaitingDeliveryValue || 0)}
+                  </h3>
+                  <DataCardList
+                    rows={data.awaitingDelivery}
+                    fields={[
+                      { key: 'date', label: 'التاريخ' },
+                      { key: 'client_name', label: 'العميل' },
+                      { key: 'address', label: 'العنوان' },
+                      { key: 'items', label: 'الأصناف' },
+                      { key: 'status', label: 'الحالة' },
+                    ]}
+                    emptyMessage="لا توجد طلبات"
+                  />
+                  <div className="table-container has-card-fallback">
+                    <table className="data-table">
+                      <thead>
+                        <tr><th>التاريخ</th><th>العميل</th><th>العنوان</th><th>الأصناف</th><th>الحالة</th></tr>
+                      </thead>
+                      <tbody>
+                        {data.awaitingDelivery.map((d, i) => (
+                          <tr key={i}>
+                            <td>{d.date}</td>
+                            <td style={{ fontWeight: 600 }}>{d.client_name}</td>
+                            <td>{d.address}</td>
+                            <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
+                            <td>
+                              <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600,
+                                background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
+                                color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6' }}>
+                                {d.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -386,7 +610,11 @@ function SummaryContent() {
               <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 12 }}>
                 أرقام حقيقية من جدول المدفوعات (ليست من طريقة البيع المعلنة) — تشمل تحصيلات ديون سابقة ودفعات موردين جزئية.
               </div>
-              <div className="cash-table" style={{ marginBottom: 24 }}>
+              {/* Detailed cash-flow — wrapped so it scrolls horizontally on
+                  mobile instead of squishing its 4 columns. The headline
+                  "صافي التدفق النقدي" already sits in the KPI row above. */}
+              <div className="cash-scroll" style={{ marginBottom: 24 }}>
+                <div className="cash-table">
                 <div className="cash-header" style={{ gridTemplateColumns: '1.3fr 1fr 1fr 1fr' }}>
                   <div className="cash-col"></div>
                   <div className="cash-col cash-col-header"><span style={{ color: '#10b981' }}>●</span> كاش</div>
@@ -442,65 +670,25 @@ function SummaryContent() {
                     </span>
                   </div>
                 </div>
+                </div>
               </div>
 
-              {/* Pending Deliveries */}
-              {data.recentDeliveries?.length > 0 && (
-                <div className="card" style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#f59e0b" width="20" height="20">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-                    </svg>
-                    التوصيلات المعلقة والجارية
-                  </h3>
-                  <DataCardList
-                    rows={data.recentDeliveries}
-                    fields={[
-                      { key: 'date', label: 'التاريخ' },
-                      { key: 'client_name', label: 'العميل' },
-                      { key: 'address', label: 'العنوان' },
-                      { key: 'items', label: 'الأصناف' },
-                      { key: 'status', label: 'الحالة' },
-                    ]}
-                    emptyMessage="لا توجد توصيلات"
-                  />
-                  <div className="table-container has-card-fallback">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>التاريخ</th>
-                          <th>العميل</th>
-                          <th>العنوان</th>
-                          <th>الأصناف</th>
-                          <th>الحالة</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.recentDeliveries.map((d, i) => (
-                          <tr key={i}>
-                            <td>{d.date}</td>
-                            <td style={{ fontWeight: 600 }}>{d.client_name}</td>
-                            <td>{d.address}</td>
-                            <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.items}</td>
-                            <td>
-                              <span style={{
-                                padding: '2px 10px',
-                                borderRadius: '20px',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                background: d.status === 'قيد الانتظار' ? '#fef3c7' : '#dbeafe',
-                                color: d.status === 'قيد الانتظار' ? '#d97706' : '#3b82f6',
-                              }}>
-                                {d.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              {/* Net-profit trend — moved here from the Reports tab so the
+                  owner's "am I improving?" question is answered up front.
+                  Independent trailing-6-month window (not the date filter). */}
+              <div className="chart-card" style={{ marginBottom: 24 }}>
+                <h3>اتجاه صافي الربح (آخر 6 شهور)</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={data.monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatNumber(value)} />
+                    <Legend />
+                    <Line type="monotone" dataKey="profit" name="صافي الربح" stroke="#1e40af" strokeWidth={2} dot={{ fill: '#1e40af' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </>
           )}
 
@@ -519,6 +707,14 @@ function SummaryContent() {
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px' }}>
               محجوز + مؤكد — مؤشر تقديري، قابل للتغير مع الإلغاءات. عمولات الطلبات المحجوزة غير مدرجة (تُنشأ عند التوصيل).
             </div>
+            {/* Headline first; the 6-figure breakdown is collapsed by default to
+                cut clutter — the projected net is only a tentative indicator. */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: '0.9rem', color: '#6d28d9', fontWeight: 600 }}>صافي الربح المتوقع</span>
+              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</span>
+            </div>
+            <details>
+              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#6d28d9', fontWeight: 600, marginBottom: 8 }}>عرض التفاصيل</summary>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '16px', background: '#ede9fe', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 500 }}>إيرادات متوقعة ({(data.confirmedCount || 0) + (data.reservedCount || 0)})</div>
@@ -549,6 +745,7 @@ function SummaryContent() {
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: (data.projectedNetProfit || 0) >= 0 ? '#8b5cf6' : '#dc2626' }}>{formatNumber(data.projectedNetProfit || 0)}</div>
               </div>
             </div>
+            </details>
           </div>
 
           {/* Accounting P&L Cards */}
@@ -663,6 +860,9 @@ function SummaryContent() {
           {activeTab === 'reports' && (
             <>
           {/* Charts */}
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 8 }}>
+            مخطّط «المبيعات مقابل المشتريات» يعرض آخر 6 شهور دائماً (مستقل عن الفلتر الزمني أعلى الصفحة).
+          </p>
           <div className="charts-grid">
             {/* Bar Chart - Monthly Sales vs Purchases */}
             <div className="chart-card">
@@ -707,20 +907,7 @@ function SummaryContent() {
               )}
             </div>
 
-            {/* Line Chart - Profit Trend */}
-            <div className="chart-card">
-              <h3>اتجاه صافي الربح</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data.monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value) => formatNumber(value)} />
-                  <Legend />
-                  <Line type="monotone" dataKey="profit" name="صافي الربح" stroke="#1e40af" strokeWidth={2} dot={{ fill: '#1e40af' }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {/* Profit-trend line chart moved to the «ملخص سريع» tab. */}
           </div>
 
           {/* DONE: Step 8 — inventory breakdown by category (admin/manager only) */}
