@@ -98,8 +98,13 @@ function TreasuryContent() {
     finally { setLoading(false); }
   };
 
+  // Re-run when `role` resolves: on a cold load the session is still loading at
+  // mount, so role is undefined and the admin-gated fetches (capital, capital
+  // history, reconciliation) would be skipped — leaving the capital log empty
+  // until a 60s auto-refresh. Depending on `role` re-fetches the moment the
+  // session hydrates, so admins see their capital tracking immediately.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [role]);
   useAutoRefresh(fetchData);
 
   // Read-only per-box money-movement ledger. The API re-checks that this box is
@@ -449,12 +454,19 @@ function TreasuryContent() {
 
       {/* Capital log (admin) — every injection/withdrawal in any status. Always
           visible so the funding history stays reviewable even when paused. */}
-      {role === 'admin' && capitalHistory.length > 0 && (
+      {role === 'admin' && (
         <div className="card" style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 4 }}>سجلّ رأس المال</h3>
           <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
             كل عمليات إدخال وسحب رأس المال — مَن نفّذها، المبلغ، والحالة.
           </p>
+          {capitalHistory.length === 0 ? (
+            <div className="empty-state">
+              <h3>لا توجد عمليات رأس مال بعد</h3>
+              <p>عند إدخال أو سحب رأس مال (من قسم «رأس المال» أدناه) يظهر هنا سجلّ بكل العمليات.</p>
+            </div>
+          ) : (
+          <>
           <DataCardList
             rows={capitalHistory}
             fields={[
@@ -486,6 +498,8 @@ function TreasuryContent() {
               </tbody>
             </table>
           </div>
+          </>
+          )}
         </div>
       )}
 
