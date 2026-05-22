@@ -103,6 +103,9 @@ html, body {
   padding: 14px;
   margin-bottom: 10px;
 }
+/* DataView: a card that opens a detail/row action when tapped */
+.data-card-clickable { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.data-card-clickable:active { border-color: var(--color-primary, #1e40af); box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
 .data-card-status {
   display: inline-block;
   font-size: 0.78rem;
