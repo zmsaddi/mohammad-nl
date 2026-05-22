@@ -15,6 +15,7 @@ import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
 const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '' }, to: { default: '' }, driver: { default: 'all' }, bank: { default: '' } };
@@ -550,7 +551,17 @@ function DeliveriesContent() {
           )}
         </div>
 
-        {/* Item 2 — filter bar */}
+        {/* Item 2 — filter bar — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setF('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setF('to', '') },
+            f.status && { label: f.status, onRemove: () => setF('status', '') },
+            f.driver !== 'all' && { label: f.driver, onRemove: () => setF('driver', 'all') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
           <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
@@ -578,6 +589,7 @@ function DeliveriesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />

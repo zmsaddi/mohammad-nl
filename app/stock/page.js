@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, PRODUCT_CATEGORIES } from '@/lib/utils';
@@ -304,6 +305,15 @@ function StockContent() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
             جرد المخزون ({filtered.length === products.length ? products.length : `${filtered.length} من ${products.length}`})
           </h3>
+          <FilterSheet
+            isActive={filtersActive}
+            onClear={resetFilters}
+            chips={[
+              f.q && { label: `بحث: ${f.q}`, onRemove: () => setF('q', '') },
+              f.status !== 'all' && { label: ({ 'in-stock': 'متوفر', low: 'مخزون منخفض', out: 'نفذ' })[f.status] || f.status, onRemove: () => setF('status', 'all') },
+              f.category !== 'all' && { label: f.category, onRemove: () => setF('category', 'all') },
+            ].filter(Boolean)}
+          >
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
@@ -340,6 +350,7 @@ function StockContent() {
               <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
           </div>
+          </FilterSheet>
         </div>
 
         {loading ? (

@@ -18,6 +18,7 @@ import { matchesText, dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 
 const SALES_FILTERS = { from: { default: '' }, to: { default: '' }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
@@ -725,8 +726,21 @@ function SalesContent() {
           </h3>
         </div>
 
-        {/* Filter bar — URL-synced via the shared useUrlFilters hook. Text search
-            is debounced; selects/dates apply immediately; "✕ مسح" preserves ?new=1. */}
+        {/* Filter bar — URL-synced via the shared useUrlFilters hook. Wrapped in
+            FilterSheet: mobile gets a bottom sheet + active-filter chips, desktop
+            renders inline (passthrough). Filtering stays live; "✕ مسح" preserves ?new=1. */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setF('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setF('to', '') },
+            f.q && { label: `بحث: ${f.q}`, onRemove: () => setF('q', '') },
+            f.status !== 'all' && { label: f.status, onRemove: () => setF('status', 'all') },
+            f.pay !== 'all' && { label: ({ pending: 'معلق', partial: 'جزئي', paid: 'مدفوع', cancelled: 'ملغي' })[f.pay] || f.pay, onRemove: () => setF('pay', 'all') },
+            canSeeCosts && f.seller !== 'all' && { label: f.seller, onRemove: () => setF('seller', 'all') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
           <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
@@ -756,6 +770,7 @@ function SalesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={8} />

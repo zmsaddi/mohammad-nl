@@ -9,6 +9,7 @@ import DetailModal from '@/components/DetailModal';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 import { formatNumber, getTodayDate, EXPENSE_CATEGORIES } from '@/lib/utils';
@@ -261,7 +262,17 @@ function ExpensesContent() {
           )}
         </div>
 
-        {/* UX-05: filter bar */}
+        {/* UX-05: filter bar — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setFilter('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setFilter('to', '') },
+            f.category && { label: f.category, onRemove: () => setFilter('category', '') },
+            f.q && { label: `بحث: ${f.q}`, onRemove: () => setFilter('q', '') },
+          ].filter(Boolean)}
+        >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
           <input type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="من تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
           <input type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="إلى تاريخ" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
@@ -288,6 +299,7 @@ function ExpensesContent() {
             </button>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />

@@ -12,6 +12,7 @@ import { dateInRange } from '@/lib/filter-engine';
 import DataCardList from '@/components/DataCardList';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -132,7 +133,16 @@ function MyBonusContent() {
           سجل العمولات ({filtered.length === count ? `${count} عملية` : `${filtered.length} من ${count}`})
         </h3>
 
-        {/* UX-09: Filters */}
+        {/* UX-09: Filters — wrapped in FilterSheet (mobile bottom sheet; desktop inline). */}
+        <FilterSheet
+          isActive={filtersActive}
+          onClear={resetFilters}
+          chips={[
+            f.from && { label: `من ${f.from}`, onRemove: () => setFilter('from', '') },
+            f.to && { label: `إلى ${f.to}`, onRemove: () => setFilter('to', '') },
+            f.settled !== 'all' && { label: ({ settled: 'تم الصرف', unsettled: 'مستحق' })[f.settled] || f.settled, onRemove: () => setFilter('settled', 'all') },
+          ].filter(Boolean)}
+        >
         <div className="form-grid" style={{ marginBottom: '16px', gap: '12px' }}>
           <div className="form-group">
             <label>من تاريخ</label>
@@ -156,6 +166,7 @@ function MyBonusContent() {
             </div>
           )}
         </div>
+        </FilterSheet>
 
         {loading ? (
           <PageSkeleton rows={6} />

@@ -13,6 +13,7 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText } from '@/lib/filter-engine';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
+import FilterSheet from '@/components/FilterSheet';
 import DataCardList from '@/components/DataCardList';
 
 const CLIENT_FILTERS = { q: { default: '', debounce: 300 }, debt: { default: 'all' } };
@@ -222,6 +223,14 @@ function ClientsContent() {
             قائمة العملاء ({filtered.length === clients.length ? clients.length : `${filtered.length} من ${clients.length}`})
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <FilterSheet
+              isActive={filtersActive}
+              onClear={resetFilters}
+              chips={[
+                f.q && { label: `بحث: ${f.q}`, onRemove: () => setFilter('q', '') },
+                f.debt !== 'all' && { label: ({ debt: 'عليه دين', clear: 'بدون دين' })[f.debt] || f.debt, onRemove: () => setFilter('debt', 'all') },
+              ].filter(Boolean)}
+            >
             <input
               type="text"
               aria-label="بحث في العملاء"
@@ -243,6 +252,7 @@ function ClientsContent() {
             {filtersActive && (
               <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
+            </FilterSheet>
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
                 + إضافة عميل
