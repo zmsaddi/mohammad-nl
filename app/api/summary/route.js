@@ -75,12 +75,48 @@ export async function GET(request) {
         totalRevenue:     confirmed.reduce((s, r) => s + (parseFloat(r.total) || 0), 0),
         reservedCount:    reserved.length,
         reservedRevenue:  reserved.reduce((s, r) => s + (parseFloat(r.total) || 0), 0),
+        // Dashboard revamp — the actual reserved orders (not just the count) so
+        // the seller can see WHICH orders are awaiting delivery, with links.
+        reservedList:     reserved.map((r) => ({
+          id: r.id, date: r.date, client_name: r.client_name,
+          item: r.item, total: parseFloat(r.total) || 0,
+        })),
         totalBonusEarned: myBonuses.reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
         totalBonusPaid:   myBonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
         totalBonusOwed:   myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
       });
     } catch (err) {
       return apiError(err, 'خطأ في جلب البيانات', 500, 'summary GET (seller)');
+    }
+  }
+
+  // Dashboard revamp — drivers get a lightweight personal payload (their
+  // pending/in-transit deliveries + their commissions), mirroring the seller
+  // branch. Pre-revamp drivers were redirected to /summary but the API replied
+  // 403, leaving them on an error screen. Same delivery visibility rule as
+  // getDeliveries: assigned to them OR still unassigned.
+  if (token.role === 'driver') {
+    try {
+      const [delRes, bonusRes] = await Promise.all([
+        sql`SELECT d.id, d.date, d.client_name, d.address, d.items, d.total_amount, d.status
+              FROM deliveries d
+              WHERE d.status IN ('قيد الانتظار', 'جاري التوصيل')
+                AND (d.assigned_driver = ${token.username} OR d.assigned_driver = '')
+              ORDER BY d.id DESC`,
+        sql`SELECT * FROM bonuses WHERE username = ${token.username}`,
+      ]);
+      const myDeliveries = delRes.rows;
+      const myBonuses = bonusRes.rows;
+      return NextResponse.json({
+        driverView:     true,
+        pendingCount:   myDeliveries.filter((d) => d.status === 'قيد الانتظار').length,
+        inTransitCount: myDeliveries.filter((d) => d.status === 'جاري التوصيل').length,
+        deliveries:     myDeliveries,
+        totalBonusOwed: myBonuses.filter((b) => !b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
+        totalBonusPaid: myBonuses.filter((b) => b.settled).reduce((s, b) => s + (parseFloat(b.total_bonus) || 0), 0),
+      });
+    } catch (err) {
+      return apiError(err, 'خطأ في جلب البيانات', 500, 'summary GET (driver)');
     }
   }
 
