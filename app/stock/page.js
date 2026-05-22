@@ -6,7 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import DetailModal from '@/components/DetailModal';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -163,15 +163,6 @@ function StockContent() {
   // DONE: Step 2 — out/low counts also use the per-product threshold
   const outOfStock = products.filter((p) => getStatus(p) === 'out').length;
   const lowStock = products.filter((p) => getStatus(p) === 'low').length;
-
-  // PA-02: DataCardList field definitions
-  const cardFields = [
-    { key: 'name', label: 'المنتج' },
-    { key: 'category', label: 'الفئة' },
-    ...(canSeeCosts ? [{ key: 'buy_price', label: 'سعر الشراء', format: (v) => formatNumber(v) }] : []),
-    { key: 'sell_price', label: 'سعر البيع', format: (v) => v ? formatNumber(v) : '-' },
-    { key: 'stock', label: 'الكمية', format: (v) => formatNumber(v) },
-  ];
 
   return (
     <AppLayout>
@@ -378,176 +369,111 @@ function StockContent() {
           </div>
         ) : (
           <>
-            {/* PA-02: Mobile card fallback */}
-            <DataCardList
-              rows={paginatedRows.map((p) => ({ ...p, statusLabel: getStatusLabel(p) }))}
-              fields={cardFields}
-              statusField="statusLabel"
-              statusColors={{ 'متوفر': '#16a34a', 'منخفض': '#d97706', 'نفذ': '#dc2626' }}
-              actions={(row) => (
-                <>
-                  <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
-                  {isAdmin && <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>}
-                </>
-              )}
+            {/* Unified mobile-first DataView. The desktop table keeps the
+                inline-editable inputs (admin); mobile cards show read-only
+                values via mobileCell / mobileHide for parity with the old
+                card list. Per-product totals live in the summary cards above,
+                so the old table footer is intentionally dropped. */}
+            <DataView
+              rows={paginatedRows}
+              sort={{ requestSort, getAriaSort, getSortIndicator }}
+              onRowClick={(row) => setSelectedRow(row)}
+              rowKey={(row) => row.id}
+              emptyMessage="لا توجد منتجات"
+              columns={[
+                // v1.2 — internal DB id: admin/manager audit column, hidden from
+                // sellers and always hidden on mobile cards.
+                !isSeller && { key: 'id', label: '#', sortable: true, mobileHide: true },
+                { key: 'name', label: 'المنتج (لاتيني)', sortable: true, cell: (p) => <span style={{ fontWeight: 600 }}>{p.name}</span> },
+                {
+                  key: 'description_ar', label: 'الوصف (عربي)', sortable: true, mobileHide: true,
+                  cell: (p) => isAdmin ? (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        defaultValue={p.description_ar || ''}
+                        placeholder="الوصف بالعربي"
+                        style={{ width: '120px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif" }}
+                        onBlur={async (e) => {
+                          const val = e.target.value.trim();
+                          if (val !== (p.description_ar || '')) {
+                            try {
+                              await fetch('/api/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, description_ar: val }), cache: 'no-store' });
+                              addToast('تم تحديث الوصف العربي');
+                              fetchData();
+                            } catch { addToast('خطأ في التحديث', 'error'); }
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : <span style={{ color: '#64748b' }}>{p.description_ar || '—'}</span>,
+                },
+                { key: 'category', label: 'الفئة', sortable: true, cell: (p) => p.category || '-' },
+                canSeeCosts && { key: 'buy_price', label: 'سعر الشراء', align: 'end', sortable: true, cell: (p) => formatNumber(p.buy_price) },
+                {
+                  key: 'sell_price', label: 'سعر البيع', align: 'end', sortable: true,
+                  // Mobile: read-only price (matches the old card list).
+                  mobileCell: (p) => <span style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</span>,
+                  cell: (p) => isAdmin ? (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <input
+                        {...numberInputProps}
+                        min="0"
+                        step="any"
+                        defaultValue={p.sell_price || ''}
+                        placeholder="0"
+                        style={{ width: '80px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center', fontFamily: "'Cairo', sans-serif" }}
+                        onBlur={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          const currentSell = parseFloat(p.sell_price) || 0;
+                          if (val !== currentSell) {
+                            setPendingPrice({ id: p.id, name: p.name, oldPrice: currentSell, newPrice: val, inputRef: e.target });
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : <span style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</span>,
+                },
+                // DONE: Step 2G — inline editable low-stock threshold (admin only)
+                isAdmin && {
+                  key: 'low_stock_threshold', label: 'حد التنبيه', align: 'end', sortable: true, mobileHide: true,
+                  cell: (p) => (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <input
+                        {...numberInputProps}
+                        min="0"
+                        defaultValue={p.low_stock_threshold ?? 3}
+                        style={{ width: '60px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center', fontFamily: "'Cairo', sans-serif" }}
+                        onBlur={async (e) => {
+                          const val = parseInt(e.target.value, 10);
+                          const safe = Number.isFinite(val) && val >= 0 ? val : 3;
+                          if (safe !== (p.low_stock_threshold ?? 3)) {
+                            try {
+                              await fetch('/api/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, low_stock_threshold: safe }), cache: 'no-store' });
+                              addToast('تم تحديث حد التنبيه');
+                              fetchData();
+                            } catch { addToast('خطأ في التحديث', 'error'); }
+                          }
+                        }}
+                      />
+                    </div>
+                  ),
+                },
+                {
+                  key: 'stock', label: 'الكمية', align: 'end', sortable: true,
+                  cell: (p) => { const s = getStatus(p); return <span style={{ fontWeight: 700, color: s === 'out' ? '#dc2626' : s === 'low' ? '#d97706' : '#16a34a' }}>{formatNumber(p.stock)}</span>; },
+                },
+                // v1.2 — parseFloat both operands (NUMERIC arrives as string).
+                canSeeCosts && {
+                  key: 'value', label: 'قيمة المخزون', align: 'end', mobileHide: true,
+                  cell: (p) => <span style={{ fontWeight: 600 }}>{formatNumber((parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0))}</span>,
+                },
+                { key: 'status', label: 'الحالة', cell: (p) => <StatusBadge status={getStatusLabel(p)} /> },
+              ].filter(Boolean)}
+              actions={isAdmin ? (row) => (
+                <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
+              ) : undefined}
             />
-
-            <div className="table-container has-card-fallback">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    {/* v1.2 — hide the internal "#" (DB id) column from sellers.
-                        Useful for admin audit, noise for sellers scanning for
-                        what to quote a customer. */}
-                    {!isSeller && <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>}
-                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('name')}>المنتج (لاتيني){getSortIndicator('name')}</th>
-                    <th onClick={() => requestSort('description_ar')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description_ar')}>الوصف (عربي){getSortIndicator('description_ar')}</th>
-                    <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
-                    {canSeeCosts && <th onClick={() => requestSort('buy_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('buy_price')}>سعر الشراء{getSortIndicator('buy_price')}</th>}
-                    <th onClick={() => requestSort('sell_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('sell_price')}>سعر البيع{getSortIndicator('sell_price')}</th>
-                    {isAdmin && <th onClick={() => requestSort('low_stock_threshold')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('low_stock_threshold')}>حد التنبيه{getSortIndicator('low_stock_threshold')}</th>}
-                    <th onClick={() => requestSort('stock')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('stock')}>الكمية{getSortIndicator('stock')}</th>
-                    {canSeeCosts && <th>قيمة المخزون</th>}
-                    <th>الحالة</th>
-                    {isAdmin && <th>إجراءات</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRows.map((p) => {
-                    // v1.2 — parseFloat both operands. @vercel/postgres returns
-                    // NUMERIC columns as strings; `"5.00" * "12.50"` silently
-                    // coerces through JS's loose multiplication but any sibling
-                    // `|| 0` fallback made the whole expression NaN when stock
-                    // or buy_price was missing.
-                    const value = (parseFloat(p.stock) || 0) * (parseFloat(p.buy_price) || 0);
-                    // DONE: Step 2F — replace hardcoded ≤5 threshold with per-product getStatus()
-                    const status = getStatus(p);
-                    const statusLabel = status === 'out' ? 'نفذ' : status === 'low' ? 'منخفض' : 'متوفر';
-                    return (
-                      <tr key={p.id} className="clickable-row" onClick={() => setSelectedRow(p)} style={{ background: status === 'out' ? '#fef2f2' : status === 'low' ? '#fffbeb' : '' }}>
-                        {!isSeller && <td>{p.id}</td>}
-                        <td style={{ fontWeight: 600 }}>{p.name}</td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          {isAdmin ? (
-                            <input
-                              type="text"
-                              defaultValue={p.description_ar || ''}
-                              placeholder="الوصف بالعربي"
-                              style={{ width: '120px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif" }}
-                              onBlur={async (e) => {
-                                const val = e.target.value.trim();
-                                if (val !== (p.description_ar || '')) {
-                                  try {
-                                    await fetch('/api/products', {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ id: p.id, description_ar: val }),
-                                      cache: 'no-store',
-                                    });
-                                    addToast('تم تحديث الوصف العربي');
-                                    fetchData();
-                                  } catch { addToast('خطأ في التحديث', 'error'); }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <span style={{ color: '#64748b' }}>{p.description_ar || '—'}</span>
-                          )}
-                        </td>
-                        <td>{p.category || '-'}</td>
-                        {canSeeCosts && <td className="number-cell">{formatNumber(p.buy_price)}</td>}
-                        <td className="number-cell">
-                          {isAdmin ? (
-                            <input
-                              {...numberInputProps}
-                              min="0"
-                              step="any"
-                              defaultValue={p.sell_price || ''}
-                              placeholder="0"
-                              style={{ width: '80px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center', fontFamily: "'Cairo', sans-serif" }}
-                              onClick={(e) => e.stopPropagation()}
-                              onBlur={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                const currentSell = parseFloat(p.sell_price) || 0;
-                                if (val !== currentSell) {
-                                  setPendingPrice({
-                                    id: p.id,
-                                    name: p.name,
-                                    oldPrice: currentSell,
-                                    newPrice: val,
-                                    inputRef: e.target,
-                                  });
-                                }
-                              }}
-                            />
-                          ) : (
-                            <span style={{ color: '#1e40af' }}>{p.sell_price ? formatNumber(p.sell_price) : '-'}</span>
-                          )}
-                        </td>
-                        {/* DONE: Step 2G — inline editable low-stock threshold (admin only) */}
-                        {isAdmin && (
-                          <td onClick={(e) => e.stopPropagation()}>
-                            <input
-                              {...numberInputProps}
-                              min="0"
-                              defaultValue={p.low_stock_threshold ?? 3}
-                              style={{
-                                width: '60px', padding: '4px 6px',
-                                border: '1.5px solid #d1d5db', borderRadius: '6px',
-                                fontSize: '0.8rem', textAlign: 'center',
-                                fontFamily: "'Cairo', sans-serif",
-                              }}
-                              onBlur={async (e) => {
-                                const val = parseInt(e.target.value, 10);
-                                const safe = Number.isFinite(val) && val >= 0 ? val : 3;
-                                if (safe !== (p.low_stock_threshold ?? 3)) {
-                                  try {
-                                    await fetch('/api/products', {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ id: p.id, low_stock_threshold: safe }),
-                                      cache: 'no-store',
-                                    });
-                                    addToast('تم تحديث حد التنبيه');
-                                    fetchData();
-                                  } catch { addToast('خطأ في التحديث', 'error'); }
-                                }
-                              }}
-                            />
-                          </td>
-                        )}
-                        <td className="number-cell" style={{ fontWeight: 700, color: status === 'out' ? '#dc2626' : status === 'low' ? '#d97706' : '#16a34a' }}>
-                          {formatNumber(p.stock)}
-                        </td>
-                        {canSeeCosts && <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(value)}</td>}
-                        <td>
-                          <StatusBadge status={statusLabel} />
-                        </td>
-                        {isAdmin && (
-                          <td>
-                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(p.id)}>حذف</button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  {/* v1.2 — colspan recomputed across three axes:
-                        - id column: seller hidden (-1)
-                        - buy_price + value columns: canSeeCosts (+0 or +2)
-                        - threshold column: admin only (+1)
-                      Base columns up to "الكمية" = id + name + desc + category
-                      + sell_price = 5 (or 4 when id is hidden for seller). */}
-                  <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                    <td colSpan={(isSeller ? 3 : 4) + (canSeeCosts ? 1 : 0) + (isAdmin ? 1 : 0)} style={{ textAlign: 'center' }}>الإجمالي</td>
-                    <td className="number-cell">{formatNumber(totalStock)}</td>
-                    {canSeeCosts && <td className="number-cell" style={{ color: '#4f46e5' }}>{formatNumber(totalValue)}</td>}
-                    <td colSpan={isAdmin ? 2 : 1}></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
 
             {/* PA-03: Pagination */}
             <Pagination

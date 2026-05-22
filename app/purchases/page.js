@@ -16,7 +16,7 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { matchesText, dateInRange } from '@/lib/filter-engine';
 
 const PURCHASE_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, supplier: { default: 'all' }, pay: { default: 'all' } };
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -582,144 +582,40 @@ function PurchasesContent() {
           </div>
         ) : (
           <>
-          {/* PA-02: mobile card fallback */}
-          <DataCardList
+          <DataView
             rows={paginatedRows}
-            fields={[
-              { key: 'ref_code', label: 'الكود' },
-              { key: 'date', label: 'التاريخ' },
-              { key: 'supplier', label: 'المورد' },
-              { key: 'item', label: 'المنتج' },
-              { key: 'category', label: 'الفئة' },
-              { key: 'quantity', label: 'الكمية' },
-              { key: 'total', label: 'الإجمالي', format: (v) => v ? `${formatNumber(v)} \u20ac` : '\u2014' },
-              { key: 'paid_amount', label: 'المدفوع', format: (v, row) => `${formatNumber(v ?? row.total)} \u20ac` },
-              { key: 'payment_type', label: 'الدفع' },
+            sort={{ requestSort, getAriaSort, getSortIndicator }}
+            onRowClick={(row) => setSelectedRow(row)}
+            rowKey={(row) => row.id}
+            emptyMessage="لا توجد مشتريات"
+            columns={[
+              { key: 'ref_code', label: 'الكود', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{r.ref_code || `PU-${r.id}`}</span> },
+              { key: 'date', label: 'التاريخ', sortable: true },
+              { key: 'supplier', label: 'المورد', sortable: true },
+              { key: 'item', label: 'المنتج', sortable: true },
+              { key: 'category', label: 'الفئة', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>{r.category || '-'}</span> },
+              { key: 'quantity', label: 'الكمية', align: 'end', sortable: true, cell: (r) => formatNumber(r.quantity) },
+              { key: 'unit_price', label: 'سعر الوحدة', align: 'end', sortable: true, mobileHide: true, cell: (r) => formatNumber(r.unit_price) },
+              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{formatNumber(r.total)} €</span> },
+              { key: 'paid_amount', label: 'المدفوع', align: 'end', sortable: true, cell: (r) => <span style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(r.paid_amount ?? r.total)} €</span> },
+              { key: 'payment_status', label: 'الحالة', sortable: true, cell: (r) => <StatusBadge status={(r.payment_status || 'paid') === 'paid' ? 'مدفوع' : r.payment_status === 'partial' ? 'جزئي' : 'معلق'} /> },
+              { key: 'payment_type', label: 'طريقة الدفع', sortable: true, cell: (r) => <StatusBadge status={r.payment_type || 'كاش'} /> },
+              { key: 'notes', label: 'ملاحظات', mobileHide: true },
             ]}
-            statusField="payment_status"
-            statusColors={{
-              'paid': '#16a34a',
-              'partial': '#d97706',
-              'pending': '#dc2626',
-            }}
             actions={(row) => (
-              <>
-                {/* v1.2 — mobile card parity with desktop table actions.
-                    Pre-v1.2 admins on phones could not edit or delete a
-                    purchase — both buttons existed only in the desktop
-                    table's إجراءات column. Same permission gates mirrored. */}
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
+              <div style={{ display: 'flex', gap: '4px' }}>
                 {row.payment_status && row.payment_status !== 'paid' && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: 'white' }} onClick={() => setPaySupplierState({ purchaseId: row.id, supplier: row.supplier, total: parseFloat(row.total) || 0, currentPaid: parseFloat(row.paid_amount) || 0, amount: '', paymentMethod: 'كاش', notes: '', submitting: false })}>دفع</button>
                 )}
                 {isAdmin && (
-                  <button className="btn btn-outline btn-sm" onClick={() => startEditPurchase(row)}>
-                    تعديل
-                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={() => startEditPurchase(row)}>تعديل</button>
                 )}
                 {isAdmin && (
-                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                    حذف
-                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
                 )}
-              </>
+              </div>
             )}
-            emptyMessage="لا توجد مشتريات"
           />
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('ref_code')}>الكود{getSortIndicator('ref_code')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('supplier')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('supplier')}>المورد{getSortIndicator('supplier')}</th>
-                  <th onClick={() => requestSort('item')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('item')}>المنتج{getSortIndicator('item')}</th>
-                  <th onClick={() => requestSort('category')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('category')}>الفئة{getSortIndicator('category')}</th>
-                  <th onClick={() => requestSort('quantity')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('quantity')}>الكمية{getSortIndicator('quantity')}</th>
-                  <th onClick={() => requestSort('unit_price')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('unit_price')}>سعر الوحدة{getSortIndicator('unit_price')}</th>
-                  <th onClick={() => requestSort('total')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total')}>الإجمالي{getSortIndicator('total')}</th>
-                  {/* v1.0.1 Feature 6 — supplier credit columns */}
-                  <th onClick={() => requestSort('paid_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('paid_amount')}>المدفوع{getSortIndicator('paid_amount')}</th>
-                  <th onClick={() => requestSort('payment_status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_status')}>الحالة{getSortIndicator('payment_status')}</th>
-                  <th onClick={() => requestSort('payment_type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('payment_type')}>طريقة الدفع{getSortIndicator('payment_type')}</th>
-                  <th>ملاحظات</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRows.map((row) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `PU-${row.id}`}</td>
-                    <td>{row.date}</td>
-                    <td>{row.supplier}</td>
-                    <td>{row.item}</td>
-                    {/* DONE: Step 6 — category cell (legacy rows show '-') */}
-                    <td>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        background: '#f1f5f9',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        color: '#475569',
-                      }}>
-                        {row.category || '-'}
-                      </span>
-                    </td>
-                    <td className="number-cell">{formatNumber(row.quantity)}</td>
-                    <td className="number-cell">{formatNumber(row.unit_price)}</td>
-                    <td className="number-cell" style={{ fontWeight: 600 }}>{formatNumber(row.total)}</td>
-                    {/* v1.0.1 Feature 6 — paid + status cells */}
-                    <td className="number-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
-                      {formatNumber(row.paid_amount ?? row.total)}
-                    </td>
-                    {/* UX-10: StatusBadge for payment status */}
-                    <td>
-                      <StatusBadge status={
-                        (row.payment_status || 'paid') === 'paid' ? 'مدفوع'
-                        : row.payment_status === 'partial' ? 'جزئي'
-                        : 'معلق'
-                      } />
-                    </td>
-                    <td><StatusBadge status={row.payment_type || 'كاش'} /></td>
-                    <td>{row.notes}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                        {/* v1.0.1 Feature 6 — "pay now" button for partial/pending */}
-                        {row.payment_status && row.payment_status !== 'paid' && (
-                          <button
-                            className="btn btn-sm"
-                            style={{ background: '#16a34a', color: 'white', padding: '4px 8px' }}
-                            onClick={() => setPaySupplierState({
-                              purchaseId: row.id,
-                              supplier: row.supplier,
-                              total: parseFloat(row.total) || 0,
-                              currentPaid: parseFloat(row.paid_amount) || 0,
-                              amount: '',
-                              paymentMethod: 'كاش',
-                              notes: '',
-                              submitting: false,
-                            })}
-                          >
-                            دفع
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); startEditPurchase(row); }}>
-                            تعديل
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>
-                            حذف
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           {/* PA-03: Pagination */}
           <Pagination
             page={page}

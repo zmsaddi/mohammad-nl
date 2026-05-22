@@ -13,7 +13,7 @@ import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
 import { useUrlFilters } from '@/lib/use-url-filters';
 import { dateInRange } from '@/lib/filter-engine';
-import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
@@ -618,197 +618,72 @@ function DeliveriesContent() {
           </div>
         ) : (
           <>
-          {/* v1.1 S3.2 — mobile card fallback: visible below 768px, hidden at 768px+ */}
-          <DataCardList
+          {/* Unified mobile-first DataView. The status + driver dropdowns
+              live in their own column cells (working on both card and table),
+              each wrapped so a tap doesn't bubble up to the row's detail
+              click. Bank-confirm + cancel stay in the row actions. */}
+          <DataView
             rows={paginatedRows}
-            fields={[
-              { key: 'ref_code', label: 'الكود', format: (v, r) => v || `DL-${r.id}` },
-              { key: 'date', label: 'التاريخ' },
-              { key: 'client_name', label: 'العميل' },
-              { key: 'client_phone', label: 'الهاتف' },
-              { key: 'address', label: 'العنوان' },
-              { key: 'items', label: 'الأصناف' },
-              { key: 'total_amount', label: 'المبلغ', format: (v) => v ? `${formatNumber(v)} €` : '—' },
-              { key: 'assigned_driver', label: 'السائق', format: (v) => v || '—' },
+            sort={{ requestSort, getAriaSort, getSortIndicator }}
+            onRowClick={(row) => setSelectedRow(row)}
+            rowKey={(row) => row.id}
+            emptyMessage="لا توجد توصيلات"
+            columns={[
+              { key: 'ref_code', label: 'الكود', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{r.ref_code || `DL-${r.id}`}</span> },
+              { key: 'date', label: 'التاريخ', sortable: true },
+              { key: 'client_name', label: 'العميل', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{r.client_name}</span> },
+              { key: 'client_phone', label: 'الهاتف', sortable: true, cell: (r) => <span style={{ direction: 'ltr', display: 'inline-block' }}>{r.client_phone}</span> },
+              { key: 'address', label: 'العنوان', sortable: true },
+              { key: 'items', label: 'الأصناف', sortable: true },
+              { key: 'total_amount', label: 'المبلغ', align: 'end', sortable: true, cell: (r) => r.total_amount ? `${formatNumber(r.total_amount)} €` : '—' },
+              {
+                key: 'assigned_driver', label: 'السائق', sortable: true,
+                cell: (row) => (canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي') ? (
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block' }}>
+                    <select
+                      value={row.assigned_driver || ''}
+                      onChange={(e) => handleAssignDriver(row.id, e.target.value)}
+                      style={{ padding: '4px 8px', border: '1.5px solid #d1d5db', borderRadius: '8px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif", background: row.assigned_driver ? '#dcfce7' : '#fef3c7', cursor: 'pointer' }}
+                    >
+                      <option value="">-- غير معيّن --</option>
+                      {drivers.map((d) => (
+                        <option key={d.username} value={d.username}>{d.name || d.username}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (row.assigned_driver || row.driver_name || '-'),
+              },
+              {
+                key: 'status', label: 'الحالة', sortable: true,
+                cell: (row) => canChangeStatus ? (
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block' }}>
+                    <select
+                      value={row.status}
+                      onChange={(e) => handleStatusChange(row, e.target.value)}
+                      style={{ padding: '4px 8px', border: 'none', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, fontFamily: "'Cairo', sans-serif", cursor: 'pointer', ...getStatusStyle(row.status) }}
+                    >
+                      {SELECTABLE_STATUSES.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : <span className="status-badge" style={getStatusStyle(row.status)}>{row.status}</span>,
+              },
             ]}
-            statusField="status"
-            statusColors={{
-              'قيد الانتظار': '#f59e0b',
-              'جاري التوصيل': '#3b82f6',
-              'تم التوصيل': '#16a34a',
-              'ملغي': '#dc2626',
-            }}
             actions={(row) => (
-              <>
-                {/* v1.2 — status-change select added to mobile card.
-                    Previously only "تفاصيل" / "إلغاء" / "تعيين سائق" buttons
-                    showed on mobile, leaving drivers no way to mark a
-                    delivery as "تم التوصيل" from the phone. The desktop
-                    table has this select in the status column; the card
-                    actions block now mirrors it so mobile parity holds. */}
-                {canChangeStatus && (
-                  <select
-                    value={row.status}
-                    onChange={(e) => handleStatusChange(row, e.target.value)}
-                    style={{
-                      flex: 2,
-                      padding: '6px 10px',
-                      border: 'none',
-                      borderRadius: '20px',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      fontFamily: "'Cairo', sans-serif",
-                      cursor: 'pointer',
-                      ...getStatusStyle(row.status),
-                    }}
-                  >
-                    {SELECTABLE_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                )}
-                {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' && (
-                  <select
-                    value={row.assigned_driver || ''}
-                    onChange={(e) => handleAssignDriver(row.id, e.target.value)}
-                    className="btn btn-outline btn-sm"
-                    style={{ flex: 2, fontFamily: "'Cairo', sans-serif", fontSize: '0.82rem' }}
-                  >
-                    <option value="">تعيين سائق...</option>
-                    {drivers.map(d => (
-                      <option key={d.username} value={d.username}>{d.name || d.username}</option>
-                    ))}
-                  </select>
-                )}
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {isBankPending(row) && (
                   <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem' }}>بنك: بانتظار التأكيد</span>
                 )}
                 {canAssignDriver && isBankPending(row) && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
                 )}
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedRow(row)}>تفاصيل</button>
                 {isAdmin && row.status !== 'ملغي' && row.sale_id && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' })}>إلغاء</button>
                 )}
-              </>
+              </div>
             )}
-            emptyMessage="لا توجد توصيلات"
           />
-          {/* Desktop table: hidden below 768px when card fallback is active */}
-          <div className="table-container has-card-fallback">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => requestSort('ref_code')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('ref_code')}>الكود{getSortIndicator('ref_code')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('client_name')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('client_name')}>العميل{getSortIndicator('client_name')}</th>
-                  <th onClick={() => requestSort('client_phone')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('client_phone')}>الهاتف{getSortIndicator('client_phone')}</th>
-                  <th onClick={() => requestSort('address')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('address')}>العنوان{getSortIndicator('address')}</th>
-                  <th onClick={() => requestSort('items')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('items')}>الأصناف{getSortIndicator('items')}</th>
-                  <th onClick={() => requestSort('total_amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('total_amount')}>المبلغ{getSortIndicator('total_amount')}</th>
-                  <th onClick={() => requestSort('assigned_driver')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('assigned_driver')}>السائق{getSortIndicator('assigned_driver')}</th>
-                  <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('status')}>الحالة{getSortIndicator('status')}</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRows.map((row) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => setSelectedRow(row)}>
-                    <td style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{row.ref_code || `DL-${row.id}`}</td>
-                    <td>{row.date}</td>
-                    <td style={{ fontWeight: 600 }}>{row.client_name}</td>
-                    <td style={{ direction: 'ltr', textAlign: 'right' }}>{row.client_phone}</td>
-                    <td>{row.address}</td>
-                    <td>{row.items}</td>
-                    <td className="number-cell">{row.total_amount ? formatNumber(row.total_amount) : '-'}</td>
-                    <td>
-                      {canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي' ? (
-                        <select
-                          value={row.assigned_driver || ''}
-                          onChange={(e) => handleAssignDriver(row.id, e.target.value)}
-                          style={{
-                            padding: '4px 8px',
-                            border: '1.5px solid #d1d5db',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontFamily: "'Cairo', sans-serif",
-                            background: row.assigned_driver ? '#dcfce7' : '#fef3c7',
-                            cursor: 'pointer',
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="">-- غير معيّن --</option>
-                          {drivers.map(d => (
-                            <option key={d.username} value={d.username}>{d.name || d.username}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        row.assigned_driver || row.driver_name || '-'
-                      )}
-                    </td>
-                    {/* v1.2 — status-change cell now stops click propagation.
-                        Without this, tapping the select bubbled up to the
-                        row's onClick, which opens setSelectedRow(row) — the
-                        DetailModal then rendered on top BEFORE the native
-                        dropdown could even open, so drivers saw the select
-                        "keep closing without letting me pick". The
-                        driver-assign select on the previous cell already
-                        had e.stopPropagation; this one was missed. Same
-                        treatment now. */}
-                    <td onClick={(e) => e.stopPropagation()}>
-                      {canChangeStatus ? (
-                      <select
-                        value={row.status}
-                        onChange={(e) => handleStatusChange(row, e.target.value)}
-                        style={{
-                          padding: '4px 8px',
-                          border: 'none',
-                          borderRadius: '20px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          fontFamily: "'Cairo', sans-serif",
-                          cursor: 'pointer',
-                          ...getStatusStyle(row.status),
-                        }}
-                      >
-                        {SELECTABLE_STATUSES.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
-                        ))}
-                      </select>
-                      ) : (
-                        <span className="status-badge" style={getStatusStyle(row.status)}>{row.status}</span>
-                      )}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      {canAssignDriver && isBankPending(row) && (
-                        <button
-                          className="btn btn-sm"
-                          style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap', marginLeft: 4 }}
-                          onClick={() => handleConfirmBank(row.sale_id)}
-                        >
-                          ✓ تأكيد البنك
-                        </button>
-                      )}
-                      {isAdmin && row.status !== 'ملغي' && (
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => {
-                            if (!row.sale_id) {
-                              addToast('لا يمكن إلغاء توصيل غير مرتبط ببيع', 'error');
-                              return;
-                            }
-                            setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' });
-                          }}
-                        >
-                          إلغاء
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           <Pagination
             page={page}
             totalPages={totalPages}
