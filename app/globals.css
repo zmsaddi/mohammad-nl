@@ -1888,6 +1888,45 @@ html, body {
 .action-tile-label { font-size: 0.82rem; font-weight: 700; color: #374151; }
 .action-tile-sub { font-size: 0.7rem; color: var(--color-text-muted); }
 
+/* Action center — rows with a direct CTA button (control-center pattern) */
+.action-rows { display: flex; flex-direction: column; gap: 10px; }
+.action-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
+}
+.action-row-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.action-row-icon { font-size: 1.5rem; flex-shrink: 0; }
+.action-row-label { font-size: 0.9rem; font-weight: 600; color: #1e293b; }
+.action-row-sub { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 2px; }
+.action-row-cta {
+  flex-shrink: 0; white-space: nowrap; color: #fff; font-weight: 700; font-size: 0.85rem;
+  padding: 10px 14px; border-radius: 10px; text-decoration: none; min-height: 40px;
+  display: inline-flex; align-items: center;
+}
+.action-row-cta:hover { opacity: 0.9; }
+
+/* P&L — radically simplified: hero number + comparison chips + statement table */
+.pnl-hero { padding: 20px; text-align: center; }
+.pnl-hero-label { font-size: 0.85rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 6px; }
+.pnl-hero-row { display: flex; justify-content: center; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pnl-hero-value { font-size: 2.4rem; font-weight: 800; }
+.pnl-compare { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pnl-chip {
+  background: #fff; border-radius: 12px; padding: 12px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 4px; text-align: center;
+}
+.pnl-chip-label { font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; }
+.pnl-chip-value { font-size: 1.05rem; font-weight: 800; }
+.pnl-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.88rem; }
+.pnl-table td { padding: 9px 4px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+.pnl-table td:last-child { text-align: left; font-weight: 700; color: #1e293b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pnl-table .pnl-sub td { color: #1e40af; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+.pnl-table .pnl-total td { color: #0f172a; font-weight: 800; font-size: 1rem; border-top: 2px solid #cbd5e1; border-bottom: none; padding-top: 12px; }
+
+@media (max-width: 640px) {
+  .pnl-hero-value { font-size: 2rem; }
+}
+
 /* ============================
    Shared filter controls (Commit 9 — styling consolidation).
    Replaces the per-page inline style repeated on every filter-bar
