@@ -1856,13 +1856,18 @@ html, body {
   color: #334155;
 }
 
-/* Always-visible sort control (mobile + desktop) — see components/SortControl. */
+/* Sort control (components/SortControl) — MOBILE ONLY. On desktop the data
+   table has neat click-to-sort column headers, so the control is hidden there
+   to keep that view uncluttered; below 768px (card view, no headers) it shows. */
 .sort-control {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+@media (max-width: 768px) {
+  .sort-control { display: flex; }
 }
 .sort-control-label {
   font-size: 0.82rem;
