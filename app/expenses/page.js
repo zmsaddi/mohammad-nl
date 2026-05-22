@@ -196,7 +196,7 @@ function ExpensesContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="exp-date">التاريخ *</label>
-                <input id="exp-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <input id="exp-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label htmlFor="exp-category">الفئة *</label>

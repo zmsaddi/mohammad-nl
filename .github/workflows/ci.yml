@@ -103,6 +103,7 @@ jobs:
         run: |
           npx vitest run \
             tests/ui/ \
+            tests/future-date-guard.test.js \
             tests/setup.test-env.guard.test.js \
             tests/ignore-expected-ddl.test.js \
             tests/authz/ \

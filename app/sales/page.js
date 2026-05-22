@@ -407,7 +407,7 @@ function SalesContent() {
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="sale-date">التاريخ *</label>
-              <input id="sale-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <input id="sale-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>اسم العميل *</label>

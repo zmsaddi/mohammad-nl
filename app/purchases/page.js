@@ -365,7 +365,7 @@ function PurchasesContent() {
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="pur-date">التاريخ *</label>
-              <input id="pur-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <input id="pur-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div className="form-group">
               <label>المورد *</label>

@@ -486,7 +486,7 @@ function DeliveriesContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="del-date">التاريخ *</label>
-                <input id="del-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <input id="del-date" type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label htmlFor="del-client">اسم العميل *</label>

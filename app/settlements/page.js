@@ -272,7 +272,7 @@ function SettlementsContent() {
             <div className="form-grid">
               <div className="form-group">
                 <label>التاريخ *</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                <input type="date" max={getTodayDate()} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               </div>
               <div className="form-group">
                 <label>النوع *</label>
