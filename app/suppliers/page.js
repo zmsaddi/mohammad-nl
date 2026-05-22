@@ -163,7 +163,7 @@ function SuppliersContent() {
               style={{ padding: '8px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontFamily: "'Cairo', sans-serif", fontSize: '0.85rem' }}
             />
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
             {!showForm && (
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
@@ -182,7 +182,7 @@ function SuppliersContent() {
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا يوجد موردين بعد'}</h3>
             <p>{filtersActive ? 'جرّب تعديل البحث أو مسح الفلاتر' : 'أضف أول مورد بالضغط على زر الإضافة'}</p>
             {filtersActive ? (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             ) : (!showForm && (
               <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setShowForm(true)}>+ أضف أول مورد</button>
             ))}

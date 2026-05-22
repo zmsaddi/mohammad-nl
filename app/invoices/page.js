@@ -146,7 +146,7 @@ function InvoicesContent() {
               className="filter-control-lg" style={{ flex: 1 }}
             />
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
           </div>
         </div>
@@ -166,7 +166,7 @@ function InvoicesContent() {
               <>
                 <h3>لا توجد نتائج مطابقة</h3>
                 <p>جرّب تعديل البحث أو مسح الفلاتر</p>
-                <button className="btn btn-sm" onClick={resetFilters} style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+                <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ marginTop: 8 }}>✕ مسح الفلاتر</button>
               </>
             )}
           </div>
@@ -324,7 +324,7 @@ function InvoicesContent() {
               />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={closeVinEdit} disabled={vinSaving} style={{ background: '#e2e8f0', color: '#334155' }}>إلغاء</button>
+              <button className="btn btn-clear" onClick={closeVinEdit} disabled={vinSaving}>إلغاء</button>
               <button className="btn btn-primary" onClick={saveVin} disabled={vinSaving}>
                 {vinSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}
               </button>

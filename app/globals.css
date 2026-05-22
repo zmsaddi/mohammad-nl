@@ -1957,3 +1957,9 @@ html, body {
   font-family: 'Cairo', sans-serif;
   font-size: 0.85rem;
 }
+/* Neutral grey "✕ مسح / مسح الفلاتر" reset button — colours only; layout extras
+   (marginTop / whiteSpace) stay inline where present. */
+.btn-clear {
+  background: #e2e8f0;
+  color: #334155;
+}

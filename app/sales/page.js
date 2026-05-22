@@ -781,7 +781,7 @@ function SalesContent() {
             <h3>{rows.length === 0 ? 'لا توجد مبيعات بعد' : 'لا توجد نتائج مطابقة'}</h3>
             <p>{rows.length === 0 ? 'سجّل أول عملية بيع من النموذج أعلاه' : 'جرّب تعديل الفلاتر أو مسحها'}</p>
             {rows.length > 0 && filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (

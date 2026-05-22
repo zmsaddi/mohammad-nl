@@ -162,7 +162,7 @@ function MyBonusContent() {
           </div>
           {filtersActive && (
             <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155' }}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters}>✕ مسح الفلاتر</button>
             </div>
           )}
         </div>
@@ -183,7 +183,7 @@ function MyBonusContent() {
               <>
                 <h3>لا توجد نتائج مطابقة</h3>
                 <p>جرّب تعديل الفلاتر أو مسحها</p>
-                <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+                <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
               </>
             )}
           </div>

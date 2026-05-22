@@ -347,7 +347,7 @@ function StockContent() {
               ))}
             </select>
             {filtersActive && (
-              <button className="btn btn-sm" onClick={resetFilters} style={{ background: '#e2e8f0', color: '#334155', whiteSpace: 'nowrap' }}>✕ مسح</button>
+              <button className="btn btn-sm btn-clear" onClick={resetFilters} style={{ whiteSpace: 'nowrap' }}>✕ مسح</button>
             )}
           </div>
           </FilterSheet>
@@ -362,7 +362,7 @@ function StockContent() {
             <h3>{filtersActive ? 'لا توجد نتائج مطابقة' : 'لا توجد منتجات بعد'}</h3>
             <p>{filtersActive ? 'جرّب تعديل الفلاتر أو مسحها' : 'المنتجات تُضاف تلقائياً عند الشراء'}</p>
             {filtersActive && (
-              <button className="btn btn-sm" style={{ marginTop: 8, background: '#e2e8f0', color: '#334155' }} onClick={resetFilters}>✕ مسح الفلاتر</button>
+              <button className="btn btn-sm btn-clear" style={{ marginTop: 8 }} onClick={resetFilters}>✕ مسح الفلاتر</button>
             )}
           </div>
         ) : (
