@@ -22,6 +22,7 @@ import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import OrderLifecycle from '@/components/OrderLifecycle';
+import ConfirmDeliveryDialog from '@/components/ConfirmDeliveryDialog';
 
 const SALES_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
@@ -33,6 +34,9 @@ function SalesContent() {
   const isAdmin = role === 'admin';
   const canSeeCosts = role === 'admin' || role === 'manager';
   const isSeller = role === 'seller';
+  // Who may confirm a delivery + collect from the orders hub. Sellers never
+  // handle money; drivers are redirected off this page (Phase 3b).
+  const canConfirmDelivery = role === 'admin' || role === 'manager';
   const currentUser = session?.user
     ? { role: session.user.role, username: session.user.username }
     : null;
@@ -45,6 +49,10 @@ function SalesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Phase 3 — confirm-delivery shortcut on the order card. We map each order's
+  // linked delivery (by sale_id) so admin/manager can confirm + collect inline.
+  const [deliveriesBySale, setDeliveriesBySale] = useState({});
+  const [confirmDeliveryRow, setConfirmDeliveryRow] = useState(null);
 
   // v1.2 UX-1: filter state hydrated from URL on first render so
   // refresh + sharing a link both preserve the view. Date/select/seller
@@ -188,6 +196,19 @@ function SalesContent() {
       if (isSeller && results[4] && results[4].ok) {
         const cr = await results[4].json();
         setCategoryRates(Array.isArray(cr) ? cr : []);
+      }
+      // Phase 3 — map each order's linked delivery so admin/manager can confirm
+      // delivery + collect from the order card. Non-fatal if it fails.
+      if (canConfirmDelivery) {
+        try {
+          const dRes = await fetch('/api/deliveries', { cache: 'no-store' });
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            const map = {};
+            (Array.isArray(dData) ? dData : []).forEach((d) => { if (d.sale_id != null) map[d.sale_id] = d; });
+            setDeliveriesBySale(map);
+          }
+        } catch { /* non-fatal — the confirm shortcut just won't show */ }
       }
     } catch {
       setError(true);
@@ -879,6 +900,15 @@ function SalesContent() {
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 <button className="btn btn-sm" style={{ background: '#25d366', color: 'white' }} onClick={() => shareWhatsApp(row)} title="مشاركة عبر واتساب">واتساب</button>
+                {/* Confirm-delivery shortcut — admin/manager only, while the order
+                    is still awaiting delivery. Opens the same amount→VIN flow as
+                    the deliveries page and collects + invoices on confirm. */}
+                {canConfirmDelivery && (row.status || 'محجوز') === 'محجوز'
+                  && deliveriesBySale[row.id]
+                  && deliveriesBySale[row.id].status !== 'تم التوصيل'
+                  && deliveriesBySale[row.id].status !== 'ملغي' && (
+                  <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff' }} onClick={() => setConfirmDeliveryRow(deliveriesBySale[row.id])}>تأكيد التسليم</button>
+                )}
                 {/* Edit ONLY before delivery (محجوز). A delivered order (مؤكد) is
                     final — it's paid + invoiced; the only post-delivery change is
                     the VIN, edited on the invoice. Corrections go via إلغاء/إرجاع. */}
@@ -1019,6 +1049,16 @@ function SalesContent() {
             fetchData();
           }}
           onCancel={() => setCancelSale(null)}
+        />
+      )}
+
+      {/* Phase 3 — confirm delivery + collect, inline from the order card. */}
+      {confirmDeliveryRow && (
+        <ConfirmDeliveryDialog
+          delivery={confirmDeliveryRow}
+          addToast={addToast}
+          onClose={() => setConfirmDeliveryRow(null)}
+          onSuccess={() => { setConfirmDeliveryRow(null); fetchData(); }}
         />
       )}
     </AppLayout>
