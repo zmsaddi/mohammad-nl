@@ -90,18 +90,43 @@ html, body {
   overflow-x: hidden;
 }
 
-/* v1.1 S3.2 — DataCardList: mobile card-fallback. Cards hidden by
-   default (desktop shows tables). The 768px media query below shows
-   cards and hides tables that opt in via .has-card-fallback. */
+/* Card layout for list pages — cards on EVERY screen size (phone + desktop).
+   On the phone it's a single column; on wider screens it becomes a responsive
+   grid (several cards per row) so desktop no longer shows wide, long-line
+   tables. Any table that opts in via .has-card-fallback is hidden everywhere
+   (the cards fully replace it). */
 .data-card-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 769px) {
+  .data-card-list {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+  }
+}
+/* The paired table is fully replaced by the cards — hidden at all widths. */
+.table-container.has-card-fallback {
   display: none;
+}
+/* DataView: columns flagged mobileHide are desktop-only — they appear on the
+   wider desktop card (e.g. cost/profit, inline-edit fields) but stay off the
+   compact phone card. */
+.data-card-field.dv-desktop-field {
+  display: none;
+}
+@media (min-width: 769px) {
+  .data-card-field.dv-desktop-field {
+    display: flex;
+  }
 }
 .data-card {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 /* DataView: a card that opens a detail/row action when tapped */
 .data-card-clickable { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
@@ -1225,13 +1250,8 @@ html, body {
     font-size: 1.2rem;
   }
 
-  /* v1.1 S3.2 — card fallback: hide tables, show cards on mobile */
-  .table-container.has-card-fallback {
-    display: none;
-  }
-  .data-card-list {
-    display: block;
-  }
+  /* (card-fallback tables are now hidden at all widths — see the default
+     rule near .data-card-list; cards render as a grid on every screen.) */
 
   /* Tables without card fallback: keep the old scroll behavior */
   .table-container:not(.has-card-fallback) {
@@ -1967,18 +1987,15 @@ html, body {
   color: #334155;
 }
 
-/* Sort control (components/SortControl) — MOBILE ONLY. On desktop the data
-   table has neat click-to-sort column headers, so the control is hidden there
-   to keep that view uncluttered; below 768px (card view, no headers) it shows. */
+/* Sort control (components/SortControl) — shown on EVERY screen now. The list
+   pages render cards (no table headers) on desktop too, so this select is the
+   universal way to sort on both phone and desktop. */
 .sort-control {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
-}
-@media (max-width: 768px) {
-  .sort-control { display: flex; }
 }
 .sort-control-label {
   font-size: 0.82rem;
