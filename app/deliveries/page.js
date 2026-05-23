@@ -644,15 +644,29 @@ function DeliveriesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{r.client_name}</span> },
               { key: 'client_phone', label: 'الهاتف', sortable: true, cell: (r) => <span style={{ direction: 'ltr', display: 'inline-block' }}>{r.client_phone}</span> },
-              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true, cell: (r) => r.address ? (
-                <span
-                  onClick={(e) => { e.stopPropagation(); copyAddress(r.address); }}
-                  title="اضغط لنسخ العنوان"
-                  style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
-                >
-                  {r.address} 📋
-                </span>
-              ) : '—' },
+              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true, cell: (r) => {
+                if (!r.address) return '—';
+                const awaiting = r.status !== 'تم التوصيل' && r.status !== 'ملغي';
+                return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span
+                      onClick={(e) => { e.stopPropagation(); copyAddress(r.address); }}
+                      title="اضغط لنسخ العنوان"
+                      style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
+                    >{r.address} 📋</span>
+                    {awaiting && (
+                      <a
+                        href={`https://waze.com/ul?q=${encodeURIComponent(r.address)}&navigate=yes`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="افتح Waze ووجّه مباشرة"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#33ccff', color: '#06283d', fontWeight: 700, padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                      >🧭 Waze</a>
+                    )}
+                  </span>
+                );
+              } },
               { key: 'items', label: 'الأصناف', sortable: true, fullWidth: true },
               { key: 'total_amount', label: 'المبلغ', align: 'end', sortable: true, cell: (r) => r.total_amount ? `${formatNumber(r.total_amount)} €` : '—' },
               {
