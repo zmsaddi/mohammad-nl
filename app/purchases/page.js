@@ -599,7 +599,7 @@ function PurchasesContent() {
               { key: 'payment_type', label: 'طريقة الدفع', sortable: true, cell: (r) => <StatusBadge status={r.payment_type || 'كاش'} /> },
             ]}
             actions={(row) => (
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <>
                 {row.payment_status && row.payment_status !== 'paid' && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: 'white' }} onClick={() => setPaySupplierState({ purchaseId: row.id, supplier: row.supplier, total: parseFloat(row.total) || 0, currentPaid: parseFloat(row.paid_amount) || 0, amount: '', paymentMethod: 'كاش', notes: '', submitting: false })}>دفع</button>
                 )}
@@ -609,7 +609,7 @@ function PurchasesContent() {
                 {isAdmin && (
                   <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(row.id)}>حذف</button>
                 )}
-              </div>
+              </>
             )}
           />
           {/* PA-03: Pagination */}

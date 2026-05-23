@@ -671,17 +671,17 @@ function DeliveriesContent() {
               },
             ]}
             actions={(row) => (
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <>
                 {isBankPending(row) && (
-                  <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem' }}>بنك: بانتظار التأكيد</span>
+                  <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem', flexBasis: '100%' }}>بنك: بانتظار التأكيد</span>
                 )}
                 {canAssignDriver && isBankPending(row) && (
-                  <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
+                  <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
                 )}
                 {isAdmin && row.status !== 'ملغي' && row.sale_id && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.sale_id, invoiceMode: 'soft' })}>إلغاء</button>
                 )}
-              </div>
+              </>
             )}
           />
           <Pagination
