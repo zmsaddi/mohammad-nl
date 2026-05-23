@@ -633,11 +633,11 @@ function DeliveriesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{r.client_name}</span> },
               { key: 'client_phone', label: 'الهاتف', sortable: true, cell: (r) => <span style={{ direction: 'ltr', display: 'inline-block' }}>{r.client_phone}</span> },
-              { key: 'address', label: 'العنوان', sortable: true },
-              { key: 'items', label: 'الأصناف', sortable: true },
+              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true },
+              { key: 'items', label: 'الأصناف', sortable: true, fullWidth: true },
               { key: 'total_amount', label: 'المبلغ', align: 'end', sortable: true, cell: (r) => r.total_amount ? `${formatNumber(r.total_amount)} €` : '—' },
               {
-                key: 'assigned_driver', label: 'السائق', sortable: true,
+                key: 'assigned_driver', label: 'السائق', sortable: true, fullWidth: true,
                 cell: (row) => (canAssignDriver && row.status !== 'تم التوصيل' && row.status !== 'ملغي') ? (
                   <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block' }}>
                     <select
@@ -654,7 +654,7 @@ function DeliveriesContent() {
                 ) : (row.assigned_driver || row.driver_name || '-'),
               },
               {
-                key: 'status', label: 'الحالة', sortable: true,
+                key: 'status', label: 'الحالة', sortable: true, fullWidth: true,
                 cell: (row) => canChangeStatus ? (
                   <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-block' }}>
                     <select

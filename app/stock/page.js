@@ -386,14 +386,14 @@ function StockContent() {
                 !isSeller && { key: 'id', label: '#', sortable: true, mobileHide: true },
                 { key: 'name', label: 'المنتج (لاتيني)', sortable: true, cell: (p) => <span style={{ fontWeight: 600 }}>{p.name}</span> },
                 {
-                  key: 'description_ar', label: 'الوصف (عربي)', sortable: true, mobileHide: true,
+                  key: 'description_ar', label: 'الوصف (عربي)', sortable: true, mobileHide: true, fullWidth: true,
                   cell: (p) => isAdmin ? (
                     <div onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         defaultValue={p.description_ar || ''}
                         placeholder="الوصف بالعربي"
-                        style={{ width: '120px', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif" }}
+                        style={{ width: '100%', maxWidth: '320px', boxSizing: 'border-box', padding: '4px 6px', border: '1.5px solid #d1d5db', borderRadius: '6px', fontSize: '0.8rem', fontFamily: "'Cairo', sans-serif" }}
                         onBlur={async (e) => {
                           const val = e.target.value.trim();
                           if (val !== (p.description_ar || '')) {
