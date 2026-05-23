@@ -41,6 +41,8 @@ export default function DetailModal({ isOpen, onClose, title, fields, actions })
           {fields.map((field, i) => (
             field.type === 'divider' ? (
               <div key={i} className="detail-divider" />
+            ) : field.type === 'node' ? (
+              <div key={i} style={{ margin: '4px 0 8px' }}>{field.value}</div>
             ) : field.type === 'badge' ? (
               <div key={i} className="detail-field">
                 <span className="detail-label">{field.label}</span>
