@@ -1,9 +1,20 @@
 import './globals.css';
 import Providers from '@/components/Providers';
+import PwaRegister from '@/components/PwaRegister';
 
 export const metadata = {
   title: 'Vitesse Eco - إدارة الدراجات الكهربائية',
   description: 'نظام إدارة متكامل للدراجات الكهربائية والإكسسوارات وقطع الغيار',
+  // PWA: Next auto-links /manifest.webmanifest from app/manifest.js. Add the
+  // iOS bits (apple-touch-icon + standalone web-app capability) here.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Vitesse Eco',
+  },
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 // Next.js 16 requires viewport to be its own export.
@@ -13,6 +24,7 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#1e40af',
 };
 
 export default function RootLayout({ children }) {
@@ -20,6 +32,7 @@ export default function RootLayout({ children }) {
     <html lang="ar" dir="rtl">
       <body>
         <Providers>{children}</Providers>
+        <PwaRegister />
       </body>
     </html>
   );
