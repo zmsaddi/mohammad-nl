@@ -218,8 +218,13 @@ function SalesContent() {
     }
   };
 
+  // Re-run when `role` resolves. On a cold load the session is still loading at
+  // mount, so role is undefined and the role-gated fetches (admin/manager
+  // deliveries map for the confirm shortcut, seller bonus settings) would be
+  // skipped — leaving the «تأكيد التسليم» button hidden until a 60s auto-refresh.
+  // Depending on `role` re-fetches the moment the session hydrates.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [role]);
   useAutoRefresh(fetchData);
 
   // Phase 3b — the «الطلبات» hub isn't for drivers (their orders view IS the
