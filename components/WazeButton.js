@@ -14,11 +14,14 @@ export default function WazeButton({ address }) {
       title="افتح Waze ووجّه مباشرة"
       style={{ background: '#fff', color: '#05a8e0', border: '1px solid #33ccff', fontWeight: 700, textDecoration: 'none', gap: 5 }}
     >
-      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style={{ flexShrink: 0 }}>
-        <path fill="#33ccff" d="M20 4H4a2 2 0 00-2 2v8a2 2 0 002 2h2v2.4a.55.55 0 00.9.42L11 16h9a2 2 0 002-2V6a2 2 0 00-2-2z" />
-        <circle cx="9" cy="9.6" r="1.25" fill="#fff" />
-        <circle cx="15" cy="9.6" r="1.25" fill="#fff" />
-        <path d="M8.7 12c.8 1.05 2 1.6 3.3 1.6s2.5-.55 3.3-1.6" stroke="#fff" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+      {/* Waze app-icon style: a rounded cyan tile with a white smiling face.
+          Own representation (not the trademarked file). To use the exact
+          official logo, drop it at public/waze.svg and swap this for an <img>. */}
+      <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <rect x="3" y="3" width="42" height="42" rx="13" fill="#33ccff" />
+        <circle cx="18" cy="21" r="2.7" fill="#fff" />
+        <circle cx="30" cy="21" r="2.7" fill="#fff" />
+        <path d="M15.5 28c1.8 2.7 4.6 4.1 8.1 4.1s6.3-1.4 8.1-4.1" stroke="#fff" strokeWidth="2.7" fill="none" strokeLinecap="round" />
       </svg>
       Waze
     </a>
