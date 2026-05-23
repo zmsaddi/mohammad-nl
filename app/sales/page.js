@@ -438,6 +438,17 @@ function SalesContent() {
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
   };
 
+  // Copy the delivery address to the clipboard (to paste into a maps/Waze app).
+  const copyAddress = async (addr) => {
+    if (!addr) return;
+    try {
+      await navigator.clipboard.writeText(addr);
+      addToast('تم نسخ العنوان');
+    } catch {
+      addToast('تعذّر النسخ — انسخه يدوياً', 'error');
+    }
+  };
+
   // Phase 3b — drivers are redirected to their delivery queue (see effect above).
   if (role === 'driver') {
     return (
@@ -890,6 +901,16 @@ function SalesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true },
               { key: 'item', label: 'الصنف', sortable: true, fullWidth: true },
+              // Delivery address — tap the text itself to copy it (no button).
+              { key: 'delivery_address', label: 'العنوان', fullWidth: true, cell: (r) => r.delivery_address ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); copyAddress(r.delivery_address); }}
+                  title="اضغط لنسخ العنوان"
+                  style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
+                >
+                  {r.delivery_address} 📋
+                </span>
+              ) : '—' },
               { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 700 }}>{formatNumber(r.total)} €</span> },
               {
                 key: 'status', label: 'الحالة', sortable: true,
