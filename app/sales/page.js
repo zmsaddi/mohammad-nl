@@ -201,6 +201,13 @@ function SalesContent() {
   useEffect(() => { fetchData(); }, []);
   useAutoRefresh(fetchData);
 
+  // Phase 3b — the «الطلبات» hub isn't for drivers (their orders view IS the
+  // delivery queue, and the sales API 403s them). Send them straight there
+  // instead of an error screen if they ever land on this URL.
+  useEffect(() => {
+    if (role === 'driver') router.replace('/deliveries');
+  }, [role, router]);
+
   // Item 2 — filter pipeline. Client-side because row volumes are small
   // (Phase 0.5 production shows ~200 rows). Server-side can come later
   // if the list grows past ~500 rows.
@@ -404,6 +411,15 @@ function SalesContent() {
     );
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
   };
+
+  // Phase 3b — drivers are redirected to their delivery queue (see effect above).
+  if (role === 'driver') {
+    return (
+      <AppLayout>
+        <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>جارٍ التحويل إلى التوصيل…</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
