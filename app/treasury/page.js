@@ -10,6 +10,7 @@ import PageSkeleton from '@/components/PageSkeleton';
 import ConfirmModal from '@/components/ConfirmModal';
 import MoneyInput from '@/components/MoneyInput';
 import DataCardList from '@/components/DataCardList';
+import DataView from '@/components/DataView';
 import ErrorState from '@/components/ErrorState';
 import Pagination, { usePagination } from '@/components/Pagination';
 
@@ -538,29 +539,27 @@ function TreasuryContent() {
           </div>
 
           {capTab === '__all' ? (
-            <div className="table-container">
-              <table className="data-table">
-                <thead><tr><th>الشخص</th><th>إجمالي الإدخال</th><th>إجمالي السحب</th><th>رأس المال الحالي</th></tr></thead>
-                <tbody>
-                  {capitalByPerson.map((p) => (
-                    <tr key={p.username} className="clickable-row" onClick={() => setCapTab(p.username)}>
-                      <td style={{ fontWeight: 600 }}>{p.name}</td>
-                      <td className="number-cell" style={{ color: '#16a34a' }}>+{formatNumber(p.injected)} €</td>
-                      <td className="number-cell" style={{ color: '#dc2626' }}>−{formatNumber(p.withdrawn)} €</td>
-                      <td className="number-cell" style={{ fontWeight: 700, color: p.net < 0 ? '#dc2626' : '#0f172a' }}>{formatNumber(p.net)} €</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td style={{ fontWeight: 700 }}>الإجمالي</td>
-                    <td className="number-cell" style={{ fontWeight: 700, color: '#16a34a' }}>+{formatNumber(capitalByPerson.reduce((s, p) => s + p.injected, 0))} €</td>
-                    <td className="number-cell" style={{ fontWeight: 700, color: '#dc2626' }}>−{formatNumber(capitalByPerson.reduce((s, p) => s + p.withdrawn, 0))} €</td>
-                    <td className="number-cell" style={{ fontWeight: 800 }}>{formatNumber(capitalByPerson.reduce((s, p) => s + p.net, 0))} €</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <>
+              <DataView
+                rows={capitalByPerson}
+                rowKey={(p) => p.username}
+                onRowClick={(p) => setCapTab(p.username)}
+                emptyMessage="لا توجد عمليات رأس مال"
+                columns={[
+                  { key: 'name', label: 'الشخص', cell: (p) => <span style={{ fontWeight: 600 }}>{p.name}</span> },
+                  { key: 'injected', label: 'إجمالي الإدخال', align: 'end', cell: (p) => <span style={{ color: '#16a34a' }}>+{formatNumber(p.injected)} €</span> },
+                  { key: 'withdrawn', label: 'إجمالي السحب', align: 'end', cell: (p) => <span style={{ color: '#dc2626' }}>−{formatNumber(p.withdrawn)} €</span> },
+                  { key: 'net', label: 'رأس المال الحالي', align: 'end', cell: (p) => <span style={{ fontWeight: 700, color: p.net < 0 ? '#dc2626' : '#0f172a' }}>{formatNumber(p.net)} €</span> },
+                ]}
+              />
+              {/* Grand totals (DataView has no table footer — render a strip). */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'flex-end', padding: '10px 12px', marginTop: 8, background: '#f8fafc', borderRadius: 8, fontSize: '0.85rem', fontWeight: 700 }}>
+                <span>الإجمالي:</span>
+                <span style={{ color: '#16a34a' }}>+{formatNumber(capitalByPerson.reduce((s, p) => s + p.injected, 0))} €</span>
+                <span style={{ color: '#dc2626' }}>−{formatNumber(capitalByPerson.reduce((s, p) => s + p.withdrawn, 0))} €</span>
+                <span style={{ fontWeight: 800 }}>{formatNumber(capitalByPerson.reduce((s, p) => s + p.net, 0))} €</span>
+              </div>
+            </>
           ) : (() => {
             const p = capitalByPerson.find((x) => x.username === capTab);
             if (!p) return null;
@@ -571,25 +570,18 @@ function TreasuryContent() {
                   <div className="summary-card"><div className="summary-card-content"><h3>إجمالي الإدخال</h3><div className="value" style={{ color: '#16a34a' }}>{formatNumber(p.injected)} €</div></div></div>
                   <div className="summary-card"><div className="summary-card-content"><h3>إجمالي السحب</h3><div className="value" style={{ color: '#dc2626' }}>{formatNumber(p.withdrawn)} €</div></div></div>
                 </div>
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الطريقة</th><th>الحالة</th></tr></thead>
-                    <tbody>
-                      {p.ops.map((o) => {
-                        const inj = o.kind === 'injection';
-                        return (
-                          <tr key={o.id}>
-                            <td>{String(o.created_at).slice(0, 10)}</td>
-                            <td style={{ fontWeight: 600, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? 'إدخال رأس مال' : 'سحب رأس مال'}</td>
-                            <td className="number-cell" style={{ fontWeight: 700, color: inj ? '#16a34a' : '#dc2626' }}>{inj ? '+' : '−'}{formatNumber(o.amount)} €</td>
-                            <td>{o.method}</td>
-                            <td><span className="status-badge" style={CAP_STATUS_STYLE[o.status] || {}}>{CAP_STATUS[o.status] || o.status}</span></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <DataView
+                  rows={p.ops}
+                  rowKey={(o) => o.id}
+                  emptyMessage="لا توجد عمليات"
+                  columns={[
+                    { key: 'created_at', label: 'التاريخ', cell: (o) => String(o.created_at).slice(0, 10) },
+                    { key: 'kind', label: 'النوع', cell: (o) => <span style={{ fontWeight: 600, color: o.kind === 'injection' ? '#16a34a' : '#dc2626' }}>{o.kind === 'injection' ? 'إدخال رأس مال' : 'سحب رأس مال'}</span> },
+                    { key: 'amount', label: 'المبلغ', align: 'end', cell: (o) => <span style={{ fontWeight: 700, color: o.kind === 'injection' ? '#16a34a' : '#dc2626' }}>{o.kind === 'injection' ? '+' : '−'}{formatNumber(o.amount)} €</span> },
+                    { key: 'method', label: 'الطريقة' },
+                    { key: 'status', label: 'الحالة', cell: (o) => <span className="status-badge" style={CAP_STATUS_STYLE[o.status] || {}}>{CAP_STATUS[o.status] || o.status}</span> },
+                  ]}
+                />
               </>
             );
           })()}
@@ -608,37 +600,33 @@ function TreasuryContent() {
               <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>
                 أدخل النقد الفعلي الموجود في كل صندوق الآن كنقطة بداية. يُسجَّل كرصيد افتتاحي، ويمكن تصحيحه بإعادة الإدخال (يستبدل السابق).
               </p>
-              <div className="table-container">
-                <table className="data-table">
-                  <thead><tr><th>الصندوق</th><th>الرصيد الحالي</th><th>الافتتاحي المُسجّل</th><th>تعيين رصيد افتتاحي</th></tr></thead>
-                  <tbody>
-                    {boxes.map((b) => (
-                      <tr key={b.id}>
-                        <td style={{ fontWeight: 600 }}>
-                          {boxName(b)}
-                          {b.type !== 'main' && b.owner_role && <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '0.8rem' }}> ({ROLE_LABEL[b.owner_role] || b.owner_role})</span>}
-                        </td>
-                        <td className="number-cell">{formatNumber(parseFloat(b.balance) || 0)} €</td>
-                        <td className="number-cell" style={{ color: b.opening != null ? '#16a34a' : '#94a3b8' }}>
-                          {b.opening != null ? `${formatNumber(parseFloat(b.opening) || 0)} €` : '—'}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <MoneyInput
-                              min="0" step="any"
-                              value={openingInputs[b.id] ?? ''}
-                              onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
-                              placeholder="0.00"
-                              style={{ maxWidth: 120 }}
-                            />
-                            <button className="btn btn-sm btn-primary" onClick={() => handleSetOpening(b)}>تعيين</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataView
+                rows={boxes}
+                rowKey={(b) => b.id}
+                emptyMessage="لا توجد صناديق"
+                columns={[
+                  { key: 'box', label: 'الصندوق', cell: (b) => (
+                    <span style={{ fontWeight: 600 }}>
+                      {boxName(b)}
+                      {b.type !== 'main' && b.owner_role && <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '0.8rem' }}> ({ROLE_LABEL[b.owner_role] || b.owner_role})</span>}
+                    </span>
+                  ) },
+                  { key: 'balance', label: 'الرصيد الحالي', align: 'end', cell: (b) => `${formatNumber(parseFloat(b.balance) || 0)} €` },
+                  { key: 'opening', label: 'الافتتاحي المُسجّل', align: 'end', cell: (b) => <span style={{ color: b.opening != null ? '#16a34a' : '#94a3b8' }}>{b.opening != null ? `${formatNumber(parseFloat(b.opening) || 0)} €` : '—'}</span> },
+                  { key: 'set', label: 'تعيين رصيد افتتاحي', cell: (b) => (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <MoneyInput
+                        min="0" step="any"
+                        value={openingInputs[b.id] ?? ''}
+                        onChange={(e) => setOpeningInputs((s) => ({ ...s, [b.id]: e.target.value }))}
+                        placeholder="0.00"
+                        style={{ maxWidth: 120 }}
+                      />
+                      <button className="btn btn-sm btn-primary" onClick={() => handleSetOpening(b)}>تعيين</button>
+                    </div>
+                  ) },
+                ]}
+              />
             </div>
           )}
 
@@ -700,31 +688,29 @@ function TreasuryContent() {
             {pending.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>لا توجد طلبات معلّقة.</p>
             ) : (
-              <div className="table-container">
-                <table className="data-table">
-                  <thead><tr><th>النوع</th><th>من</th><th>إلى</th><th>المبلغ</th><th>المُبادِر</th><th>إجراء</th></tr></thead>
-                  <tbody>
-                    {pending.map((h) => {
-                      const mine = h.initiated_by === username;
-                      return (
-                        <tr key={h.id}>
-                          <td>{h.kind === 'funding' ? 'تمويل' : 'تسليم'}</td>
-                          <td>{partyLabel(h.from_type, h.from_name, h.from_owner)}</td>
-                          <td>{partyLabel(h.to_type, h.to_name, h.to_owner)}</td>
-                          <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(h.amount)} €</td>
-                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{h.initiated_by}{mine ? ' (أنت)' : ''}</td>
-                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {!mine && (
-                              <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleConfirm(h.id)}>✓ تأكيد</button>
-                            )}
-                            <button className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleReject(h.id)}>{mine ? 'إلغاء الطلب' : 'رفض'}</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataView
+                rows={pending}
+                rowKey={(h) => h.id}
+                emptyMessage="لا توجد طلبات معلّقة"
+                columns={[
+                  { key: 'kind', label: 'النوع', cell: (h) => h.kind === 'funding' ? 'تمويل' : 'تسليم' },
+                  { key: 'from', label: 'من', cell: (h) => partyLabel(h.from_type, h.from_name, h.from_owner) },
+                  { key: 'to', label: 'إلى', cell: (h) => partyLabel(h.to_type, h.to_name, h.to_owner) },
+                  { key: 'amount', label: 'المبلغ', align: 'end', cell: (h) => <span style={{ fontWeight: 700 }}>{formatNumber(h.amount)} €</span> },
+                  { key: 'initiated_by', label: 'المُبادِر', cell: (h) => <span style={{ fontSize: '0.82rem', color: '#64748b' }}>{h.initiated_by}{h.initiated_by === username ? ' (أنت)' : ''}</span> },
+                ]}
+                actions={(h) => {
+                  const mine = h.initiated_by === username;
+                  return (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {!mine && (
+                        <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleConfirm(h.id)}>✓ تأكيد</button>
+                      )}
+                      <button className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleReject(h.id)}>{mine ? 'إلغاء الطلب' : 'رفض'}</button>
+                    </div>
+                  );
+                }}
+              />
             )}
           </div>
 
@@ -824,25 +810,23 @@ function TreasuryContent() {
                 <button className="btn btn-primary" onClick={handleInitCapital} disabled={busy}>{busy ? 'جارٍ…' : 'إنشاء'}</button>
               </div>
               {capitalOps.length > 0 && (
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead><tr><th>النوع</th><th>المبلغ</th><th>الموافقات</th><th>المُبادِر</th><th>إجراء</th></tr></thead>
-                    <tbody>
-                      {capitalOps.map((o) => (
-                        <tr key={o.id}>
-                          <td>{o.kind === 'injection' ? 'إدخال' : 'سحب'}</td>
-                          <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(o.amount)} €</td>
-                          <td>{o.approvals} / {o.admin_count}</td>
-                          <td style={{ fontSize: '0.82rem', color: '#64748b' }}>{o.initiated_by}</td>
-                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleApproveCapital(o.id)}>✓ موافقة</button>
-                            <button className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleRejectCapital(o.id)}>رفض</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataView
+                  rows={capitalOps}
+                  rowKey={(o) => o.id}
+                  emptyMessage="لا توجد عمليات"
+                  columns={[
+                    { key: 'kind', label: 'النوع', cell: (o) => o.kind === 'injection' ? 'إدخال' : 'سحب' },
+                    { key: 'amount', label: 'المبلغ', align: 'end', cell: (o) => <span style={{ fontWeight: 700 }}>{formatNumber(o.amount)} €</span> },
+                    { key: 'approvals', label: 'الموافقات', cell: (o) => `${o.approvals} / ${o.admin_count}` },
+                    { key: 'initiated_by', label: 'المُبادِر', cell: (o) => <span style={{ fontSize: '0.82rem', color: '#64748b' }}>{o.initiated_by}</span> },
+                  ]}
+                  actions={(o) => (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleApproveCapital(o.id)}>✓ موافقة</button>
+                      <button className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '3px 10px', fontSize: '0.78rem' }} onClick={() => handleRejectCapital(o.id)}>رفض</button>
+                    </div>
+                  )}
+                />
               )}
             </div>
           )}
