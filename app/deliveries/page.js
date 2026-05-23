@@ -311,6 +311,17 @@ function DeliveriesContent() {
     } catch { addToast('خطأ في الاتصال', 'error'); }
   };
 
+  // Copy the delivery address to the clipboard (to paste into a maps/Waze app).
+  const copyAddress = async (addr) => {
+    if (!addr) return;
+    try {
+      await navigator.clipboard.writeText(addr);
+      addToast('تم نسخ العنوان');
+    } catch {
+      addToast('تعذّر النسخ — انسخه يدوياً', 'error');
+    }
+  };
+
   const handleStatusChange = async (row, newStatus) => {
     // If confirming delivery, show confirmation flow
     if (newStatus === 'تم التوصيل') {
@@ -633,7 +644,15 @@ function DeliveriesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{r.client_name}</span> },
               { key: 'client_phone', label: 'الهاتف', sortable: true, cell: (r) => <span style={{ direction: 'ltr', display: 'inline-block' }}>{r.client_phone}</span> },
-              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true },
+              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true, cell: (r) => r.address ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); copyAddress(r.address); }}
+                  title="اضغط لنسخ العنوان"
+                  style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
+                >
+                  {r.address} 📋
+                </span>
+              ) : '—' },
               { key: 'items', label: 'الأصناف', sortable: true, fullWidth: true },
               { key: 'total_amount', label: 'المبلغ', align: 'end', sortable: true, cell: (r) => r.total_amount ? `${formatNumber(r.total_amount)} €` : '—' },
               {
