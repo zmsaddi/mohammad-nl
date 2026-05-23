@@ -247,6 +247,17 @@ html, body {
   padding: 9px 4px;
   min-height: 40px;
 }
+/* Safety net: if a page wraps its action buttons in an extra flex <div>, that
+   wrapper is otherwise content-sized (a flex item of .data-card-actions), which
+   makes the 1/3 button width relative to the wrapper instead of the card. Force
+   the wrapper full-width so buttons size to the card. Pages that return buttons
+   directly (no wrapper) are unaffected. */
+.data-card-actions > div {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 
 /* Sidebar */
 .sidebar {

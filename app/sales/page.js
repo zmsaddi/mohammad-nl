@@ -903,7 +903,7 @@ function SalesContent() {
               { key: 'lifecycle', label: 'المرحلة', fullWidth: true, cell: (r) => <OrderLifecycle saleStatus={r.status || 'محجوز'} deliveryStatus={r.delivery_status} hasInvoice={!!r.invoice_ref_code} /> },
             ]}
             actions={(row) => (
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              <>
                 <button className="btn btn-sm" style={{ background: '#25d366', color: 'white' }} onClick={() => shareWhatsApp(row)} title="مشاركة عبر واتساب">واتساب</button>
                 {/* Confirm-delivery shortcut — admin/manager only, while the order
                     is still awaiting delivery. Opens the same amount→VIN flow as
@@ -931,7 +931,7 @@ function SalesContent() {
                 {(row.status || 'محجوز') === 'مؤكد' && row.invoice_ref_code && (
                   <button className="btn btn-sm" style={{ background: '#2563eb', color: '#fff' }} onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}>فاتورة PDF</button>
                 )}
-              </div>
+              </>
             )}
           />
           <Pagination
