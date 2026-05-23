@@ -137,7 +137,7 @@ html, body {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 14px;
+  padding: 18px 16px;
   margin-bottom: 0;
 }
 /* DataView: a card that opens a detail/row action when tapped */
@@ -155,7 +155,7 @@ html, body {
 .data-card-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px 12px;
+  gap: 11px 14px;
 }
 .data-card-field {
   display: flex;
@@ -232,6 +232,8 @@ html, body {
   text-align: center;
   white-space: normal;
   line-height: 1.25;
+  padding: 9px 8px;
+  min-height: 38px;
 }
 
 /* Sidebar */

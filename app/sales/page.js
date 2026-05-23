@@ -912,7 +912,7 @@ function SalesContent() {
                   && deliveriesBySale[row.id]
                   && deliveriesBySale[row.id].status !== 'تم التوصيل'
                   && deliveriesBySale[row.id].status !== 'ملغي' && (
-                  <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff' }} onClick={() => setConfirmDeliveryRow(deliveriesBySale[row.id])}>تأكيد التسليم</button>
+                  <button className="btn btn-sm" style={{ background: '#fde047', color: '#713f12', border: '1px solid #f59e0b', fontWeight: 700 }} onClick={() => setConfirmDeliveryRow(deliveriesBySale[row.id])}>تأكيد التسليم</button>
                 )}
                 {/* Edit ONLY before delivery (محجوز). A delivered order (مؤكد) is
                     final — it's paid + invoiced; the only post-delivery change is
