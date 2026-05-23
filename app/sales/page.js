@@ -901,31 +901,15 @@ function SalesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true },
               { key: 'item', label: 'الصنف', sortable: true, fullWidth: true },
-              // Delivery address — tap the text to COPY it; awaiting orders also
-              // get a Waze chip that opens Waze and navigates straight there.
-              { key: 'delivery_address', label: 'العنوان', fullWidth: true, cell: (r) => {
-                if (!r.delivery_address) return '—';
-                const awaiting = (r.status || 'محجوز') === 'محجوز';
-                return (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span
-                      onClick={(e) => { e.stopPropagation(); copyAddress(r.delivery_address); }}
-                      title="اضغط لنسخ العنوان"
-                      style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
-                    >{r.delivery_address} 📋</span>
-                    {awaiting && (
-                      <a
-                        href={`https://waze.com/ul?q=${encodeURIComponent(r.delivery_address)}&navigate=yes`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title="افتح Waze ووجّه مباشرة"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#33ccff', color: '#06283d', fontWeight: 700, padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                      >🧭 Waze</a>
-                    )}
-                  </span>
-                );
-              } },
+              // Delivery address — tap the text itself to copy it (no button).
+              // (Waze moved into the action buttons row below — button #6.)
+              { key: 'delivery_address', label: 'العنوان', fullWidth: true, cell: (r) => r.delivery_address ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); copyAddress(r.delivery_address); }}
+                  title="اضغط لنسخ العنوان"
+                  style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
+                >{r.delivery_address} 📋</span>
+              ) : '—' },
               { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 700 }}>{formatNumber(r.total)} €</span> },
               {
                 key: 'status', label: 'الحالة', sortable: true,
@@ -966,6 +950,17 @@ function SalesContent() {
                 {/* After delivery: the invoice replaces the delete action. */}
                 {(row.status || 'محجوز') === 'مؤكد' && row.invoice_ref_code && (
                   <button className="btn btn-sm" style={{ background: '#2563eb', color: '#fff' }} onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}>فاتورة PDF</button>
+                )}
+                {/* Button #6 — Waze: navigate straight to the delivery address.
+                    Only for awaiting orders that have an address. */}
+                {(row.status || 'محجوز') === 'محجوز' && row.delivery_address && (
+                  <a
+                    className="btn btn-sm"
+                    href={`https://waze.com/ul?q=${encodeURIComponent(row.delivery_address)}&navigate=yes`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ background: '#33ccff', color: '#06283d', fontWeight: 700, textDecoration: 'none' }}
+                  >🧭 Waze</a>
                 )}
               </>
             )}

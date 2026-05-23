@@ -644,29 +644,14 @@ function DeliveriesContent() {
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{r.client_name}</span> },
               { key: 'client_phone', label: 'الهاتف', sortable: true, cell: (r) => <span style={{ direction: 'ltr', display: 'inline-block' }}>{r.client_phone}</span> },
-              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true, cell: (r) => {
-                if (!r.address) return '—';
-                const awaiting = r.status !== 'تم التوصيل' && r.status !== 'ملغي';
-                return (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span
-                      onClick={(e) => { e.stopPropagation(); copyAddress(r.address); }}
-                      title="اضغط لنسخ العنوان"
-                      style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
-                    >{r.address} 📋</span>
-                    {awaiting && (
-                      <a
-                        href={`https://waze.com/ul?q=${encodeURIComponent(r.address)}&navigate=yes`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title="افتح Waze ووجّه مباشرة"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#33ccff', color: '#06283d', fontWeight: 700, padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                      >🧭 Waze</a>
-                    )}
-                  </span>
-                );
-              } },
+              // Address — tap the text itself to copy it (Waze moved to the actions row).
+              { key: 'address', label: 'العنوان', sortable: true, fullWidth: true, cell: (r) => r.address ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); copyAddress(r.address); }}
+                  title="اضغط لنسخ العنوان"
+                  style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}
+                >{r.address} 📋</span>
+              ) : '—' },
               { key: 'items', label: 'الأصناف', sortable: true, fullWidth: true },
               { key: 'total_amount', label: 'المبلغ', align: 'end', sortable: true, cell: (r) => r.total_amount ? `${formatNumber(r.total_amount)} €` : '—' },
               {
@@ -707,6 +692,16 @@ function DeliveriesContent() {
               <>
                 {isBankPending(row) && (
                   <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem', flexBasis: '100%' }}>بنك: بانتظار التأكيد</span>
+                )}
+                {/* Waze — navigate straight to the address (awaiting deliveries only). */}
+                {row.status !== 'تم التوصيل' && row.status !== 'ملغي' && row.address && (
+                  <a
+                    className="btn btn-sm"
+                    href={`https://waze.com/ul?q=${encodeURIComponent(row.address)}&navigate=yes`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ background: '#33ccff', color: '#06283d', fontWeight: 700, textDecoration: 'none' }}
+                  >🧭 Waze</a>
                 )}
                 {canAssignDriver && isBankPending(row) && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
