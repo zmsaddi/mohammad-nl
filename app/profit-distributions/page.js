@@ -640,7 +640,7 @@ function ProfitDistributionsContent() {
             <p>أنشئ أول توزيع من النموذج أعلاه</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '12px' }}>
             {paginatedRows.map((d) => (
               <div key={d.group_id} style={{
                 background: '#f8fafc',
@@ -664,7 +664,7 @@ function ProfitDistributionsContent() {
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>بواسطة: {d.created_by}</div>
                 </div>
                 {/* Recipients detail */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
                   {d.recipients.map((r, i) => (
                     <div key={i} style={{
                       background: 'white',

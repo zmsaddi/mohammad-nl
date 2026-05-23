@@ -121,6 +121,18 @@ html, body {
     display: flex;
   }
 }
+/* Full-width card field: spans both columns of the card grid. Use it for long
+   text (address, items, description, notes) and for interactive controls
+   (status/driver dropdowns) so they aren't cramped into a half column. */
+.data-card-field.dv-field-full {
+  grid-column: 1 / -1;
+}
+/* Interactive controls inside a card never overflow their field; in a
+   full-width field they fill it instead of sitting tiny. */
+.data-card-value select { max-width: 100%; }
+.dv-field-full .data-card-value > select,
+.dv-field-full .data-card-value > div { width: 100%; }
+.dv-field-full .data-card-value > div > select { width: 100%; box-sizing: border-box; }
 .data-card {
   background: white;
   border: 1px solid #e2e8f0;

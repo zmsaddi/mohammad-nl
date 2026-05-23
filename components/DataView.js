@@ -26,6 +26,9 @@
 //   sortable?: boolean,         // (kept for compatibility; sorting is via SortControl)
 //   mobileHide?: boolean,       // DESKTOP-ONLY column: shown on the wide card,
 //                               // hidden on the compact phone card.
+//   fullWidth?: boolean,        // field spans both columns of the card grid —
+//                               // for long text + dropdowns (e.g. address,
+//                               // items, status/driver selects).
 // }]
 // rows
 // actions?: (row) => ReactNode  // per-row buttons (card actions row)
@@ -75,7 +78,10 @@ export default function DataView({
         >
           <div className="data-card-fields">
             {columns.map((col) => (
-              <div key={col.key} className={`data-card-field${col.mobileHide ? ' dv-desktop-field' : ''}`}>
+              <div
+                key={col.key}
+                className={`data-card-field${col.mobileHide ? ' dv-desktop-field' : ''}${col.fullWidth ? ' dv-field-full' : ''}`}
+              >
                 <span className="data-card-label">{col.label}</span>
                 <div className="data-card-value">{renderCell(col, row)}</div>
               </div>

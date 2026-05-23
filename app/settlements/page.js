@@ -7,7 +7,6 @@ import { formatNumber, getTodayDate, numberInputProps } from '@/lib/utils';
 import { useSortedRows } from '@/lib/use-sorted-rows';
 import SortControl from '@/components/SortControl';
 import { useAutoRefresh } from '@/lib/use-auto-refresh';
-import DataCardList from '@/components/DataCardList';
 import DataView from '@/components/DataView';
 import PageSkeleton from '@/components/PageSkeleton';
 import Pagination, { usePagination } from '@/components/Pagination';
@@ -95,7 +94,7 @@ function SettlementsContent() {
                         amountNum > availableCredit + 0.01;
 
   // Item 3 — click-to-sort on the settlements history table, default newest first
-  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, setSort, sortConfig } = useSortedRows(
     Array.isArray(settlements) ? settlements : [],
     { key: 'date', direction: 'desc' }
   );
@@ -382,62 +381,24 @@ function SettlementsContent() {
             <div className="empty-state"><h3>لا توجد تسويات</h3></div>
           ) : (
             <>
-            {/* PA-02: mobile card fallback */}
-            <DataCardList
+            <DataView
               rows={paginatedRows}
-              fields={[
-                { key: 'date', label: 'التاريخ' },
-                { key: 'type', label: 'النوع', format: (v) => TYPES[v]?.label || v },
-                { key: 'username', label: 'المستخدم' },
-                { key: 'description', label: 'الوصف' },
-                { key: 'amount', label: 'المبلغ', format: (v) => `${formatNumber(v)} €` },
-                { key: 'notes', label: 'ملاحظات' },
+              rowKey={(s) => s.id}
+              emptyMessage="لا توجد تسويات"
+              columns={[
+                { key: 'id', label: '#', sortable: true, mobileHide: true },
+                { key: 'date', label: 'التاريخ', sortable: true },
+                { key: 'type', label: 'النوع', sortable: true, cell: (s) => { const t = TYPES[s.type]; return <StatusBadge status={t?.label || s.type} bg={t?.bg} color={t?.color} />; } },
+                { key: 'username', label: 'المستخدم', sortable: true, cell: (s) => <span style={{ fontWeight: 600 }}>{s.username || '-'}</span> },
+                { key: 'description', label: 'الوصف', sortable: true, fullWidth: true },
+                { key: 'amount', label: 'المبلغ', align: 'end', sortable: true, cell: (s) => <span style={{ fontWeight: 700 }}>{formatNumber(s.amount)} €</span> },
+                { key: 'settled_by', label: 'بواسطة', sortable: true, mobileHide: true },
+                { key: 'notes', label: 'ملاحظات', fullWidth: true, cell: (s) => s.notes || '—' },
               ]}
-              actions={(row) => (
-                <button className="btn btn-outline btn-sm" onClick={() => openDetails(row.id)}>تفاصيل</button>
+              actions={(s) => (
+                <button className="btn btn-outline btn-sm" onClick={() => openDetails(s.id)}>تفاصيل</button>
               )}
             />
-            {/* Desktop table */}
-            <div className="table-container has-card-fallback">
-              <table className="data-table">
-                <thead><tr>
-                  <th onClick={() => requestSort('id')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('id')}>#{getSortIndicator('id')}</th>
-                  <th onClick={() => requestSort('date')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('date')}>التاريخ{getSortIndicator('date')}</th>
-                  <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('type')}>النوع{getSortIndicator('type')}</th>
-                  <th onClick={() => requestSort('username')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('username')}>المستخدم{getSortIndicator('username')}</th>
-                  <th onClick={() => requestSort('description')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('description')}>الوصف{getSortIndicator('description')}</th>
-                  <th onClick={() => requestSort('amount')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('amount')}>المبلغ{getSortIndicator('amount')}</th>
-                  <th onClick={() => requestSort('settled_by')} style={{ cursor: 'pointer' }} aria-sort={getAriaSort('settled_by')}>بواسطة{getSortIndicator('settled_by')}</th>
-                  <th>ملاحظات</th>
-                  <th>التفاصيل</th>
-                </tr></thead>
-                <tbody>
-                  {paginatedRows.map((s) => {
-                    const t = TYPES[s.type];
-                    return (
-                      <tr key={s.id}>
-                        <td>{s.id}</td>
-                        <td>{s.date}</td>
-                        <td><StatusBadge status={t?.label || s.type} bg={t?.bg} color={t?.color} /></td>
-                        <td style={{ fontWeight: 600 }}>{s.username || '-'}</td>
-                        <td>{s.description}</td>
-                        <td className="number-cell" style={{ fontWeight: 700 }}>{formatNumber(s.amount)}</td>
-                        <td>{s.settled_by}</td>
-                        <td>{s.notes}</td>
-                        <td>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            onClick={() => openDetails(s.id)}
-                          >
-                            تفاصيل
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
             <Pagination
               page={page}
               totalPages={totalPages}
