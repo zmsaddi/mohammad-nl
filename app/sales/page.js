@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -21,12 +21,14 @@ import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
+import OrderLifecycle from '@/components/OrderLifecycle';
 
 const SALES_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
 function SalesContent() {
   const { data: session } = useSession();
   const addToast = useToast();
+  const router = useRouter();
   const role = session?.user?.role;
   const isAdmin = role === 'admin';
   const canSeeCosts = role === 'admin' || role === 'manager';
@@ -837,6 +839,8 @@ function SalesContent() {
                 key: 'payment_type', label: 'الدفع', sortable: true,
                 cell: (r) => <span className="status-badge" style={{ background: r.payment_type === 'بنك' ? '#dbeafe' : r.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: r.payment_type === 'بنك' ? '#1e40af' : r.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>{r.payment_type || 'كاش'}</span>,
               },
+              // Phase 1 — order lifecycle strip (بيع → توصيل → فاتورة) from sale status.
+              { key: 'lifecycle', label: 'المرحلة', fullWidth: true, cell: (r) => <OrderLifecycle status={r.status || 'محجوز'} /> },
             ]}
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -871,7 +875,14 @@ function SalesContent() {
         isOpen={!!selectedRow}
         onClose={() => setSelectedRow(null)}
         title={selectedRow ? `بيع ${selectedRow.ref_code || selectedRow.id}` : ''}
+        actions={selectedRow ? [
+          // Phase 1 — jump to the stage that needs action next.
+          ...((selectedRow.status || 'محجوز') === 'محجوز' ? [{ label: 'متابعة التوصيل ←', className: 'btn-primary', onClick: () => router.push('/deliveries') }] : []),
+          ...(selectedRow.status === 'مؤكد' ? [{ label: 'عرض الفاتورة ←', className: 'btn-outline', onClick: () => router.push('/invoices') }] : []),
+        ] : []}
         fields={selectedRow ? [
+          { type: 'node', value: <OrderLifecycle status={selectedRow.status || 'محجوز'} /> },
+          { type: 'divider' },
           { label: 'الكود', value: selectedRow.ref_code || `SL-${selectedRow.id}`, color: '#6366f1' },
           { label: 'التاريخ', value: selectedRow.date },
           { label: 'العميل', value: selectedRow.client_name },
