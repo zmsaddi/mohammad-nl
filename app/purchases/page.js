@@ -592,15 +592,11 @@ function PurchasesContent() {
               { key: 'ref_code', label: 'الكود', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{r.ref_code || `PU-${r.id}`}</span> },
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'supplier', label: 'المورد', sortable: true },
-              { key: 'item', label: 'المنتج', sortable: true },
-              { key: 'category', label: 'الفئة', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', color: '#475569' }}>{r.category || '-'}</span> },
-              { key: 'quantity', label: 'الكمية', align: 'end', sortable: true, cell: (r) => formatNumber(r.quantity) },
-              { key: 'unit_price', label: 'سعر الوحدة', align: 'end', sortable: true, mobileHide: true, cell: (r) => formatNumber(r.unit_price) },
-              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{formatNumber(r.total)} €</span> },
+              { key: 'item', label: 'المنتج', sortable: true, fullWidth: true },
+              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 700 }}>{formatNumber(r.total)} €</span> },
               { key: 'paid_amount', label: 'المدفوع', align: 'end', sortable: true, cell: (r) => <span style={{ color: '#16a34a', fontWeight: 600 }}>{formatNumber(r.paid_amount ?? r.total)} €</span> },
               { key: 'payment_status', label: 'الحالة', sortable: true, cell: (r) => <StatusBadge status={(r.payment_status || 'paid') === 'paid' ? 'مدفوع' : r.payment_status === 'partial' ? 'جزئي' : 'معلق'} /> },
               { key: 'payment_type', label: 'طريقة الدفع', sortable: true, cell: (r) => <StatusBadge status={r.payment_type || 'كاش'} /> },
-              { key: 'notes', label: 'ملاحظات', mobileHide: true },
             ]}
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px' }}>
@@ -645,6 +641,7 @@ function PurchasesContent() {
           { label: 'المورد', value: selectedRow.supplier },
           { type: 'divider' },
           { label: 'المنتج', value: selectedRow.item },
+          { label: 'الفئة', value: selectedRow.category || '-' },
           { label: 'الكمية', value: selectedRow.quantity },
           { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
           { label: 'الإجمالي', type: 'money', value: selectedRow.total },
