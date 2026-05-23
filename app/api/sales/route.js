@@ -103,14 +103,16 @@ export async function PUT(request) {
     if (rows[0].status === 'ملغي') {
       return NextResponse.json({ error: 'لا يمكن تعديل طلب ملغي' }, { status: 403 });
     }
-    // v1.2 — admin can edit confirmed sales (discount, price correction)
-    if (rows[0].status === 'مؤكد' && token.role !== 'admin') {
-      return NextResponse.json({ error: 'تعديل الطلب المؤكد يتطلب صلاحية المدير' }, { status: 403 });
+    // A delivered order is final — no edits for anyone (it's paid + invoiced).
+    // The only allowed post-delivery change is the VIN, handled separately on
+    // the invoice (PATCH /api/invoices/[id]/vin). Corrections go via cancel/return.
+    if (rows[0].status === 'مؤكد') {
+      return NextResponse.json({ error: 'لا يمكن تعديل طلب مؤكد بعد التسليم — التصحيح عبر الإلغاء/الإرجاع، أو رقم الهيكل من الفاتورة' }, { status: 403 });
     }
     if (rows[0].status === 'محجوز' && token.role === 'seller' && rows[0].created_by !== token.username) {
       return NextResponse.json({ error: 'لا يمكنك تعديل طلب غيرك' }, { status: 403 });
     }
-    await updateSale({ ...parsed.data, adminOverride: token.role === 'admin', updatedBy: token.username });
+    await updateSale({ ...parsed.data, updatedBy: token.username });
     invalidateCache();
     return NextResponse.json({ success: true });
   } catch (err) {

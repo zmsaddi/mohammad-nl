@@ -845,16 +845,22 @@ function SalesContent() {
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 <button className="btn btn-sm" style={{ background: '#25d366', color: 'white' }} onClick={() => shareWhatsApp(row)} title="مشاركة عبر واتساب">واتساب</button>
-                {(row.status || 'محجوز') !== 'ملغي' && (
-                  isAdmin || ((!isAdmin) && (role === 'seller' || role === 'manager') && (row.status || 'محجوز') === 'محجوز')
-                ) && (
+                {/* Edit ONLY before delivery (محجوز). A delivered order (مؤكد) is
+                    final — it's paid + invoiced; the only post-delivery change is
+                    the VIN, edited on the invoice. Corrections go via إلغاء/إرجاع. */}
+                {(row.status || 'محجوز') === 'محجوز' && (
                   <button className="btn btn-outline btn-sm" onClick={() => startEditSale(row)}>تعديل</button>
                 )}
                 {canCancelSale(row, currentUser) && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'soft' })}>إلغاء</button>
                 )}
-                {canCancelSale(row, currentUser) && isAdmin && (
+                {/* Permanent delete only before delivery. */}
+                {(row.status || 'محجوز') !== 'مؤكد' && canCancelSale(row, currentUser) && isAdmin && (
                   <button className="btn btn-sm" style={{ background: '#7f1d1d', color: '#fff' }} onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}>حذف نهائي</button>
+                )}
+                {/* After delivery: the invoice replaces the delete action. */}
+                {(row.status || 'محجوز') === 'مؤكد' && row.invoice_ref_code && (
+                  <button className="btn btn-outline btn-sm" onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}>فاتورة PDF</button>
                 )}
               </div>
             )}
