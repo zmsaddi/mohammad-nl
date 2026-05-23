@@ -239,7 +239,7 @@ function InvoicesContent() {
       </div>
 
       <div className="cross-nav">
-        <Link href="/sales">المبيعات &rarr;</Link>
+        <Link href="/sales">الطلبات &rarr;</Link>
         <Link href="/clients">العملاء &rarr;</Link>
       </div>
 

@@ -408,8 +408,8 @@ function SalesContent() {
   return (
     <AppLayout>
       <div className="page-header">
-        <h2>المبيعات</h2>
-        <p>بيع الدراجات والإكسسوارات وقطع الغيار</p>
+        <h2>الطلبات</h2>
+        <p>متابعة الطلبات من البيع حتى التوصيل والفاتورة</p>
       </div>
 
       {/* Add Form — collapsible (PA-01) */}
@@ -743,8 +743,31 @@ function SalesContent() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151' }}>
-            سجل المبيعات ({filteredRows.length === rows.length ? rows.length : `${filteredRows.length} من ${rows.length}`})
+            سجل الطلبات ({filteredRows.length === rows.length ? rows.length : `${filteredRows.length} من ${rows.length}`})
           </h3>
+        </div>
+
+        {/* Phase 3 — lifecycle tabs: the order stage at a glance. Each drives the
+            shared status filter (محجوز = awaiting delivery, مؤكد = completed). */}
+        <div className="tabs" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
+          {[
+            { val: 'all', label: 'الكل' },
+            { val: 'محجوز', label: 'بانتظار التوصيل' },
+            { val: 'مؤكد', label: 'مكتملة' },
+            { val: 'ملغي', label: 'ملغية' },
+          ].map((t) => {
+            const count = t.val === 'all' ? rows.length : rows.filter((r) => (r.status || 'محجوز') === t.val).length;
+            return (
+              <button
+                key={t.val}
+                type="button"
+                className={`tab ${f.status === t.val ? 'active' : ''}`}
+                onClick={() => setF('status', t.val)}
+              >
+                {t.label} ({count})
+              </button>
+            );
+          })}
         </div>
 
         {/* Filter bar — URL-synced via the shared useUrlFilters hook. Wrapped in
@@ -757,7 +780,7 @@ function SalesContent() {
             f.from && { label: `من ${f.from}`, onRemove: () => setF('from', '') },
             f.to && { label: `إلى ${f.to}`, onRemove: () => setF('to', '') },
             f.q && { label: `بحث: ${f.q}`, onRemove: () => setF('q', '') },
-            f.status !== 'all' && { label: f.status, onRemove: () => setF('status', 'all') },
+            f.status !== 'all' && { label: ({ 'محجوز': 'بانتظار التوصيل', 'مؤكد': 'مكتملة', 'ملغي': 'ملغية' })[f.status] || f.status, onRemove: () => setF('status', 'all') },
             f.pay !== 'all' && { label: ({ pending: 'معلق', partial: 'جزئي', paid: 'مدفوع', cancelled: 'ملغي' })[f.pay] || f.pay, onRemove: () => setF('pay', 'all') },
             canSeeCosts && f.seller !== 'all' && { label: f.seller, onRemove: () => setF('seller', 'all') },
           ].filter(Boolean)}
@@ -765,13 +788,8 @@ function SalesContent() {
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: '0.85rem' }}>
           <input type="date" value={f.from} onChange={(e) => setF('from', e.target.value)} aria-label="من تاريخ" className="filter-control" />
           <input type="date" value={f.to} onChange={(e) => setF('to', e.target.value)} aria-label="إلى تاريخ" className="filter-control" />
-          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في المبيعات" value={f.q} onChange={(e) => setF('q', e.target.value)} className="filter-control" />
-          <select value={f.status} onChange={(e) => setF('status', e.target.value)} aria-label="تصفية حسب الحالة" className="filter-control">
-            <option value="all">كل الحالات</option>
-            <option value="محجوز">محجوز</option>
-            <option value="مؤكد">مؤكد</option>
-            <option value="ملغي">ملغي</option>
-          </select>
+          <input type="text" placeholder="بحث عميل / منتج / كود..." aria-label="بحث في الطلبات" value={f.q} onChange={(e) => setF('q', e.target.value)} className="filter-control" />
+          {/* status filter now lives in the lifecycle tabs above */}
           <select value={f.pay} onChange={(e) => setF('pay', e.target.value)} aria-label="تصفية حسب حالة الدفع" className="filter-control">
             <option value="all">كل حالات الدفع</option>
             <option value="pending">معلق</option>
