@@ -839,8 +839,8 @@ function SalesContent() {
                 key: 'payment_type', label: 'الدفع', sortable: true,
                 cell: (r) => <span className="status-badge" style={{ background: r.payment_type === 'بنك' ? '#dbeafe' : r.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: r.payment_type === 'بنك' ? '#1e40af' : r.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>{r.payment_type || 'كاش'}</span>,
               },
-              // Phase 1 — order lifecycle strip (بيع → توصيل → فاتورة) from sale status.
-              { key: 'lifecycle', label: 'المرحلة', fullWidth: true, cell: (r) => <OrderLifecycle status={r.status || 'محجوز'} /> },
+              // Order lifecycle strip (بيع → توصيل → فاتورة) — real delivery status + invoice.
+              { key: 'lifecycle', label: 'المرحلة', fullWidth: true, cell: (r) => <OrderLifecycle saleStatus={r.status || 'محجوز'} deliveryStatus={r.delivery_status} hasInvoice={!!r.invoice_ref_code} /> },
             ]}
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -876,12 +876,15 @@ function SalesContent() {
         onClose={() => setSelectedRow(null)}
         title={selectedRow ? `بيع ${selectedRow.ref_code || selectedRow.id}` : ''}
         actions={selectedRow ? [
-          // Phase 1 — jump to the stage that needs action next.
-          ...((selectedRow.status || 'محجوز') === 'محجوز' ? [{ label: 'متابعة التوصيل ←', className: 'btn-primary', onClick: () => router.push('/deliveries') }] : []),
-          ...(selectedRow.status === 'مؤكد' ? [{ label: 'عرض الفاتورة ←', className: 'btn-outline', onClick: () => router.push('/invoices') }] : []),
+          // Phase 2 — act on the stage that's still open. Follow the delivery
+          // until it's done; open the real invoice PDF once it exists.
+          ...(selectedRow.status !== 'ملغي' && selectedRow.delivery_status !== 'تم التوصيل'
+            ? [{ label: 'متابعة التوصيل ←', className: 'btn-primary', onClick: () => router.push('/deliveries') }] : []),
+          ...(selectedRow.invoice_ref_code
+            ? [{ label: 'عرض الفاتورة (PDF)', className: 'btn-outline', onClick: () => window.open(`/api/invoices/${selectedRow.invoice_ref_code}/pdf`, '_blank') }] : []),
         ] : []}
         fields={selectedRow ? [
-          { type: 'node', value: <OrderLifecycle status={selectedRow.status || 'محجوز'} /> },
+          { type: 'node', value: <OrderLifecycle saleStatus={selectedRow.status || 'محجوز'} deliveryStatus={selectedRow.delivery_status} hasInvoice={!!selectedRow.invoice_ref_code} /> },
           { type: 'divider' },
           { label: 'الكود', value: selectedRow.ref_code || `SL-${selectedRow.id}`, color: '#6366f1' },
           { label: 'التاريخ', value: selectedRow.date },
@@ -901,6 +904,10 @@ function SalesContent() {
           { type: 'divider' },
           { label: 'حالة الطلب', type: 'badge', value: selectedRow.status || 'محجوز', bg: selectedRow.status === 'مؤكد' ? '#dcfce7' : selectedRow.status === 'ملغي' ? '#fee2e2' : '#fef3c7', color: selectedRow.status === 'مؤكد' ? '#16a34a' : selectedRow.status === 'ملغي' ? '#dc2626' : '#d97706' },
           { label: 'طريقة الدفع', type: 'badge', value: selectedRow.payment_type || 'كاش', bg: selectedRow.payment_type === 'بنك' ? '#dbeafe' : selectedRow.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: selectedRow.payment_type === 'بنك' ? '#1e40af' : selectedRow.payment_type === 'آجل' ? '#d97706' : '#16a34a' },
+          { type: 'divider' },
+          { label: 'حالة التوصيل', value: selectedRow.delivery_status || 'قيد الانتظار' },
+          { label: 'السائق', value: selectedRow.delivery_driver || 'لم يُعيَّن' },
+          { label: 'الفاتورة', value: selectedRow.invoice_ref_code || 'تصدر بعد التوصيل', color: selectedRow.invoice_ref_code ? '#16a34a' : '#94a3b8' },
           ...(selectedRow.created_by ? [{ label: 'بواسطة', value: selectedRow.created_by }] : []),
           ...(selectedRow.notes ? [{ label: 'ملاحظات', value: selectedRow.notes }] : []),
         ] : []}
