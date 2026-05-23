@@ -23,6 +23,7 @@ import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
 import OrderLifecycle from '@/components/OrderLifecycle';
 import ConfirmDeliveryDialog from '@/components/ConfirmDeliveryDialog';
+import WazeButton from '@/components/WazeButton';
 
 const SALES_FILTERS = { from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, q: { default: '', debounce: 300 }, status: { default: 'all' }, pay: { default: 'all' }, seller: { default: 'all' } };
 
@@ -953,15 +954,7 @@ function SalesContent() {
                 )}
                 {/* Button #6 — Waze: navigate straight to the delivery address.
                     Only for awaiting orders that have an address. */}
-                {(row.status || 'محجوز') === 'محجوز' && row.delivery_address && (
-                  <a
-                    className="btn btn-sm"
-                    href={`https://waze.com/ul?q=${encodeURIComponent(row.delivery_address)}&navigate=yes`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ background: '#33ccff', color: '#06283d', fontWeight: 700, textDecoration: 'none' }}
-                  >🧭 Waze</a>
-                )}
+                {(row.status || 'محجوز') === 'محجوز' && <WazeButton address={row.delivery_address} />}
               </>
             )}
           />
