@@ -212,7 +212,7 @@ function SalesContent() {
   }), [rows, f.from, f.to, f.q, f.status, f.pay, f.seller]);
 
   // Item 3 — click-to-sort, defaulting to newest first
-  const { sortedRows, requestSort, setSort, sortConfig, getSortIndicator, getAriaSort } = useSortedRows(
+  const { sortedRows, setSort, sortConfig } = useSortedRows(
     filteredRows,
     { key: 'date', direction: 'desc' }
   );
@@ -815,13 +815,11 @@ function SalesContent() {
           </div>
         ) : (
           <>
-          {/* Unified mobile-first DataView. Cost/profit columns stay gated to
-              canSeeCosts AND hidden on mobile cards (mobileHide) — same as the
-              old card list, which never surfaced them. unit_price is desktop-
-              only too. Row click opens the detail modal. */}
+          {/* Lean summary card — just what the owner scans at a glance (who,
+              what, how much, status). The full breakdown (quantity, unit price,
+              paid/remaining, cost/profit) lives in the detail modal on click. */}
           <DataView
             rows={paginatedRows}
-            sort={{ requestSort, getAriaSort, getSortIndicator }}
             onRowClick={(row) => setSelectedRow(row)}
             rowKey={(row) => row.id}
             emptyMessage="لا توجد مبيعات"
@@ -829,14 +827,8 @@ function SalesContent() {
               { key: 'ref_code', label: 'الكود', sortable: true, cell: (r) => <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>{r.ref_code || `SL-${r.id}`}</span> },
               { key: 'date', label: 'التاريخ', sortable: true },
               { key: 'client_name', label: 'العميل', sortable: true },
-              { key: 'item', label: 'الصنف', sortable: true },
-              { key: 'quantity', label: 'الكمية', align: 'end', sortable: true, cell: (r) => formatNumber(r.quantity) },
-              { key: 'unit_price', label: 'سعر الوحدة', align: 'end', sortable: true, mobileHide: true, cell: (r) => `${formatNumber(r.unit_price)} €` },
-              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 600 }}>{formatNumber(r.total)} €</span> },
-              { key: 'paid_amount', label: 'المدفوع', align: 'end', sortable: true, cell: (r) => `${formatNumber(r.paid_amount)} €` },
-              { key: 'remaining', label: 'المتبقي', align: 'end', sortable: true, cell: (r) => <span style={{ color: (r.remaining || 0) > 0 ? '#dc2626' : undefined }}>{formatNumber(r.remaining)} €</span> },
-              canSeeCosts && { key: 'cost_total', label: 'التكلفة', align: 'end', sortable: true, mobileHide: true, cell: (r) => <span style={{ color: '#94a3b8' }}>{formatNumber(r.cost_total)} €</span> },
-              canSeeCosts && { key: 'profit', label: 'الربح', align: 'end', sortable: true, mobileHide: true, cell: (r) => <span style={{ color: (r.profit || 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>{formatNumber(r.profit)} €</span> },
+              { key: 'item', label: 'الصنف', sortable: true, fullWidth: true },
+              { key: 'total', label: 'الإجمالي', align: 'end', sortable: true, cell: (r) => <span style={{ fontWeight: 700 }}>{formatNumber(r.total)} €</span> },
               {
                 key: 'status', label: 'الحالة', sortable: true,
                 cell: (r) => <span className="status-badge" style={{ background: r.status === 'مؤكد' ? '#dcfce7' : r.status === 'ملغي' ? '#fee2e2' : '#fef3c7', color: r.status === 'مؤكد' ? '#16a34a' : r.status === 'ملغي' ? '#dc2626' : '#d97706' }}>{r.status || 'محجوز'}</span>,
@@ -845,7 +837,7 @@ function SalesContent() {
                 key: 'payment_type', label: 'الدفع', sortable: true,
                 cell: (r) => <span className="status-badge" style={{ background: r.payment_type === 'بنك' ? '#dbeafe' : r.payment_type === 'آجل' ? '#fef3c7' : '#dcfce7', color: r.payment_type === 'بنك' ? '#1e40af' : r.payment_type === 'آجل' ? '#d97706' : '#16a34a' }}>{r.payment_type || 'كاش'}</span>,
               },
-            ].filter(Boolean)}
+            ]}
             actions={(row) => (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 <button className="btn btn-sm" style={{ background: '#25d366', color: 'white' }} onClick={() => shareWhatsApp(row)} title="مشاركة عبر واتساب">واتساب</button>
@@ -888,6 +880,8 @@ function SalesContent() {
           { label: 'الكمية', value: selectedRow.quantity },
           { label: 'سعر الوحدة', type: 'money', value: selectedRow.unit_price },
           { label: 'الإجمالي', type: 'money', value: selectedRow.total },
+          { label: 'المدفوع', type: 'money', value: selectedRow.paid_amount },
+          { label: 'المتبقي', type: 'money', value: selectedRow.remaining, color: (selectedRow.remaining || 0) > 0 ? '#dc2626' : undefined },
           ...(canSeeCosts ? [
             { type: 'divider' },
             { label: 'التكلفة', type: 'money', value: selectedRow.cost_total, color: '#94a3b8' },
