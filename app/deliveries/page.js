@@ -18,6 +18,7 @@ import PageSkeleton from '@/components/PageSkeleton';
 import ErrorState from '@/components/ErrorState';
 import FilterSheet from '@/components/FilterSheet';
 import Pagination, { usePagination } from '@/components/Pagination';
+import WazeButton from '@/components/WazeButton';
 
 const DELIVERY_FILTERS = { status: { default: '' }, from: { default: '', debounce: 400 }, to: { default: '', debounce: 400 }, driver: { default: 'all' }, bank: { default: '' } };
 
@@ -694,15 +695,7 @@ function DeliveriesContent() {
                   <span className="status-badge" style={{ background: '#ffedd5', color: '#ea580c', fontSize: '0.72rem', flexBasis: '100%' }}>بنك: بانتظار التأكيد</span>
                 )}
                 {/* Waze — navigate straight to the address (awaiting deliveries only). */}
-                {row.status !== 'تم التوصيل' && row.status !== 'ملغي' && row.address && (
-                  <a
-                    className="btn btn-sm"
-                    href={`https://waze.com/ul?q=${encodeURIComponent(row.address)}&navigate=yes`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ background: '#33ccff', color: '#06283d', fontWeight: 700, textDecoration: 'none' }}
-                  >🧭 Waze</a>
-                )}
+                {row.status !== 'تم التوصيل' && row.status !== 'ملغي' && <WazeButton address={row.address} />}
                 {canAssignDriver && isBankPending(row) && (
                   <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', border: 'none' }} onClick={() => handleConfirmBank(row.sale_id)}>✓ تأكيد البنك</button>
                 )}
