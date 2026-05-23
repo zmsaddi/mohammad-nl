@@ -272,7 +272,9 @@ function SalesContent() {
       clientName: row.client_name || '',
       clientPhone: '',
       clientEmail: '',
-      clientAddress: '',
+      // Pre-fill the ORDER's actual delivery address (it lives on the delivery),
+      // not just the client's stored address — so editing changes the right value.
+      clientAddress: row.delivery_address || '',
       item: row.item || '',
       quantity: String(row.quantity ?? ''),
       unitPrice: String(row.unit_price ?? ''),
@@ -280,14 +282,14 @@ function SalesContent() {
       downPaymentExpected: String(row.down_payment_expected ?? ''),
       notes: row.notes || '',
     });
-    // Fill client details from the clients list
+    // Fill client details from the clients list (keep the order's address if set).
     const client = clients.find((c) => c.name === row.client_name);
     if (client) {
       setForm((prev) => ({
         ...prev,
         clientPhone: client.phone || '',
         clientEmail: client.email || '',
-        clientAddress: client.address || '',
+        clientAddress: prev.clientAddress || client.address || '',
       }));
     }
   };
@@ -341,6 +343,7 @@ function SalesContent() {
             item: form.item,
             quantity: form.quantity,
             unitPrice: form.unitPrice,
+            clientAddress: form.clientAddress,
             notes: form.notes,
             downPaymentExpected: form.downPaymentExpected,
           }),
