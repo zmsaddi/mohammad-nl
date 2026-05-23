@@ -102,7 +102,7 @@ html, body {
 }
 @media (min-width: 769px) {
   .data-card-list {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 14px;
   }
 }
@@ -218,15 +218,20 @@ html, body {
 .data-card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #f1f5f9;
 }
+/* Cap action buttons at 3 per row (basis ~30% → a 4th wraps to the next line),
+   while still growing to fill the row when there are 1–2. So 5 buttons lay out
+   as 3 + 2 across two lines instead of stacking one per line. */
 .data-card-actions .btn {
-  flex: 1;
+  flex: 1 1 30%;
   min-width: 0;
   text-align: center;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 /* Sidebar */
