@@ -102,7 +102,7 @@ html, body {
 }
 @media (min-width: 769px) {
   .data-card-list {
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 14px;
   }
 }
@@ -223,16 +223,18 @@ html, body {
   padding-top: 10px;
   border-top: 1px solid #f1f5f9;
 }
-/* Cap action buttons at 3 per row (basis ~30% → a 4th wraps to the next line),
-   while still growing to fill the row when there are 1–2. So 5 buttons lay out
-   as 3 + 2 across two lines instead of stacking one per line. */
+/* Fixed-size action buttons: every button is exactly one third of the row
+   (minus the two 6px gaps) and does NOT grow/shrink — so buttons are the same
+   size and position in every card regardless of how many there are. Max 3 per
+   row; a 4th wraps to the next line (5 → 3 + 2). */
 .data-card-actions .btn {
-  flex: 1 1 30%;
+  flex: 0 0 calc((100% - 12px) / 3);
   min-width: 0;
   text-align: center;
   white-space: normal;
   line-height: 1.25;
-  padding: 9px 8px;
+  font-size: 0.75rem;
+  padding: 9px 6px;
   min-height: 38px;
 }
 

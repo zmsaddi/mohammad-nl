@@ -925,11 +925,11 @@ function SalesContent() {
                 )}
                 {/* Permanent delete only before delivery. */}
                 {(row.status || 'محجوز') !== 'مؤكد' && canCancelSale(row, currentUser) && isAdmin && (
-                  <button className="btn btn-sm" style={{ background: '#7f1d1d', color: '#fff' }} onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}>حذف نهائي</button>
+                  <button className="btn btn-sm" style={{ background: '#111827', color: '#fff' }} onClick={() => setCancelSale({ saleId: row.id, invoiceMode: 'delete' })}>حذف نهائي</button>
                 )}
                 {/* After delivery: the invoice replaces the delete action. */}
                 {(row.status || 'محجوز') === 'مؤكد' && row.invoice_ref_code && (
-                  <button className="btn btn-outline btn-sm" onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}>فاتورة PDF</button>
+                  <button className="btn btn-sm" style={{ background: '#2563eb', color: '#fff' }} onClick={() => window.open(`/api/invoices/${row.invoice_ref_code}/pdf`, '_blank')}>فاتورة PDF</button>
                 )}
               </div>
             )}
