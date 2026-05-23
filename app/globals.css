@@ -222,20 +222,30 @@ html, body {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #f1f5f9;
+  /* Lets the buttons size their font to the card width (cqi units below). */
+  container-type: inline-size;
 }
-/* Fixed-size action buttons: every button is exactly one third of the row
-   (minus the two 6px gaps) and does NOT grow/shrink — so buttons are the same
-   size and position in every card regardless of how many there are. Max 3 per
-   row; a 4th wraps to the next line (5 → 3 + 2). */
+/* Equal action buttons: every button is exactly one third of the row (minus
+   the two 6px gaps) and never grows/shrinks — same width everywhere. The label
+   stays on ONE line and its font ADAPTS to the card width (clamp + cqi), so all
+   buttons keep the same height (no wrapping) regardless of label length. Max 3
+   per row; a 4th wraps to the next line (5 → 3 + 2). The button TYPE/colour may
+   differ by order state — that's expected. */
 .data-card-actions .btn {
   flex: 0 0 calc((100% - 12px) / 3);
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  white-space: normal;
-  line-height: 1.25;
-  font-size: 0.75rem;
-  padding: 9px 6px;
-  min-height: 38px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  font-size: 0.72rem;                       /* fallback */
+  font-size: clamp(0.6rem, 4cqi, 0.8rem);   /* adapts to the card width */
+  padding: 9px 4px;
+  min-height: 40px;
 }
 
 /* Sidebar */
